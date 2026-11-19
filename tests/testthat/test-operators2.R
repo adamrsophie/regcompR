@@ -1,0 +1,29 @@
+test_that("convolution, splice and copula operators are exact", {
+  d <- distribution(convolve_dist("normal", "exponential"), mu.1 = .3, sigma.1 = 1, lambda.2 = 2)
+  expect_equal(log_prob(d, c(-1, .5, 2)), log_prob(distribution("ex_gaussian", mu = .3, sigma = 1, nu = .5), c(-1, .5, 2)), tolerance = 1e-8)
+  dp <- distribution(convolve_dist("poisson", "poisson"), lambda.1 = 1.5, lambda.2 = 2.2)
+  expect_equal(log_prob(dp, 0:10), dpois(0:10, 3.7, log = TRUE), tolerance = 1e-10)
+  ds <- distribution(splice("lognormal", "lomax"), mu.b = 0, sigma.b = 1, scale.t = 2, alpha.t = 3, threshold = 1.5, w = .6)
+  expect_equal(integrate(function(x) prob(ds, x), 0, 1.5)$value + integrate(function(x) prob(ds, x), 1.5, Inf)$value, 1, tolerance = 1e-6)
+  cg <- copula_dist("normal", "normal", "gaussian")
+  Y <- cbind(c(.2, -1, 1.5), c(.5, .3, -2))
+  expect_equal(cg$lpdf(Y, list(mu.1 = 0, sigma.1 = 1, mu.2 = 1, sigma.2 = 2, rho = .6)),
+               mvtnorm::dmvnorm(Y, c(0, 1), matrix(c(1, 1.2, 1.2, 4), 2), log = TRUE), tolerance = 1e-10)
+  cd <- copula_dist("poisson", "poisson", "frank")
+  G <- as.matrix(expand.grid(0:40, 0:40))
+  expect_equal(sum(exp(cd$lpdf(G, list(lambda.1 = 2, lambda.2 = 3, theta = 4)))), 1, tolerance = 1e-8)
+  skip_if_not_installed("copula")
+  cc <- copula_dist("exponential", "exponential", "clayton"); Y <- cbind(c(.2, 1, 2.5), c(.7, .3, 1.1))
+  expect_equal(cc$lpdf(Y, list(lambda.1 = 1, lambda.2 = 1, theta = 2)),
+               log(copula::dCopula(pexp(Y), copula::claytonCopula(2))) + rowSums(dexp(Y, log = TRUE)), tolerance = 1e-10)
+})
+
+test_that("mixture cure model matches flexsurvcure", {
+  skip_on_cran(); skip_if_not_installed("flexsurvcure")
+  set.seed(1); n <- 600; cured <- runif(n) < .3; t <- ifelse(cured, Inf, rweibull(n, 1.5, 2)); cs <- runif(n, 0, 6)
+  dd <- data.frame(time = pmin(t, cs), event = as.numeric(t <= cs))
+  fit <- regcomp(surv(time, event) ~ 1, family = cure("weibull"), data = dd)
+  fc <- flexsurvcure::flexsurvcure(survival::Surv(time, event) ~ 1, data = dd, dist = "weibull", mixture = TRUE)
+  expect_equal(fit$logLik, fc$loglik, tolerance = 1e-6)
+  expect_equal(unname(plogis(fit$coefficients["cure:(Intercept)"])), unname(fc$res["theta", 1]), tolerance = 1e-4)
+})
