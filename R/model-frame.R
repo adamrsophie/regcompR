@@ -211,7 +211,10 @@ build_predictor <- function(rhs, data, par, xlev = NULL, smooth_specs = NULL,
       W <- Matrix::sparseMatrix(i = ii[keep], j = ll[keep], x = ww[keep], dims = c(length(G[[1]]), length(lev)))
       gi <- rep(NA_integer_, length(G[[1]]))
     } else {
-      g <- eval_group(gexpr, data, env)
+      # New data without the grouping columns: every row is a new group
+      # (random effect zero), as for unseen levels.
+      g <- if (is.null(re_levels[[key]])) eval_group(gexpr, data, env) else
+        tryCatch(eval_group(gexpr, data, env), error = function(e) rep(NA, nrow(data)))
       lev <- if (!is.null(re_levels[[key]])) re_levels[[key]] else
         levels(droplevels(as.factor(g)))
       gi <- match(as.character(g), lev)

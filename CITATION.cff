@@ -1,0 +1,71 @@
+# -----------------------------------------------------------------------------
+# Citation File Format (https://citation-file-format.github.io/).
+# Machine-readable citation metadata for GitHub, Zenodo, and FAIR tooling.
+# The R-level citation lives in inst/CITATION; Zenodo deposit metadata is in
+# .zenodo.json.
+# -----------------------------------------------------------------------------
+cff-version: 1.2.0
+message: 'To cite the regcompR package in publications use:'
+type: software
+license: GPL-3.0-only
+title: 'regcompR: Distributional Regression with a Verified Registry of Probability Distributions'
+version: 0.1.0
+date-released: '2026-11-19'
+abstract: >-
+  A framework for distributional regression in which every parameter of a
+  response distribution can depend on covariates through its own formula,
+  with random effects in any parameter. Distributions are held in a machine
+  readable registry that records support, parameter domains, links, moments
+  and their existence conditions, references and validation status.
+  Operators build new laws from old ones. Models are fitted by maximum or
+  penalized likelihood with a Laplace approximation, through TMB, or by
+  Bayesian inference with generated Stan and BUGS programs.
+authors:
+  - family-names: Sophie
+    given-names: Adam R
+    email: adamrsophie@gmail.com
+repository-code: https://github.com/adamrsophie/regcompR
+url: https://adamrsophie.github.io/regcompR/
+keywords:
+  - distributional-regression
+  - gamlss
+  - probability-distributions
+  - mixed-models
+  - count-data
+  - ordinal-regression
+  - survival-analysis
+  - bayesian-inference
+  - stan
+  - r
+references:
+  - type: article
+    title: 'Generalized additive models for location, scale and shape'
+    authors:
+      - family-names: Rigby
+        given-names: Robert A.
+      - family-names: Stasinopoulos
+        given-names: D. Mikis
+    journal: Journal of the Royal Statistical Society Series C
+    volume: 54
+    start: 507
+    end: 554
+    year: 2005
+    doi: 10.1111/j.1467-9876.2005.00510.x
+  - type: article
+    title: 'TMB: Automatic Differentiation and Laplace Approximation'
+    authors:
+      - family-names: Kristensen
+        given-names: Kasper
+      - family-names: Nielsen
+        given-names: Anders
+      - family-names: Berg
+        given-names: Casper W.
+      - family-names: Skaug
+        given-names: Hans
+      - family-names: Bell
+        given-names: Bradley M.
+    journal: Journal of Statistical Software
+    volume: 70
+    issue: 5
+    year: 2016
+    doi: 10.18637/jss.v070.i05

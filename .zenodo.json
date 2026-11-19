@@ -1,0 +1,15 @@
+{
+  "title": "regcompR: Distributional Regression with a Verified Registry of Probability Distributions",
+  "description": "A framework for distributional regression in which every parameter of a response distribution can depend on covariates through its own formula, with random effects in any parameter. Distributions are held in a machine readable registry that records support, parameter domains, links, moments and their existence conditions, references and validation status. Operators build new laws from old ones. Models are fitted by maximum or penalized likelihood with a Laplace approximation, through TMB, or by Bayesian inference with generated Stan and BUGS programs.",
+  "upload_type": "software",
+  "license": "GPL-3.0-only",
+  "access_right": "open",
+  "creators": [{"name": "Sophie, Adam R"}],
+  "keywords": ["distributional regression", "GAMLSS", "probability distributions", "mixed models", "count data", "ordinal regression", "survival analysis", "Bayesian inference", "Stan", "R"],
+  "related_identifiers": [
+    {"identifier": "https://github.com/adamrsophie/regcompR", "relation": "isSupplementTo", "scheme": "url"},
+    {"identifier": "https://adamrsophie.github.io/regcompR/", "relation": "isDocumentedBy", "scheme": "url"},
+    {"identifier": "10.1111/j.1467-9876.2005.00510.x", "relation": "references", "scheme": "doi"},
+    {"identifier": "10.18637/jss.v070.i05", "relation": "references", "scheme": "doi"}
+  ]
+}

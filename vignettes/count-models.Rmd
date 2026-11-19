@@ -17,8 +17,7 @@ library(regcompR)
 length(families("count"))
 ```
 
-The count families cover the models of Hilbe's *Modeling Count Data* and the
-wider literature: Poisson, NB1, NB2, NB-P, generalized Poisson, Conway
+The count families cover the main models of the count data literature: Poisson, NB1, NB2, NB-P, generalized Poisson, Conway
 Maxwell Poisson, Poisson inverse Gaussian, Poisson lognormal, Sichel,
 Delaporte, generalized Waring, Faddy's EPPM, and their zero truncated,
 zero inflated and hurdle variants.

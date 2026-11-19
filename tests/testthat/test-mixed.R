@@ -59,3 +59,11 @@ test_that("structured random effects match glmmTMB", {
   expect_equal(f$logLik, as.numeric(logLik(m)), tolerance = 1e-5)
   expect_length(predict(f, newdata = d[1:4, ], type = "mean"), 4)
 })
+
+test_that("prediction for new data without the grouping column uses zero effects", {
+  set.seed(5); d <- data.frame(x = rnorm(200), g = factor(rep(1:20, each = 10)))
+  d$y <- rpois(200, exp(0.5 + 0.3 * d$x + rnorm(20, 0, 0.5)[d$g]))
+  f <- regcomp(y ~ x + (1 | g), family = "poisson", data = d)
+  p <- predict(f, data.frame(x = c(0, 1)), type = "mean", re = "zero")
+  expect_equal(unname(drop(p)), unname(exp(coef(f)[1] + coef(f)[2] * c(0, 1))), tolerance = 1e-8)
+})
