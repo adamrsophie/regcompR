@@ -4,7 +4,7 @@ rename_pars <- function(fam, suffix) {
   out <- lapply(fam$pars, function(p) { p$name <- paste0(p$name, suffix); p$symbol <- p$name; p$is_mean <- FALSE; p })
   stats::setNames(out, paste0(names(fam$pars), suffix))
 }
-sub_pars <- function(p, fam, suffix) stats::setNames(lapply(names(fam$pars), function(k) p[[paste0(k, suffix)]]), names(fam$pars))
+suffix_pars <- function(p, fam, suffix) stats::setNames(lapply(names(fam$pars), function(k) p[[paste0(k, suffix)]]), names(fam$pars))
 
 #' Mixture cure models
 #'
@@ -64,7 +64,7 @@ splice <- function(body, tail) {
   pars <- c(rename_pars(body, ".b"), rename_pars(tail, ".t"),
             list(threshold = P("threshold", "real", role = "threshold", link = "identity"),
                  w = P("w", "unit", role = "body weight", link = "logit")))
-  pb <- function(p) sub_pars(p, body, ".b"); pt <- function(p) sub_pars(p, tail, ".t")
+  pb <- function(p) suffix_pars(p, body, ".b"); pt <- function(p) suffix_pars(p, tail, ".t")
   lpdf <- function(y, p) { u <- p$threshold
     lb <- log(p$w) + eval_lpdf(body, y, pb(p)) - log(family_cdf(body, u, pb(p)))
     lt <- log1p(-p$w) + eval_lpdf(tail, y, pt(p)) - log1p(-family_cdf(tail, u, pt(p)))
@@ -101,7 +101,7 @@ convolve_dist <- function(a, b) {
   a <- get_family(a); b <- get_family(b)
   if (a$discrete != b$discrete) stop_input("convolve_dist() needs two continuous or two discrete laws.")
   pars <- c(rename_pars(a, ".1"), rename_pars(b, ".2"))
-  pa <- function(p) sub_pars(p, a, ".1"); pb <- function(p) sub_pars(p, b, ".2")
+  pa <- function(p) suffix_pars(p, a, ".1"); pb <- function(p) suffix_pars(p, b, ".2")
   one <- function(y, p) {
     if (a$discrete) {
       sb <- b$support(pb(p)); lo <- max(sb$lower, 0)
@@ -152,7 +152,7 @@ copula_dist <- function(m1, m2, copula = c("gaussian", "clayton", "gumbel", "fra
     gumbel = P("theta", "greater_than_one", role = "copula dependence"),
     frank = P("theta", "real", role = "copula dependence", link = "identity"))
   pars <- c(rename_pars(m1, ".1"), rename_pars(m2, ".2"), stats::setNames(list(dep), dep$name))
-  p1 <- function(p) sub_pars(p, m1, ".1"); p2 <- function(p) sub_pars(p, m2, ".2")
+  p1 <- function(p) suffix_pars(p, m1, ".1"); p2 <- function(p) suffix_pars(p, m2, ".2")
   Cfun <- function(u, v, th) { u <- pmin(pmax(u, 1e-15), 1 - 1e-15); v <- pmin(pmax(v, 1e-15), 1 - 1e-15)
     switch(copula,
       gaussian = vapply(seq_along(u), function(i) mvtnorm::pmvnorm(upper = stats::qnorm(c(u[i], v[i])), corr = matrix(c(1, th[i], th[i], 1), 2))[1], 0),

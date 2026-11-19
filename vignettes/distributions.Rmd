@@ -1,0 +1,88 @@
+---
+title: "Distributions and operators"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Distributions and operators}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(collapse = TRUE, comment = "#>", fig.width = 6, fig.height = 4)
+set.seed(1)
+```
+
+```{r}
+library(regcompR)
+```
+
+## The registry
+
+`registry_table()` lists every family with its category, parameters,
+status and the backends that support it.
+
+```{r}
+reg <- registry_table()
+table(reg$category)
+head(reg[, c("id", "category", "parameters", "status")])
+capabilities("conway_maxwell_poisson")
+```
+
+Families are validated against reference implementations: densities
+integrate or sum to one, distribution functions agree with numerical
+integration, and random draws agree with the stated moments.
+
+## Operators
+
+Operators build new families from registered ones. The result is a family
+like any other: it can be used in `distribution()` and `regcomp()`.
+
+```{r}
+zinb <- inflate("nb2")          # zero inflation
+names(zinb$pars)
+hnb <- hurdle("poisson")                        # hurdle at zero
+tn <- truncate_dist("normal", lower = 0)        # truncation
+mx <- mixture("normal", "normal")               # finite mixture
+d <- distribution(mx, mu.1 = -2, sigma.1 = 1, mu.2 = 2, sigma.2 = 0.7, w2 = 0.4)
+plot(d)
+```
+
+Further operators:
+
+* `censor()`, `discretize()`, `round_dist()`, `transform_dist()`, `wrap()`, `weighted()`;
+* `compound()` for mixtures over a parameter, such as the Poisson lognormal law;
+* `cure()` for mixture cure survival models;
+* `splice()` for body and tail composite laws;
+* `convolve_dist()` for sums of independent variables;
+* `copula_dist()` for bivariate copula models with any margins.
+
+```{r}
+emg <- convolve_dist("normal", "exponential")
+prob(distribution(emg, mu.1 = 0, sigma.1 = 1, lambda.2 = 2), c(0, 1, 2))
+sp <- splice("lognormal", "lomax")
+plot(distribution(sp, mu.b = 0, sigma.b = 0.6, scale.t = 2, alpha.t = 2.5,
+                  threshold = 2, w = 0.7), xlim = c(0, 8))
+```
+
+## Generators
+
+Generators such as `kumaraswamy_g()`, `beta_g()`, `marshall_olkin()`,
+`transmuted()` and `exponentiated()` produce the generalized families of
+the distribution literature from any baseline.
+
+```{r}
+kw <- kumaraswamy_g("weibull")
+names(kw$pars)
+```
+
+## Custom families
+
+`custom_family()` registers a law from its log density; regcompR checks
+that it is normalized.
+
+```{r}
+myexp <- custom_family("my_exponential", list(par_spec("rate", "positive", role = "rate")),
+  lpdf = function(y, p) dexp(y, p$rate, log = TRUE),
+  support = function(p) list(lower = 0, upper = Inf), check = list(rate = 2))
+coef(regcomp(y ~ 1, family = myexp, data = data.frame(y = rexp(200, 2))))
+```

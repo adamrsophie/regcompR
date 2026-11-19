@@ -1,0 +1,77 @@
+---
+title: "Ordinal and categorical responses"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Ordinal and categorical responses}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(collapse = TRUE, comment = "#>", fig.width = 6, fig.height = 4)
+set.seed(1)
+```
+
+```{r}
+library(regcompR)
+families("ordinal")
+```
+
+## Cumulative link models
+
+An ordered factor response with a cumulative family gives the proportional
+odds model (logit), the ordered probit, and the cloglog, loglog and cauchit
+variants. The thresholds are estimated on their natural scale; the main
+formula has no intercept.
+
+```{r}
+n <- 400
+d <- data.frame(x = rnorm(n), z = rnorm(n))
+d$g <- factor(rep(1:40, each = 10))
+d$y <- cut(0.8 * d$x - 0.5 * d$z + rnorm(40, 0, 0.7)[d$g] + rlogis(n), c(-Inf, -1, 0.5, 2, Inf),
+           labels = c("low", "mid", "high", "top"), ordered_result = TRUE)
+fit <- regcomp(y ~ x + z, family = "cumulative_logit", data = d)
+summary(fit)
+```
+
+The estimates and standard errors equal those of `MASS::polr()`. A formula
+for `scale` gives the location scale model of `ordinal::clm()`:
+
+```{r}
+fit_ls <- regcomp(y ~ x + z, scale ~ x, family = "cumulative_logit", data = d)
+AIC(fit, fit_ls)
+```
+
+Category probabilities:
+
+```{r}
+predict(fit, data.frame(x = c(-1, 0, 1), z = 0), type = "probability")
+plot(fit, which = "effects", variable = "x")
+```
+
+Continuation ratio (`continuation_ratio_logit`, `_probit`, `_cloglog`),
+adjacent category (`adjacent_category_logit`) and stereotype models are also
+available, and random effects work as for any other family:
+
+```{r}
+fit_m <- regcomp(y ~ x + z + (1 | g), family = "cumulative_logit", data = d)
+exp(fit_m$theta)   # random intercept standard deviation (true value 0.7)
+```
+
+## Nominal responses
+
+`multinomial_logit` fits the baseline category logit model of
+`nnet::multinom()`; the main formula is shared by every non-baseline
+category.
+
+```{r}
+d$k <- factor(sample(c("a", "b", "c"), n, TRUE, prob = c(0.5, 0.3, 0.2)))
+fm <- regcomp(k ~ x, family = "multinomial_logit", data = d)
+coef(fm)
+```
+
+## Bivariate binary responses and selection
+
+`bivariate_binary_odds_ratio` models two binary outcomes with an odds ratio
+regression (as in VGAM's `binom2.or`), and `heckman_selection` fits the
+sample selection model with response `cbind(selected, outcome)`.

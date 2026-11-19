@@ -27,3 +27,15 @@ test_that("mixture cure model matches flexsurvcure", {
   expect_equal(fit$logLik, fc$loglik, tolerance = 1e-6)
   expect_equal(unname(plogis(fit$coefficients["cure:(Intercept)"])), unname(fc$res["theta", 1]), tolerance = 1e-4)
 })
+
+test_that("zero inflated and hurdle fits work alongside the new operators", {
+  set.seed(3); n <- 300; x <- rnorm(n)
+  y <- ifelse(runif(n) < 0.3, 0, rnbinom(n, mu = exp(0.5 + 0.4 * x), size = 2))
+  d <- data.frame(y, x)
+  f <- regcomp(y ~ x, family = inflate("nb2"), data = d)
+  expect_true(is.finite(f$logLik))
+  expect_equal(unname(plogis(coef(f)["zi:(Intercept)"])), 0.3, tolerance = 0.3)
+  expect_true(is.finite(regcomp(y ~ x, family = hurdle("poisson"), data = d)$logLik))
+  a <- AIC(f, regcomp(y ~ x, family = "nb2", data = d))
+  expect_s3_class(a, "data.frame"); expect_equal(nrow(a), 2)
+})

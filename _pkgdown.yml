@@ -1,0 +1,107 @@
+url: https://adamrsophie.github.io/regcompR/
+
+template:
+  bootstrap: 5
+  light-switch: true
+  math-rendering: katex
+
+navbar:
+  structure:
+    left: [intro, reference, articles, news]
+    right: [search, lightswitch, github]
+
+articles:
+- title: Guides
+  navbar: ~
+  contents:
+  - distributions
+  - count-models
+  - hierarchical-longitudinal
+  - ordinal-categorical
+  - survival
+  - model-checking
+  - bayesian
+
+reference:
+- title: Fitting models
+  contents:
+  - regcomp
+  - regcomp_control
+  - penalty
+  - prior
+  - gee
+  - exact_poisson
+  - quantile_count
+  - person_period
+- title: Distributions
+  contents:
+  - distribution
+  - probability-interface
+  - moments
+  - quantile.regcomp_dist
+  - support
+  - score
+  - plot.regcomp_dist
+  - families
+  - get_family
+  - registry_table
+  - capabilities
+  - supports
+  - validate_parameters
+  - validate_response
+  - ordinal-families
+- title: Building families
+  contents:
+  - par_spec
+  - custom_family
+  - link
+  - links
+  - quantile_param
+- title: Operators
+  contents:
+  - inflate
+  - hurdle
+  - truncate_dist
+  - censor
+  - cens
+  - surv
+  - transform_dist
+  - discretize
+  - round_dist
+  - mixture
+  - compound
+  - convolve_dist
+  - splice
+  - cure
+  - copula_dist
+  - wrap
+  - weighted
+  - skew_symmetric
+  - sine_skew
+  - exponentiated
+- title: Results and prediction
+  contents:
+  - summary.regcomp_fit
+  - predict.regcomp_fit
+  - fitted_distribution
+  - simulate.regcomp_fit
+  - residuals.regcomp_fit
+  - vcov.regcomp_fit
+  - log_lik
+  - ranef_regcomp
+  - plot.regcomp_fit
+- title: Model checking and comparison
+  contents:
+  - scoring_rule
+  - cv_regcomp
+  - compare_models
+  - identifiability_check
+- title: Bayesian code generation
+  contents:
+  - stan_code
+  - bugs_code
+- title: Utilities
+  contents:
+  - numerics
+  - regcomp-conditions
+  - regcompR-package

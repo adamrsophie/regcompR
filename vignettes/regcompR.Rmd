@@ -1,0 +1,89 @@
+---
+title: "Getting started with regcompR"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Getting started with regcompR}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(collapse = TRUE, comment = "#>", fig.width = 6, fig.height = 4)
+set.seed(1)
+```
+
+regcompR fits distributional regression models: every parameter of a
+response distribution can depend on covariates through its own formula. The
+same model specification can be fitted by maximum likelihood, through TMB,
+or by Bayesian inference in Stan, JAGS or OpenBUGS.
+
+```{r}
+library(regcompR)
+```
+
+## Distributions
+
+Every family lives in a registry that records its support, parameters,
+links, moments and references.
+
+```{r}
+length(families())
+head(families("count"), 10)
+get_family("nb2")
+```
+
+A distribution object evaluates densities, distribution functions,
+quantiles, moments and random draws.
+
+```{r}
+d <- distribution("gamma", mu = 2, sigma = 0.5)
+prob(d, c(1, 2, 3))
+cdf(d, 2)
+quantile(d, c(0.1, 0.5, 0.9))
+mean(d); variance(d)
+plot(d)
+```
+
+## A first regression
+
+The first formula is the main formula (it models the mean parameter, or
+the location or scale parameter where there is no mean). Further formulas
+name the parameter on their left side.
+
+```{r}
+n <- 400
+dat <- data.frame(x = runif(n))
+dat$y <- rgamma(n, shape = 1 / (0.3 + 0.4 * dat$x)^2,
+                scale = exp(1 + dat$x) * (0.3 + 0.4 * dat$x)^2)
+fit <- regcomp(y ~ x, sigma ~ x, family = "gamma", data = dat)
+summary(fit)
+```
+
+## Predictions
+
+```{r}
+nd <- data.frame(x = c(0.1, 0.5, 0.9))
+predict(fit, nd, type = "mean")
+predict(fit, nd, type = "quantile", probs = c(0.05, 0.95))
+predict(fit, nd, type = "probability", at = 5)
+predict(fit, nd, type = "mean", interval = "confidence")
+```
+
+## Checking the fit
+
+Randomized quantile residuals are standard normal under a correct model.
+
+```{r}
+plot(fit, which = "qq")
+plot(fit, which = "effects", variable = "x", par = "sigma")
+```
+
+## Where to go next
+
+* `vignette("distributions")`: the registry and the operators that build new laws.
+* `vignette("count-models")`: overdispersion, zeros and the count families.
+* `vignette("hierarchical-longitudinal")`: random effects, covariance structures and GEE.
+* `vignette("ordinal-categorical")`: ordinal, nominal and bivariate binary responses.
+* `vignette("survival")`: censoring, cure models and discrete time hazards.
+* `vignette("model-checking")`: residuals, scoring rules and cross validation.
+* `vignette("bayesian")`: priors and Bayesian fitting.

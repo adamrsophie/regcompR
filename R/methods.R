@@ -110,10 +110,10 @@ print.summary.regcomp_fit <- function(x, digits = 4, ...) {
   print(round(as.matrix(x$table), digits))
   if (x$kind == "wald") {
     d <- x$fit$diagnostics
-    if (!is.null(d$max_abs_gradient)) cat(sprintf("max |gradient| %.2e", d$max_abs_gradient))
-    if (!is.null(d$hessian_positive_definite))
-      cat(sprintf("; Hessian %s", if (d$hessian_positive_definite) "positive definite" else "NOT positive definite"))
-    cat("\n")
+    msg <- c(if (!is.null(d$max_abs_gradient)) sprintf("max |gradient| %.2e", d$max_abs_gradient),
+             if (!is.null(d$hessian_positive_definite))
+               sprintf("Hessian %s", if (d$hessian_positive_definite) "positive definite" else "NOT positive definite"))
+    if (length(msg)) cat(paste(msg, collapse = "; "), "\n")
     if (length(d$boundary_variance)) cat("Variance components near zero:", d$boundary_variance, "\n")
   }
   invisible(x)
@@ -128,10 +128,20 @@ confint.regcomp_fit <- function(object, parm, level = 0.95, ...) {
 }
 
 #' @export
-AIC.regcomp_fit <- function(object, ..., k = 2) -2 * object$logLik + k * object$df
+AIC.regcomp_fit <- function(object, ..., k = 2) ic_table(list(object, ...), k, "AIC", substitute(list(object, ...)))
 
 #' @export
-BIC.regcomp_fit <- function(object, ...) -2 * object$logLik + log(object$nobs) * object$df
+BIC.regcomp_fit <- function(object, ...) ic_table(list(object, ...), NULL, "BIC", substitute(list(object, ...)))
+
+# One value for one model; a data frame of df and criterion for several, as in stats.
+ic_table <- function(fits, k, name, calls) {
+  val <- vapply(fits, function(f) -2 * f$logLik + (if (is.null(k)) log(f$nobs) else k) * f$df, 0)
+  if (length(fits) == 1) return(val)
+  out <- data.frame(df = vapply(fits, function(f) f$df, 0), val)
+  names(out)[2] <- name
+  rownames(out) <- vapply(as.list(calls)[-1], deparse1, "")
+  out
+}
 
 #' @export
 formula.regcomp_fit <- function(x, ...) x$spec$formulas

@@ -1,0 +1,76 @@
+---
+title: "Censored data and survival models"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Censored data and survival models}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(collapse = TRUE, comment = "#>", fig.width = 6, fig.height = 4)
+set.seed(1)
+```
+
+```{r}
+library(regcompR)
+```
+
+## Right censoring and parametric survival
+
+`surv(time, event)` marks right censored responses (with optional delayed
+entry); `cens(lower, upper)` gives interval censoring and truncation for any
+family, discrete or continuous.
+
+```{r}
+n <- 400
+d <- data.frame(x = rbinom(n, 1, 0.5), age = rnorm(n))
+tt <- rweibull(n, shape = 1.4, scale = exp(1 + 0.6 * d$x - 0.2 * d$age))
+cc <- runif(n, 0, 8)
+d$time <- pmin(tt, cc); d$event <- as.numeric(tt <= cc)
+fw <- regcomp(surv(time, event) ~ x + age, family = "weibull", data = d)
+summary(fw)
+```
+
+The main formula models the Weibull scale, so the estimates match
+`survival::survreg()` on the log time scale. Other choices include the
+lognormal, log logistic, gamma, generalized gamma and Gompertz families;
+any parameter can take a formula.
+
+```{r}
+fl <- regcomp(surv(time, event) ~ x + age, family = "lognormal", data = d)
+AIC(fw, fl)
+nd <- data.frame(x = c(0, 1), age = 0)
+predict(fw, nd, type = "survival", at = c(1, 3, 5))
+predict(fw, nd, type = "median")
+```
+
+## Cure models
+
+When a fraction of subjects never has the event, `cure()` gives the mixture
+cure model `S(t) = cure + (1 - cure) S0(t)`. A formula for `cure` is the
+incidence model; the results match flexsurvcure.
+
+```{r}
+cured <- runif(n) < plogis(-0.5 + d$x)
+tc <- ifelse(cured, Inf, rweibull(n, 1.4, 2))
+d$time2 <- pmin(tc, cc); d$event2 <- as.numeric(tc <= cc)
+fc <- regcomp(surv(time2, event2) ~ 1, cure ~ x, family = cure("weibull"), data = d)
+coef(fc)
+```
+
+## Interval censoring
+
+Event times known only to the year, with right censored subjects:
+
+```{r}
+d$lo <- ifelse(d$event == 1, floor(d$time), d$time)
+d$hi <- ifelse(d$event == 1, floor(d$time) + 1, Inf)
+fi <- regcomp(cens(lo, hi) ~ x + age, family = "weibull", data = d)
+coef(fi)
+```
+
+## Discrete time and frailty
+
+See `vignette("hierarchical-longitudinal")` for discrete time hazard models
+built with `person_period()` and for shared frailty through random effects.

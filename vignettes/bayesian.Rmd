@@ -1,0 +1,65 @@
+---
+title: "Bayesian distributional regression"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Bayesian distributional regression}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(collapse = TRUE, comment = "#>")
+set.seed(1)
+```
+
+```{r}
+library(regcompR)
+```
+
+`engine = "bayes"` fits the same model by MCMC. regcompR writes the Stan
+program (run by bayescompR, cmdstanr or rstan) or a BUGS program (run by
+JAGS through R2jags or by OpenBUGS through R2OpenBUGS).
+
+## The generated program
+
+```{r}
+d <- data.frame(x = rnorm(100), g = factor(rep(1:10, each = 10)))
+d$y <- rpois(100, exp(0.5 + 0.3 * d$x))
+cat(stan_code(y ~ x + (1 | g), family = "poisson", data = d)$code)
+```
+
+## Priors
+
+Default priors are weakly informative. `prior()` sets priors by class
+(`b`, `Intercept`, `sd`, `cor`), by distribution parameter and by
+coefficient.
+
+```{r}
+pr <- c(prior("normal(0, 1)", class = "b"), prior("exponential(2)", class = "sd"))
+pr
+```
+
+## Fitting
+
+The examples below need a working Stan or JAGS installation.
+
+```{r, eval = FALSE}
+fit <- regcomp(y ~ x + (1 | g), family = "poisson", data = d, engine = "bayes",
+               priors = pr, control = regcomp_control(runner = "cmdstanr", chains = 4))
+summary(fit)
+plot(fit, which = c("trace", "ppc"))
+predict(fit, type = "mean", interval = "confidence")
+
+fit_jags <- regcomp(y ~ x + (1 | g), family = "poisson", data = d, engine = "bayes",
+                    control = regcomp_control(runner = "jags"))
+```
+
+Every family with a Stan density, every operator built from such families,
+ordinal and nominal models, all random effect covariance structures and
+multiple membership terms are supported by the Stan backends. The BUGS
+backends support the families with BUGS densities and unstructured random
+effects; `capabilities()` reports what is available for a family.
+
+```{r}
+capabilities("generalized_poisson")
+```

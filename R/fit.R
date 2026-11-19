@@ -396,12 +396,13 @@ laplace_inner <- function(spec, beta, theta, u0, control) {
     list(grad = grad, negH = Matrix::forceSymmetric(H))
   }
   factor <- function(negH) {
-    ch <- tryCatch(Matrix::Cholesky(negH, perm = TRUE, LDL = FALSE), error = function(e) NULL)
+    fail <- function(e) NULL
+    ch <- tryCatch(Matrix::Cholesky(negH, perm = TRUE, LDL = FALSE), error = fail, warning = fail)
     lam <- 0
     while (is.null(ch) && lam <= 1e8) {
       lam <- if (lam == 0) 1e-6 else lam * 10
       ch <- tryCatch(Matrix::Cholesky(negH + lam * Matrix::Diagonal(spec$Q), perm = TRUE),
-                     error = function(e) NULL)
+                     error = fail, warning = fail)
     }
     list(ch = ch, lam = lam)
   }

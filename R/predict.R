@@ -116,6 +116,7 @@ predict.regcomp_fit <- function(object, newdata = NULL,
   if (fam$variate_type == "categorical") {
     if (type == "mean") type <- "probability"
     if (missing(at)) at <- seq_along(spec$ylev %||% seq_len(max(object$spec$y, na.rm = TRUE)))
+    if (!is.null(object$spec$ylev)) attr(at, "labels") <- object$spec$ylev[at]
   }
   one <- function(beta, u, theta) {
     if (type == "link") return(do.call(cbind, pred_eta(spec, beta, u, if (re == "marginal") "zero" else re)))
@@ -170,7 +171,8 @@ predict.regcomp_fit <- function(object, newdata = NULL,
 label_pred <- function(x, type, probs, at) {
   if (is.matrix(x)) {
     if (type == "quantile") colnames(x) <- paste0("q", format(probs))
-    if (type %in% c("probability", "density", "cdf", "survival")) colnames(x) <- paste0(type, "(", format(at), ")")
+    if (type %in% c("probability", "density", "cdf", "survival"))
+      colnames(x) <- paste0(type, "(", if (is.null(attr(at, "labels"))) format(at) else attr(at, "labels"), ")")
   }
   x
 }
