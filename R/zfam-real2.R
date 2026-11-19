@@ -193,11 +193,34 @@ dstable1 <- function(z, a, b) {
   a * z^(1 / (a - 1)) / (pi * abs(a - 1)) * stats::integrate(function(t) { v <- V(t); ifelse(is.finite(v) & v > 0, v * exp(-k * v), 0) },
     -th0, pi / 2, subdivisions = 2000L, rel.tol = 1e-10, stop.on.error = FALSE)$value
 }
-dstable_s1 <- function(x, a, b, g, d) dstable1((x - d) / g, a, b) / g
+# S1 with alpha = 1 adds beta (2/pi) gamma log(gamma) to the location (Nolan 2020, def. 1.7).
+s1_shift <- function(a, b, g) if (abs(a - 1) < 1e-8) b * 2 / pi * g * log(g) else 0
+dstable_s1 <- function(x, a, b, g, d) dstable1((x - d - s1_shift(a, b, g)) / g, a, b) / g
+# Distribution function by the same integral representation (Nolan 1997, Theorem 1).
+pstable1 <- function(z, a, b) {
+  if (abs(a - 1) < 1e-8) {
+    if (abs(b) < 1e-10) return(stats::pcauchy(z))
+    if (b < 0) return(1 - pstable1(-z, a, -b))
+    V <- function(t) 2 / pi * ((pi / 2 + b * t) / cos(t)) * exp((pi / 2 + b * t) * tan(t) / b)
+    e <- exp(-pi * z / (2 * b))
+    return(stats::integrate(function(t) { v <- V(t); ifelse(is.finite(v), exp(-e * v), 0) }, -pi / 2, pi / 2,
+                            subdivisions = 2000L, rel.tol = 1e-10, stop.on.error = FALSE)$value / pi)
+  }
+  if (z < 0) return(1 - pstable1(-z, a, -b))
+  th0 <- atan(b * tan(pi * a / 2)) / a
+  if (z < 1e-12) return((pi / 2 - th0) / pi)
+  V <- function(t) (cos(a * th0))^(1 / (a - 1)) * (cos(t) / sin(a * (th0 + t)))^(a / (a - 1)) * cos(a * th0 + (a - 1) * t) / cos(t)
+  k <- z^(a / (a - 1))
+  I <- stats::integrate(function(t) { v <- V(t); ifelse(is.finite(v) & v > 0, exp(-k * v), 0) }, -th0, pi / 2,
+                        subdivisions = 2000L, rel.tol = 1e-10, stop.on.error = FALSE)$value / pi
+  if (a < 1) (pi / 2 - th0) / pi + I else 1 - I
+}
+pstable_s1 <- function(x, a, b, g, d) pstable1((x - d - s1_shift(a, b, g)) / g, a, b)
 rfam("stable", "Stable (alpha stable, S1 parameterization)", list(P("alpha", "unit", role = "index", interpretation = "Use (0, 2]; scaled to (0, 2) via 2 * alpha"),
   P("beta", "symmetric_unit", role = "skewness"), scale_par("gamma"), loc_par("delta")), aliases = c("levy_stable", "alpha_stable"),
   formula = "log phi(t) = -(gamma |t|)^A (1 - i beta sign(t) tan(pi A / 2)) + i delta t, A = 2 alpha",
   lpdf = function(y, p) log(pervec(y, p, function(x, pp) dstable_s1(x, 2 * pp$alpha, pp$beta, pp$gamma, pp$delta))),
+  cdf = function(q, p) pervec(q, p, function(x, pp) pstable_s1(x, 2 * pp$alpha, pp$beta, pp$gamma, pp$delta)),
   numeric_moments = FALSE,
   numerical_notes = "Index A = 2 alpha so that the unit link covers (0, 2). Density by the Zolotarev integral (Nolan 1997).",
   references = c("Nolan (2020), Univariate Stable Distributions. Springer.", "Zolotarev (1986), One-dimensional Stable Distributions. AMS."),
@@ -207,6 +230,7 @@ rfam("stable", "Stable (alpha stable, S1 parameterization)", list(P("alpha", "un
 rfam("landau", "Landau", list(loc_par("mu"), scale_par("c")),
   formula = "f(x) = (1/pi) int_0^inf exp(-t log t - z t) sin(pi t) dt / c, z = (x - mu)/c",
   lpdf = function(y, p) log(pervec(y, p, function(x, pp) dstable_s1(x, 1, 1, pi / 2 * pp$c, pp$mu))),
+  cdf = function(q, p) pervec(q, p, function(x, pp) pstable_s1(x, 1, 1, pi / 2 * pp$c, pp$mu)),
   numeric_moments = FALSE,
   references = "Landau (1944), On the energy loss of fast particles by ionization. J. Phys. USSR, 8, 201-205.",
   reference = ref_impl("Landau integral", function(y, p) log(vapply((y - p$mu) / p$c, function(z) stats::integrate(function(t)
@@ -216,6 +240,7 @@ rfam("landau", "Landau", list(loc_par("mu"), scale_par("c")),
 
 rfam("holtsmark", "Holtsmark (symmetric stable with index 3/2)", list(loc_par("mu"), scale_par("c")),
   lpdf = function(y, p) log(pervec(y, p, function(x, pp) dstable_s1(x, 1.5, 0, pp$c, pp$mu))),
+  cdf = function(q, p) pervec(q, p, function(x, pp) pstable_s1(x, 1.5, 0, pp$c, pp$mu)),
   numeric_moments = FALSE, references = "Holtsmark (1919), Ann. Phys., 363, 577-630.",
   reference = ref_impl("stabledist", function(y, p) stabledist::dstable(y, 1.5, 0, p$c, p$mu, pm = 1, log = TRUE)), status = "validated")
 

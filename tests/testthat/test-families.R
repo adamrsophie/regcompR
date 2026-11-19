@@ -35,3 +35,15 @@ test_that("generator identities hold", {
   b <- distribution("generalized_exponential", alpha = 1.7, lambda = 0.8)
   expect_equal(log_prob(a, y), log_prob(b, y), tolerance = 1e-10)
 })
+
+test_that("multivariate laws are normalized", {
+  d <- distribution("negative_multinomial", x0 = 2.5, probs = c(0.2, 0.3))
+  g <- as.matrix(expand.grid(0:150, 0:150))
+  expect_equal(sum(exp(log_prob(d, g))), 1, tolerance = 1e-8)
+  S <- matrix(c(2, 0.5, 0.5, 1), 2)
+  m <- distribution("multivariate_normal", mu = c(0, 1), Sigma = S)
+  y <- rbind(c(0.2, 0.4))
+  expect_equal(log_prob(m, y), -log(2 * pi) - 0.5 * log(det(S)) - 0.5 * drop(t(y[1, ] - c(0, 1)) %*% solve(S) %*% (y[1, ] - c(0, 1))))
+  l <- distribution("lkj", eta = 2.5)
+  expect_equal(log_prob(l, list(matrix(c(1, 0.4, 0.4, 1), 2))), dbeta(0.7, 2.5, 2.5, log = TRUE) - log(2))
+})
