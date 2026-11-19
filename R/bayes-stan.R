@@ -43,7 +43,7 @@ cens_type <- function(cmat) {
 #' cat(stan_code(y ~ x, family = "poisson", data = d)$code)
 stan_code <- function(formula, ..., family, data, weights = NULL, links = NULL,
                       fixed = NULL, priors = NULL, parameterization = NULL) {
-  fam <- get_family(family, parameterization)
+  fam <- model_family(family, parameterization, formula, as.data.frame(data))
   dots <- eval(substitute(alist(...)))
   spec <- build_spec(formula, dots, fam, as.data.frame(data), weights = substitute(weights),
                      links = links, fixed = fixed, env = parent.frame())
@@ -53,7 +53,7 @@ stan_code <- function(formula, ..., family, data, weights = NULL, links = NULL,
 stan_program <- function(spec, priors = NULL) {
   fam <- spec$fam
   if (is.null(fam$stan)) stop_unsupported("A Stan implementation", fam$id)
-  if (fam$variate_type != "scalar" && is.null(fam$stan$vector))
+  if (!fam$variate_type %in% c("scalar", "categorical") && is.null(fam$stan$vector))
     stop_unsupported("Stan code generation for this vector valued family", fam$id)
   ct <- cens_type(spec$cmat)
   censored <- !is.null(ct) && any(ct > 0)
@@ -86,8 +86,18 @@ stan_program <- function(spec, priors = NULL) {
       pri <- c(pri, "  " %+% prior_stan(find_prior(priors, cls, k, cn[j]), sprintf("b_%s[%d]", k, j)))
     }
   }
+  for (k in names(spec$aux)) {
+    d <- c(d, sprintf("  int<lower=1> Kc_%s;", k))
+    par <- c(par, sprintf("  %s[Kc_%s] %s;", if (spec$aux[[k]]$type == "ordered") "ordered" else "vector", k, k))
+    pri <- c(pri, "  " %+% prior_stan(find_prior(priors, "cuts", k), k))
+  }
   for (j in seq_along(spec$blocks)) {
     b <- spec$blocks[[j]]
+    if (b$type != "smooth" && !b$struct %in% c("us", "diag")) {
+      st <- stan_struct_block(b, j, priors)
+      d <- c(d, st$data); par <- c(par, st$par); tpar <- c(tpar, st$tpar); pri <- c(pri, st$pri)
+      next
+    }
     if (b$type == "smooth") {
       d <- c(d, sprintf("  int<lower=1> L_%d;", j), sprintf("  matrix[N, L_%d] Zs_%d;", j, j))
       par <- c(par, sprintf("  real<lower=0> sd_%d;", j), sprintf("  vector[L_%d] z_%d;", j, j))
@@ -95,7 +105,7 @@ stan_program <- function(spec, priors = NULL) {
                "  " %+% prior_stan(find_prior(priors, "sd", b$par, b$label), sprintf("sd_%d", j)))
     } else {
       d <- c(d, sprintf("  int<lower=1> L_%d;", j), sprintf("  int<lower=1> q_%d;", j),
-             sprintf("  array[N] int<lower=1, upper=L_%d> g_%d;", j, j),
+             if (is.null(b$W)) sprintf("  array[N] int<lower=1, upper=L_%d> g_%d;", j, j) else sprintf("  matrix[N, L_%d] W_%d;", j, j),
              sprintf("  matrix[N, q_%d] Xr_%d;", j, j))
       par <- c(par, sprintf("  vector<lower=0>[q_%d] sd_%d;", j, j),
                sprintf("  matrix[q_%d, L_%d] z_%d;", j, j, j))
@@ -116,13 +126,17 @@ stan_program <- function(spec, priors = NULL) {
     for (j in which(vapply(spec$blocks, `[[`, "", "par") == k)) {
       b <- spec$blocks[[j]]
       if (b$type == "smooth") mdl <- c(mdl, sprintf("  eta_%s += Zs_%d * (sd_%d * z_%d);", k, j, j, j))
+      else if (!is.null(b$W)) mdl <- c(mdl, sprintf("  for (c in 1:q_%d) eta_%s += Xr_%d[:, c] .* (W_%d * (r_%d[c])');", j, k, j, j, j))
       else mdl <- c(mdl, sprintf("  for (i in 1:N) eta_%s[i] += Xr_%d[i] * col(r_%d, g_%d[i]);", k, j, j, j))
     }
   }
   for (k in spec$rpars)
     mdl <- c(mdl, sprintf("  vector[N] %s = %s;", k, spec$links[[k]]$stan_inv(sprintf("eta_%s", k))))
   for (k in names(spec$fixed)) mdl <- c(mdl, sprintf("  vector[N] %s = rep_vector(fix_%s, N);", k, k))
-  pm <- stats::setNames(lapply(names(fam$pars), function(k) sprintf("%s[i]", k)), names(fam$pars))
+  pm <- stats::setNames(lapply(names(fam$pars), function(k)
+    if (k %in% names(spec$aux) || !is.null(fam$pars[[k]]$estimate)) k else sprintf("%s[i]", k)), names(fam$pars))
+  for (k in intersect(names(spec$fixed), names(Filter(function(p) !is.null(p$estimate), fam$pars))))
+    stop_unsupported("Fixed ordinal thresholds in Stan")
   lp <- stan_fill(fam$stan$lpdf, "y[i]", pm)
   lik <- if (!(censored || truncated)) {
     c("  for (i in 1:N) target += w[i] * " %+% lp %+% ";")
@@ -188,16 +202,59 @@ stan_data <- function(spec) {
     out[[paste0("X_", k)]] <- unname(X)
     out[[paste0("off_", k)]] <- as.numeric(spec$preds[[k]]$offset)
   }
+  for (k in names(spec$aux)) out[[paste0("Kc_", k)]] <- spec$aux[[k]]$size
   for (j in seq_along(spec$blocks)) {
     b <- spec$blocks[[j]]
     out[[paste0("L_", j)]] <- b$L
     if (b$type == "smooth") out[[paste0("Zs_", j)]] <- unname(b$Xr)
     else {
-      if (anyNA(b$gi)) stop_input("Grouping factors must not contain missing values.")
       out[[paste0("q_", j)]] <- b$q
-      out[[paste0("g_", j)]] <- as.integer(b$gi)
+      if (!is.null(b$W)) out[[paste0("W_", j)]] <- as.matrix(b$W)
+      else {
+        if (anyNA(b$gi)) stop_input("Grouping factors must not contain missing values.")
+        out[[paste0("g_", j)]] <- as.integer(b$gi)
+      }
       out[[paste0("Xr_", j)]] <- unname(b$Xr)
+      if (!is.null(b$coords)) {
+        D <- as.matrix(stats::dist(b$coords))
+        out[[paste0("D_", j)]] <- unname(D)
+        out[[paste0("Dmed_", j)]] <- stats::median(D[upper.tri(D)])
+      }
     }
   }
   out
+}
+
+# Stan code of a structured random effect block: r_j = diag(sd) chol(R) z_j.
+stan_struct_block <- function(b, j, priors) {
+  q <- sprintf("q_%d", j); L <- sprintf("L_%d", j)
+  data <- c(sprintf("  int<lower=1> L_%d;", j), sprintf("  int<lower=1> q_%d;", j),
+            if (is.null(b$W)) sprintf("  array[N] int<lower=1, upper=L_%d> g_%d;", j, j) else sprintf("  matrix[N, L_%d] W_%d;", j, j),
+            sprintf("  matrix[N, q_%d] Xr_%d;", j, j))
+  hom <- b$struct %in% c("homdiag", "homcs", "ar1", "ou", "exp", "gau", "matern32")
+  par <- c(if (hom) sprintf("  real<lower=0> sdh_%d;", j) else sprintf("  vector<lower=0>[%s] sd_%d;", q, j),
+           sprintf("  matrix[%s, %s] z_%d;", q, L, j))
+  tpar <- if (hom) sprintf("  vector[%s] sd_%d = rep_vector(sdh_%d, %s);", q, j, j, q)
+  pri <- c(sprintf("  to_vector(z_%d) ~ std_normal();", j),
+           "  " %+% prior_stan(find_prior(priors, "sd", b$par, b$label), if (hom) sprintf("sdh_%d", j) else sprintf("sd_%d", j)))
+  fill <- function(expr) c(sprintf("  matrix[%s, %s] Rc_%d;", q, q, j),
+    sprintf("  for (a in 1:%s) for (c in 1:%s) Rc_%d[a, c] = a == c ? 1 + 1e-9 : %s;", q, q, j, expr))
+  if (b$struct %in% c("cs", "homcs")) {
+    par <- c(par, sprintf("  real<lower=-1.0 / (%s - 1), upper=1> rho_%d;", q, j))
+    tpar <- c(tpar, fill(sprintf("rho_%d", j)))
+  } else if (b$struct == "ar1") {
+    par <- c(par, sprintf("  real<lower=-1, upper=1> rho_%d;", j))
+    tpar <- c(tpar, fill(sprintf("rho_%d^abs(a - c)", j)))
+  } else if (b$struct == "homdiag") {
+    tpar <- c(tpar, fill("0"))
+  } else {
+    data <- c(data, sprintf("  matrix[%s, %s] D_%d;", q, q, j), sprintf("  real<lower=0> Dmed_%d;", j))
+    par <- c(par, sprintf("  real<lower=0> range_%d;", j))
+    dd <- sprintf("D_%d[a, c] / range_%d", j, j)
+    tpar <- c(tpar, fill(switch(b$struct, ou = , exp = sprintf("exp(-%s)", dd), gau = sprintf("exp(-square(%s))", dd),
+      matern32 = sprintf("(1 + sqrt(3) * %s) * exp(-sqrt(3) * %s)", dd, dd))))
+    pri <- c(pri, sprintf("  range_%d ~ lognormal(log(Dmed_%d), 1.5);", j, j))
+  }
+  tpar <- c(tpar, sprintf("  matrix[%s, %s] r_%d = diag_pre_multiply(sd_%d, cholesky_decompose(Rc_%d)) * z_%d;", q, L, j, j, j, j))
+  list(data = data, par = par, tpar = tpar, pri = pri)
 }

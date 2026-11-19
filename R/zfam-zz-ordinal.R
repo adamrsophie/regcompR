@@ -12,10 +12,40 @@ ord_extra <- list(no_intercept = c("mu", "scale"), fixed_unless_formula = "scale
 ord_obs <- function(y, p) { n <- length(y); K <- length(p$cuts) + 1
   list(n = n, K = K, mu = rep_len(p$mu, n), s = if (is.null(p$scale)) rep(1, n) else rep_len(p$scale, n)) }
 ord_check <- function(p) if (any(diff(p$cuts) <= 0)) "Thresholds must be strictly increasing."
-ord_reg <- function(id, display, lpmf, formula, refs, reference, check = ord_check, cuts = "ordered") register_family(family_def(id, display, "ordinal", ord_pars(cuts),
-  discrete = TRUE, variate_type = "categorical", check = check, extra = ord_extra, formula = formula, lpdf = lpmf,
+ord_reg <- function(id, display, lpmf, formula, refs, reference, check = ord_check, cuts = "ordered", stan = NULL) register_family(family_def(id, display, "ordinal", ord_pars(cuts),
+  discrete = TRUE, variate_type = "categorical", check = check, extra = ord_extra, stan = stan, formula = formula, lpdf = lpmf,
   support = function(p) list(lower = 1, upper = length(p$cuts) + 1), numeric_moments = FALSE,
   references = refs, reference = reference, status = "validated"))
+
+ord_stan_fun <- "
+  real rc_invlink(real x, int lk) {
+    if (lk == 1) return inv_logit(x);
+    if (lk == 2) return Phi(x);
+    if (lk == 3) return inv_cloglog(x);
+    if (lk == 4) return exp(-exp(-x));
+    return atan(x) / pi() + 0.5;
+  }
+  real rc_cumulative_lpmf(int y, real mu, vector cuts, real s, int lk) {
+    int K = num_elements(cuts) + 1;
+    real up = y == K ? 1 : rc_invlink((cuts[y] - mu) / s, lk);
+    real lo = y == 1 ? 0 : rc_invlink((cuts[y - 1] - mu) / s, lk);
+    return log(fmax(up - lo, 1e-300));
+  }
+  real rc_contratio_lpmf(int y, real mu, vector cuts, real s, int lk) {
+    int K = num_elements(cuts) + 1;
+    real out = 0;
+    for (k in 1:(y - 1)) out += log1m(rc_invlink((cuts[k] - mu) / s, lk));
+    if (y < K) out += log(rc_invlink((cuts[y] - mu) / s, lk));
+    return out;
+  }
+  real rc_adjcat_lpmf(int y, real mu, vector cuts, real s) {
+    int K = num_elements(cuts) + 1;
+    vector[K] e;
+    e[1] = 0;
+    for (k in 2:K) e[k] = e[k - 1] + (mu - cuts[k - 1]) / s;
+    return e[y] - log_sum_exp(e);
+  }"
+ord_link_code <- c(logit = 1, probit = 2, cloglog = 3, loglog = 4, cauchit = 5)
 
 cum_lpmf <- function(F) function(y, p) { o <- ord_obs(y, p)
   up <- ifelse(y >= o$K, 1, F((p$cuts[pmin(y, o$K - 1)] - o$mu) / o$s))
@@ -36,6 +66,7 @@ for (lk in c("logit", "probit", "cloglog", "loglog", "cauchit")) local({
   F <- link(lk)$linkinv
   ord_reg(paste0("cumulative_", lk), sprintf("Cumulative %s (ordinal)", lk), cum_lpmf(F),
     formula = sprintf("P(Y <= k) = %s^-1((theta_k - mu) / scale)", lk),
+    stan = stan_generated(ord_stan_fun, sprintf("rc_cumulative_lpmf({y} | {mu}, {cuts}, {scale}, %d)", ord_link_code[[lk]])),
     refs = c("McCullagh (1980), Regression models for ordinal data. JRSS B, 42, 109-142.", "McCullagh and Nelder (1989), Generalized Linear Models, 2nd ed., ch. 5."),
     reference = ref_impl("definition (MASS::polr convention)",
       local({ L <- lk; function(y, p) { cdf <- c(0, switch(L, logit = stats::plogis, probit = stats::pnorm, cauchit = stats::pcauchy,
@@ -54,6 +85,7 @@ for (lk in c("logit", "probit", "cloglog")) local({
   F <- link(lk)$linkinv
   ord_reg(paste0("continuation_ratio_", lk), sprintf("Continuation ratio %s (sequential ordinal)", lk), cr_lpmf(F), check = NULL, cuts = "free",
     formula = sprintf("P(Y = k | Y >= k) = %s^-1(theta_k - mu)", lk),
+    stan = stan_generated(ord_stan_fun, sprintf("rc_contratio_lpmf({y} | {mu}, {cuts}, {scale}, %d)", ord_link_code[[lk]])),
     refs = c("Fienberg (1980), The Analysis of Cross-Classified Categorical Data.", "Tutz (1991), Sequential models in categorical regression. Comput. Stat. Data Anal., 11, 275-295."),
     reference = ref_impl("product of conditional probabilities", local({ G <- F; function(y, p) { h <- G((p$cuts - p$mu[1]) / p$scale[1])
       pr <- c(h, 1) * cumprod(c(1, 1 - h)); log(pr)[y] } })))
@@ -66,6 +98,7 @@ ac_lpmf <- function(y, p) { o <- ord_obs(y, p)
     eta <- c(0, cumsum((o$mu[i] - p$cuts) / o$s[i])); eta[k] - log_sum_exp(eta) }, 0) }
 ord_reg("adjacent_category_logit", "Adjacent category logit (ordinal)", ac_lpmf,
   formula = "log(P(Y = k + 1) / P(Y = k)) = (mu - theta_k) / scale",
+  stan = stan_generated(ord_stan_fun, "rc_adjcat_lpmf({y} | {mu}, {cuts}, {scale})"),
   refs = "Agresti (2010), Analysis of Ordinal Categorical Data, 2nd ed., ch. 4.", check = NULL, cuts = "free",
   reference = ref_impl("VGAM acat", function(y, p) { eta <- c(0, cumsum((p$mu[1] - p$cuts) / p$scale[1])); (eta - log(sum(exp(eta))))[y] }))
 
@@ -120,7 +153,8 @@ mlogit_family <- function(K) {
     discrete = TRUE, variate_type = "categorical", numeric_moments = FALSE,
     lpdf = function(y, p) { E <- cbind(0, do.call(cbind, p[nm]))
       m <- apply(E, 1, max); E[cbind(seq_along(y), y)] - m - log(rowSums(exp(E - m))) },
-    extra = list(share_formula = TRUE), status = "validated")
+    extra = list(share_formula = TRUE), status = "validated",
+    stan = stan_native(sprintf("categorical_logit_lpmf({y} | [0, %s]')", paste(sprintf("{%s}", nm), collapse = ", "))))
 }
 
 # Heckman (1979) sample selection model as a law for the pair (s, y): s is

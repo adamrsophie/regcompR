@@ -92,14 +92,10 @@ regcomp <- function(formula, ..., family, data, engine = c("ml", "tmb", "bayes")
                     parameterization = NULL, subset = NULL) {
   engine <- match.arg(engine)
   cl <- match.call()
-  fam <- get_family(family, parameterization)
-  if (!is.null(fam$extra$expand)) {
-    y0 <- eval(formula[[2]], if (missing(data)) environment(formula) else data, environment(formula))
-    fam <- fam$extra$expand(if (is.factor(y0)) nlevels(y0) else max(y0, na.rm = TRUE))
-  }
+  if (missing(data)) data <- environment(formula)
+  fam <- model_family(family, parameterization, formula, data)
   if (isTRUE(fam$extra$no_regression))
     stop_unsupported("Regression", fam$id)
-  if (missing(data)) data <- environment(formula)
   data <- as.data.frame(data)
   if (!is.null(subset)) data <- data[subset, , drop = FALSE]
   dots <- eval(substitute(alist(...)))
@@ -113,6 +109,15 @@ regcomp <- function(formula, ..., family, data, engine = c("ml", "tmb", "bayes")
   fit$call <- cl
   fit$engine <- engine
   fit
+}
+
+# Family of a model; families that depend on the number of response
+# categories (multinomial logit) are expanded here.
+model_family <- function(family, parameterization, formula, data) {
+  fam <- get_family(family, parameterization)
+  if (is.null(fam$extra$expand)) return(fam)
+  y0 <- eval(formula[[2]], data, environment(formula))
+  fam$extra$expand(if (is.factor(y0)) nlevels(y0) else max(y0, na.rm = TRUE))
 }
 
 #' Control settings for model fitting

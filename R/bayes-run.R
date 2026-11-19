@@ -2,14 +2,10 @@
 
 fit_bayes <- function(spec, priors, control) {
   runner <- control$runner
-  if (length(spec$aux))
-    stop_unsupported("Bayesian fitting of ordinal thresholds (use engine = \"ml\")")
-  if (any(vapply(spec$blocks, function(b) !is.null(b$W), TRUE)))
-    stop_unsupported("Bayesian fitting of multiple membership random effects (use engine = \"ml\")")
   st <- vapply(spec$blocks, function(b) b$struct, "")
-  if (any(!st %in% c("us", "diag")))
-    stop_unsupported(sprintf("Bayesian fitting of '%s' random effect structures (use engine = \"ml\")",
-                             paste(unique(st[!st %in% c("us", "diag")]), collapse = "', '")))
+  if (runner %in% c("jags", "openbugs") && (length(spec$aux) || any(!st %in% c("us", "diag")) ||
+      any(vapply(spec$blocks, function(b) !is.null(b$W), TRUE))))
+    stop_unsupported("Ordinal thresholds, structured or multiple membership random effects with the BUGS runners (use a Stan runner)")
   if (runner %in% c("jags", "openbugs")) {
     res <- run_bugs(spec, priors, control, runner)
   } else {
@@ -140,6 +136,8 @@ map_draws <- function(spec, arr, language) {
   }
   for (k in spec$rpars) for (j in seq_along(spec$beta_idx[[k]]))
     put(spec$beta_idx[[k]][j], ix(paste0("b_", k), j))
+  for (k in names(spec$aux)) for (j in seq_along(spec$beta_idx[[k]]))
+    put(spec$beta_idx[[k]][j], sprintf("%s[%d]", k, j))
   u <- if (spec$Q > 0) matrix(0, S, spec$Q) else NULL
   np <- length(spec$beta_names)
   for (j in seq_along(spec$blocks)) {
@@ -153,7 +151,16 @@ map_draws <- function(spec, arr, language) {
         sdv * get(sprintf("z_%d[%d]", j, l)) else get(sprintf("s_%d[%d]", j, l))
       next
     }
-    if (language == "bugs" && b$corr) {
+    if (!b$struct %in% c("us", "diag")) {
+      hom <- b$struct != "cs"
+      sdl <- if (hom) log(get(sprintf("sdh_%d", j))) else NULL
+      if (b$struct == "cs") for (e in seq_len(b$q)) fixed[, ti[e]] <- log(get(sprintf("sd_%d[%d]", j, e)))
+      else fixed[, ti[1]] <- sdl
+      last <- ti[length(ti)]
+      if (b$struct %in% c("cs", "homcs")) { a <- 1 / (b$q - 1); fixed[, last] <- stats::qlogis((get(sprintf("rho_%d", j)) + a) / (1 + a)) }
+      else if (b$struct == "ar1") fixed[, last] <- atanh(get(sprintf("rho_%d", j)))
+      else if (b$struct != "homdiag") fixed[, last] <- log(get(sprintf("range_%d", j)))
+    } else if (language == "bugs" && b$corr) {
       Sig <- array(NA_real_, c(S, b$q, b$q))
       for (a in seq_len(b$q)) for (c2 in seq_len(b$q)) Sig[, a, c2] <- get(sprintf("Sigma_%d[%d,%d]", j, a, c2))
       for (e in seq_len(b$q)) fixed[, ti[e]] <- 0.5 * log(Sig[, e, e])

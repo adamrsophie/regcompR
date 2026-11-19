@@ -77,7 +77,8 @@ find_prior <- function(priors, class, par, coef = NULL) {
       b = list(dist = "normal", args = c(0, 5)),
       Intercept = list(dist = "normal", args = c(0, 5)),
       sd = list(dist = "student_t", args = c(3, 0, 2.5)),
-      cor = list(dist = "lkj", args = 2))
+      cor = list(dist = "lkj", args = 2),
+      cuts = list(dist = "normal", args = c(0, 5)))
   }
   hit
 }
