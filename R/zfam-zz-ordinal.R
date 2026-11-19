@@ -122,3 +122,26 @@ mlogit_family <- function(K) {
       m <- apply(E, 1, max); E[cbind(seq_along(y), y)] - m - log(rowSums(exp(E - m))) },
     extra = list(share_formula = TRUE), status = "validated")
 }
+
+# Heckman (1979) sample selection model as a law for the pair (s, y): s is
+# the selection indicator and y the outcome, missing when s = 0.
+register_family(family_def("heckman_selection", "Heckman sample selection (bivariate normal)", "multivariate",
+  list(P("mu", "real", role = "location", link = "identity", offset_allowed = TRUE, interpretation = "Outcome mean"),
+       P("gamma", "real", role = "selection index", link = "identity", interpretation = "Probit index of selection"),
+       P("sigma", "positive", role = "scale"), P("rho", "symmetric_unit", role = "correlation")),
+  aliases = c("heckman", "sample_selection", "tobit2"),
+  discrete = FALSE, variate_type = "vector", numeric_cdf = FALSE, numeric_moments = FALSE,
+  formula = "P(s = 0) = Phi(-gamma); f(s = 1, y) = phi((y - mu)/sigma)/sigma Phi((gamma + rho (y - mu)/sigma) / sqrt(1 - rho^2))",
+  lpdf = function(y, p) { y <- if (is.matrix(y)) y else matrix(y, nrow = 1); n <- nrow(y)
+    mu <- rep_len(p$mu, n); g <- rep_len(p$gamma, n); s <- rep_len(p$sigma, n); r <- rep_len(p$rho, n)
+    z <- (y[, 2] - mu) / s
+    ifelse(y[, 1] == 0, stats::pnorm(-g, log.p = TRUE),
+           stats::dnorm(z, log = TRUE) - log(s) + stats::pnorm((g + r * z) / sqrt(1 - r^2), log.p = TRUE)) },
+  regression_notes = "Response cbind(s, y) with y missing (any value) when s = 0; the main formula models the outcome mean and gamma ~ z the selection equation (Heckman 1979; Type 2 Tobit). Fitted by full maximum likelihood.",
+  references = c("Heckman (1979), Sample selection bias as a specification error. Econometrica, 47, 153-161.",
+                 "Amemiya (1985), Advanced Econometrics, ch. 10."),
+  reference = ref_impl("bivariate normal integral", function(y, p) { y <- if (is.matrix(y)) y else matrix(y, nrow = 1)
+    vapply(seq_len(nrow(y)), function(i) if (y[i, 1] == 0) log(stats::pnorm(-p$gamma[i])) else
+      log(stats::integrate(function(v) mvtnorm::dmvnorm(cbind(v, y[i, 2]), c(p$gamma[i], p$mu[i]),
+        matrix(c(1, p$rho[i] * p$sigma[i], p$rho[i] * p$sigma[i], p$sigma[i]^2), 2)), 0, Inf, rel.tol = 1e-12)$value), 0) }),
+  status = "validated"))

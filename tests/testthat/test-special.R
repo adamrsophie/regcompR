@@ -19,3 +19,11 @@ test_that("person period expansion and multiple membership", {
   f2 <- regcomp(y ~ 1 + (1 | s1), family = "normal", data = d)
   expect_equal(f1$logLik, f2$logLik, tolerance = 1e-6)
 })
+
+test_that("Heckman selection likelihood matches the bivariate normal integral", {
+  skip_if_not_installed("mvtnorm")
+  f <- get_family("heckman_selection")
+  Y <- cbind(c(0, 1, 1), c(0, .4, -1.2))
+  p <- list(mu = c(.2, .3, -.1), gamma = c(.5, -.2, 1), sigma = c(1.2, .8, 1.5), rho = c(.4, -.6, .3))
+  expect_equal(f$lpdf(Y, p), f$reference$lpdf(Y, p), tolerance = 1e-8)
+})
