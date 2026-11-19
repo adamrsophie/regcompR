@@ -1,0 +1,54 @@
+# Covariance of the estimates
+
+`type = "model"` gives the inverse observed information (or the
+posterior covariance of a Bayesian fit). `type = "sandwich"` gives the
+robust covariance `V M V` of Huber and White, where `V` is the model
+covariance and `M` the summed outer products of score contributions;
+with `cluster` the scores are first summed within clusters (Liang and
+Zeger 1986) and `M` is multiplied by `G / (G - 1)` for `G` clusters.
+This is the independence working model of generalized estimating
+equations for any family; see
+[`gee()`](https://adamrsophie.github.io/regcompR/reference/gee.md) for
+other working correlations.
+
+## Usage
+
+``` r
+# S3 method for class 'regcomp_fit'
+vcov(object, type = c("model", "sandwich"), cluster = NULL, ...)
+```
+
+## Arguments
+
+- object:
+
+  A fitted model.
+
+- type:
+
+  `"model"` or `"sandwich"`.
+
+- cluster:
+
+  Optional cluster identifier: a vector, or a one sided formula
+  evaluated in the model data.
+
+- ...:
+
+  Unused.
+
+## Value
+
+A covariance matrix of the coefficients.
+
+## Examples
+
+``` r
+set.seed(1)
+d <- data.frame(g = rep(1:30, each = 5), x = rnorm(150))
+d$y <- rpois(150, exp(0.3 + 0.5 * d$x + rnorm(30, 0, 0.5)[d$g]))
+fit <- regcomp(y ~ x, family = "poisson", data = d)
+sqrt(diag(vcov(fit, type = "sandwich", cluster = ~ g)))
+#> lambda:(Intercept)           lambda:x 
+#>         0.10418495         0.08933988 
+```

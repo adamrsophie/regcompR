@@ -1,0 +1,411 @@
+# regcompR: Distributional Regression in R
+
+***regcompR*** fits distributional regression models: every parameter of
+a response distribution (location, scale, shape, zero inflation, cure
+fraction, ordinal thresholds, copula dependence) can depend on
+covariates through its own formula, and random effects can enter any of
+them. One model specification runs on several engines:
+
+- maximum or penalized likelihood, with a Laplace approximation for
+  random effects and smooth terms;
+- automatic differentiation and the Laplace approximation of
+  [TMB](https://github.com/kaskr/adcomp), through
+  [RTMB](https://CRAN.R-project.org/package=RTMB);
+- Bayesian inference with generated [Stan](https://mc-stan.org) programs
+  (run by bayescompR, cmdstanr or rstan) or BUGS programs (run by JAGS
+  or OpenBUGS).
+
+Distributions live in a machine readable registry of 278 families. Each
+entry records its support, parameter domains and links, moments with the
+conditions under which they exist, the methods available on each engine,
+references, and its validation status. Operators build new families from
+registered ones, and every family, built or registered, works in every
+part of the package.
+
+## Installation
+
+``` r
+
+# Development version
+# install.packages("remotes")
+remotes::install_github("adamrsophie/regcompR")
+```
+
+regcompR needs R 4.3.0 or later. It contains no compiled code of its
+own. Optional engines need their own packages: `RTMB` for
+`engine = "tmb"`, a Stan runner (`cmdstanr`, `rstan` or `bayescompR`),
+or JAGS with `R2jags` for `engine = "bayes"`.
+
+## Quick start
+
+``` r
+
+library(regcompR)
+set.seed(2026)
+
+# Distribution objects
+length(families())
+#> [1] 278
+d <- distribution("nb2", mu = 4, phi = 2)
+prob(d, 0:3)
+#> [1] 0.1111111 0.1481481 0.1481481 0.1316872
+quantile(d, c(0.1, 0.5, 0.9))
+#> [1] 0 3 9
+c(mean = mean(d), variance = variance(d))
+#>     mean variance
+#>        4       12
+
+# A negative binomial model with a random intercept in the mean and a
+# regression on the dispersion, fitted through TMB
+n <- 500
+dat <- data.frame(x = runif(n), g = factor(rep(1:50, each = 10)))
+dat$y <- rnbinom(n, mu = exp(1 + dat$x + rnorm(50, 0, 0.4)[dat$g]),
+                 size = exp(0.3 + 1.2 * dat$x))
+fit <- regcomp(y ~ x + (1 | g), phi ~ x, family = "nb2", data = dat,
+               engine = "tmb")
+round(coef(fit), 3)
+#>  mu:(Intercept)            mu:x phi:(Intercept)           phi:x
+#>           0.940           1.104           0.393           0.890
+round(exp(fit$theta), 3)       # random intercept standard deviation
+#> mu:1 | g:log_sd((Intercept))
+#>                        0.261
+
+# Predictive quantiles and event probabilities for a new group
+nd <- data.frame(x = c(0.2, 0.8))
+predict(fit, nd, type = "quantile", probs = c(0.1, 0.9), re = "zero")
+#>      q0.1 q0.9
+#> [1,]    0    7
+#> [2,]    1   12
+predict(fit, nd, type = "probability", at = 0, re = "zero")
+#>      probability(0)
+#> [1,]     0.16123603
+#> [2,]     0.03444051
+
+# Operators give new families, used like any other
+zinb <- regcomp(y ~ x, zi ~ 1, family = inflate("nb2"), data = dat)
+AIC(fit, zinb)
+#>      df      AIC
+#> fit   5 2557.586
+#> zinb  4 2571.487
+
+# Diagnostics
+plot(fit, which = c("rootogram", "qq", "ranef"))
+
+# The same model in Stan
+fit_b <- regcomp(y ~ x + (1 | g), phi ~ x, family = "nb2", data = dat,
+                 engine = "bayes")
+```
+
+## What is covered
+
+| Area | Highlights |
+|----|----|
+| Registry | 278 families: count, binary, finite discrete, bounded, ordinal, nominal, real line, positive, unit interval, simplex, circular and directional, extreme value, multivariate and matrix valued; density, distribution function, quantile, random generation, moments, score and Hessian for each |
+| Count data | Poisson, NB1, NB2, NB-P, generalized Poisson, Conway Maxwell Poisson, Poisson inverse Gaussian, Poisson lognormal, Sichel, Delaporte, generalized Waring, generalized negative binomial, Faddy’s extended Poisson process models, multivariate counts; zero truncated, zero inflated and hurdle variants |
+| Operators | [`inflate()`](https://adamrsophie.github.io/regcompR/reference/inflate.md), [`hurdle()`](https://adamrsophie.github.io/regcompR/reference/hurdle.md), [`truncate_dist()`](https://adamrsophie.github.io/regcompR/reference/truncate_dist.md), [`censor()`](https://adamrsophie.github.io/regcompR/reference/censor.md), [`transform_dist()`](https://adamrsophie.github.io/regcompR/reference/transform_dist.md), [`discretize()`](https://adamrsophie.github.io/regcompR/reference/discretize.md), [`round_dist()`](https://adamrsophie.github.io/regcompR/reference/discretize.md), [`mixture()`](https://adamrsophie.github.io/regcompR/reference/mixture.md), [`compound()`](https://adamrsophie.github.io/regcompR/reference/compound.md), [`convolve_dist()`](https://adamrsophie.github.io/regcompR/reference/convolve_dist.md), [`splice()`](https://adamrsophie.github.io/regcompR/reference/splice.md), [`cure()`](https://adamrsophie.github.io/regcompR/reference/cure.md), [`copula_dist()`](https://adamrsophie.github.io/regcompR/reference/copula_dist.md), [`wrap()`](https://adamrsophie.github.io/regcompR/reference/wrap.md), [`weighted()`](https://adamrsophie.github.io/regcompR/reference/weighted.md), skew symmetric constructions, and generators such as Kumaraswamy G, beta G, Marshall Olkin, transmuted and exponentiated families |
+| Regression | A formula for every parameter, offsets, weights, custom links, fixed parameters, smooth terms through mgcv bases, penalties (ridge, lasso, elastic net, adaptive lasso, group lasso, SCAD, MCP) and bias reduction (Firth, FLIC, FLAC, log F) |
+| Hierarchical models | Random intercepts and slopes in any parameter, nested and crossed factors, correlated or independent effects, multiple membership terms |
+| Longitudinal models | AR(1), compound symmetry, unstructured, diagonal, Ornstein Uhlenbeck and spatial (exponential, Gaussian, Matern 3/2) covariance structures; GEE with independence, exchangeable, AR(1) and unstructured working correlations; cluster robust covariances |
+| Ordinal and categorical | Cumulative (logit, probit, cloglog, loglog, cauchit), continuation ratio, adjacent category and stereotype models, location scale ordinal models, multinomial logit, bivariate binary odds ratio and sample selection models |
+| Survival | Right, left and interval censoring, truncation and delayed entry for any family; parametric survival models; mixture cure models; discrete time hazards with [`person_period()`](https://adamrsophie.github.io/regcompR/reference/person_period.md) and frailty through random effects |
+| Special methods | Exact conditional Poisson regression, quantile regression for counts, custom families from a log density |
+| Inference and prediction | Wald and posterior summaries, sandwich covariances, predictions of the mean, any parameter, quantiles, probabilities and survival with confidence or credible intervals, conditional or marginal over random effects |
+| Checking and comparison | Randomized quantile residuals, PIT histograms, rootograms, effect and caterpillar plots, posterior predictive checks, log, CRPS, Dawid Sebastiani, Brier and ranked probability scores, K fold cross validation, identifiability checks |
+| Bayesian backends | Generated Stan code for every family with a Stan density, all random effect structures and multiple membership; BUGS code for JAGS and OpenBUGS; priors by class, parameter and coefficient |
+
+[`capabilities()`](https://adamrsophie.github.io/regcompR/reference/capabilities.md)
+reports what each engine supports for a family, and
+[`registry_table()`](https://adamrsophie.github.io/regcompR/reference/registry_table.md)
+returns the whole registry as a data frame.
+
+## Validation
+
+- Families are checked for normalization, for agreement between its
+  density, distribution function and quantile function, and for moments
+  against simulation; families with a reference implementation are
+  compared with it (`stats`, `extraDistr`, `VGAM`, `actuar`, `evd`,
+  `circular` and others).
+- Model fits are tested against established packages on the same data:
+  linear and generalized linear mixed models against `lme4` and
+  `glmmTMB`, covariance structures against `glmmTMB`, ordinal models
+  against `MASS`, `ordinal` and `VGAM`, multinomial models against
+  `nnet`, GEE against `geepack`, sandwich covariances against
+  `sandwich`, parametric survival against `survival`, cure models
+  against `flexsurvcure`, copulas against `copula`, and scoring rules
+  against `scoringRules`.
+- The TMB engine reproduces the default engine’s estimates and standard
+  errors; Bayesian fits are checked against the likelihood fits.
+- `R CMD check --as-cran` passes with no errors or warnings.
+
+## Documentation
+
+The [package website](https://adamrsophie.github.io/regcompR/) has the
+full reference and these articles:
+
+- [Getting
+  started](https://adamrsophie.github.io/regcompR/articles/regcompR.html)
+- [Distributions and
+  operators](https://adamrsophie.github.io/regcompR/articles/distributions.html)
+- [Count data
+  models](https://adamrsophie.github.io/regcompR/articles/count-models.html)
+- [Hierarchical and longitudinal
+  models](https://adamrsophie.github.io/regcompR/articles/hierarchical-longitudinal.html)
+- [Ordinal and categorical
+  responses](https://adamrsophie.github.io/regcompR/articles/ordinal-categorical.html)
+- [Censored data and survival
+  models](https://adamrsophie.github.io/regcompR/articles/survival.html)
+- [Model checking and
+  comparison](https://adamrsophie.github.io/regcompR/articles/model-checking.html)
+- [Bayesian distributional
+  regression](https://adamrsophie.github.io/regcompR/articles/bayesian.html)
+
+## Citing regcompR
+
+``` r
+
+citation("regcompR")
+```
+
+The repository ships machine readable citation metadata:
+
+- [`CITATION.cff`](https://adamrsophie.github.io/regcompR/CITATION.cff):
+  Citation File Format (GitHub “Cite this repository”, Zenodo).
+- [`.zenodo.json`](https://adamrsophie.github.io/regcompR/.zenodo.json):
+  Zenodo deposit metadata.
+- `inst/CITATION`: the R level citation (`citation("regcompR")`).
+
+Once the first GitHub release is archived on Zenodo, its concept DOI
+will resolve to the latest release.
+
+## Contributing
+
+Bug reports, feature requests, and pull requests are welcome; see
+[`CONTRIBUTING.md`](https://adamrsophie.github.io/regcompR/CONTRIBUTING.md).
+A wrong answer is the most useful bug report: include a reproducible
+example and, if you can, what a reference package returns for the same
+model. Please follow the [Code of
+Conduct](https://adamrsophie.github.io/regcompR/CODE_OF_CONDUCT.md), and
+report security issues privately as described in
+[`SECURITY.md`](https://adamrsophie.github.io/regcompR/SECURITY.md).
+
+## Author
+
+- Adam R Sophie (author, maintainer, copyright holder),
+  <adamrsophie@gmail.com>
+
+## Acknowledgments
+
+regcompR builds on the distributional regression framework of Rigby and
+Stasinopoulos (2005), on TMB (Kristensen et al. 2016) through RTMB, and
+on Stan, JAGS and OpenBUGS for Bayesian inference. The packages used as
+references in its tests are gratefully acknowledged.
+
+## License
+
+GPL-3. See
+[`LICENSE.md`](https://adamrsophie.github.io/regcompR/LICENSE.md) or
+<https://www.gnu.org/licenses/gpl-3.0> for the full license text.
+
+# Package index
+
+## Fitting models
+
+- [`regcomp()`](https://adamrsophie.github.io/regcompR/reference/regcomp.md)
+  : Fit a distributional regression model
+- [`regcomp_control()`](https://adamrsophie.github.io/regcompR/reference/regcomp_control.md)
+  : Control settings for model fitting
+- [`penalty()`](https://adamrsophie.github.io/regcompR/reference/penalty.md)
+  : Penalties for regularized and bias reduced estimation
+- [`prior()`](https://adamrsophie.github.io/regcompR/reference/prior.md)
+  : Priors for Bayesian fits
+- [`gee()`](https://adamrsophie.github.io/regcompR/reference/gee.md) :
+  Generalized estimating equations
+- [`exact_poisson()`](https://adamrsophie.github.io/regcompR/reference/exact_poisson.md)
+  : Exact conditional Poisson regression
+- [`quantile_count()`](https://adamrsophie.github.io/regcompR/reference/quantile_count.md)
+  : Quantile regression for counts
+- [`person_period()`](https://adamrsophie.github.io/regcompR/reference/person_period.md)
+  : Person period data for discrete time hazard models
+
+## Distributions
+
+- [`distribution()`](https://adamrsophie.github.io/regcompR/reference/distribution.md)
+  : Create a distribution object
+- [`log_prob()`](https://adamrsophie.github.io/regcompR/reference/probability-interface.md)
+  [`prob()`](https://adamrsophie.github.io/regcompR/reference/probability-interface.md)
+  [`cdf()`](https://adamrsophie.github.io/regcompR/reference/probability-interface.md)
+  [`survival()`](https://adamrsophie.github.io/regcompR/reference/probability-interface.md)
+  [`rng()`](https://adamrsophie.github.io/regcompR/reference/probability-interface.md)
+  : Probability interface
+- [`mean(`*`<regcomp_dist>`*`)`](https://adamrsophie.github.io/regcompR/reference/moments.md)
+  [`variance()`](https://adamrsophie.github.io/regcompR/reference/moments.md)
+  [`skewness()`](https://adamrsophie.github.io/regcompR/reference/moments.md)
+  [`kurtosis()`](https://adamrsophie.github.io/regcompR/reference/moments.md)
+  : Moments of a distribution object
+- [`quantile(`*`<regcomp_dist>`*`)`](https://adamrsophie.github.io/regcompR/reference/quantile.regcomp_dist.md)
+  : Quantiles of a distribution object
+- [`support()`](https://adamrsophie.github.io/regcompR/reference/support.md)
+  : Support of a distribution object
+- [`score()`](https://adamrsophie.github.io/regcompR/reference/score.md)
+  [`hessian()`](https://adamrsophie.github.io/regcompR/reference/score.md)
+  : Score and Hessian of the log likelihood
+- [`plot(`*`<regcomp_dist>`*`)`](https://adamrsophie.github.io/regcompR/reference/plot.regcomp_dist.md)
+  : Plot a distribution
+- [`get_family()`](https://adamrsophie.github.io/regcompR/reference/get_family.md)
+  [`families()`](https://adamrsophie.github.io/regcompR/reference/get_family.md)
+  : Look up a registered family
+- [`registry_table()`](https://adamrsophie.github.io/regcompR/reference/registry_table.md)
+  : Registry table
+- [`capabilities()`](https://adamrsophie.github.io/regcompR/reference/capabilities.md)
+  [`supports()`](https://adamrsophie.github.io/regcompR/reference/capabilities.md)
+  : Capability queries
+- [`validate_parameters()`](https://adamrsophie.github.io/regcompR/reference/validate_parameters.md)
+  [`validate_response()`](https://adamrsophie.github.io/regcompR/reference/validate_parameters.md)
+  : Validate parameters and responses
+- [`ordinal-families`](https://adamrsophie.github.io/regcompR/reference/ordinal-families.md)
+  : Cumulative link ordinal families
+
+## Building families
+
+- [`par_spec()`](https://adamrsophie.github.io/regcompR/reference/par_spec.md)
+  : Parameter specification
+- [`custom_family()`](https://adamrsophie.github.io/regcompR/reference/custom_family.md)
+  : User defined families
+- [`link()`](https://adamrsophie.github.io/regcompR/reference/link.md)
+  [`links()`](https://adamrsophie.github.io/regcompR/reference/link.md)
+  : Link functions
+- [`quantile_param()`](https://adamrsophie.github.io/regcompR/reference/quantile_param.md)
+  : Quantile parameterized families
+
+## Operators
+
+- [`inflate()`](https://adamrsophie.github.io/regcompR/reference/inflate.md)
+  : Inflated distributions
+- [`hurdle()`](https://adamrsophie.github.io/regcompR/reference/hurdle.md)
+  : Hurdle distributions
+- [`truncate_dist()`](https://adamrsophie.github.io/regcompR/reference/truncate_dist.md)
+  : Truncated distributions
+- [`censor()`](https://adamrsophie.github.io/regcompR/reference/censor.md)
+  : Censored distributions
+- [`cens()`](https://adamrsophie.github.io/regcompR/reference/cens.md)
+  [`surv()`](https://adamrsophie.github.io/regcompR/reference/cens.md) :
+  Censored, truncated and interval observations
+- [`transform_dist()`](https://adamrsophie.github.io/regcompR/reference/transform_dist.md)
+  : Monotone transformations
+- [`discretize()`](https://adamrsophie.github.io/regcompR/reference/discretize.md)
+  [`round_dist()`](https://adamrsophie.github.io/regcompR/reference/discretize.md)
+  : Discretized and rounded distributions
+- [`mixture()`](https://adamrsophie.github.io/regcompR/reference/mixture.md)
+  : Finite mixtures
+- [`compound()`](https://adamrsophie.github.io/regcompR/reference/compound.md)
+  : Compound (mixed) distributions
+- [`convolve_dist()`](https://adamrsophie.github.io/regcompR/reference/convolve_dist.md)
+  : Convolution of two independent laws
+- [`splice()`](https://adamrsophie.github.io/regcompR/reference/splice.md)
+  : Spliced (composite) distributions
+- [`cure()`](https://adamrsophie.github.io/regcompR/reference/cure.md) :
+  Mixture cure models
+- [`copula_dist()`](https://adamrsophie.github.io/regcompR/reference/copula_dist.md)
+  : Bivariate copula models
+- [`wrap()`](https://adamrsophie.github.io/regcompR/reference/wrap.md) :
+  Wrapped distributions
+- [`weighted()`](https://adamrsophie.github.io/regcompR/reference/weighted.md)
+  [`contaminated()`](https://adamrsophie.github.io/regcompR/reference/weighted.md)
+  : Weighted and contaminated distributions
+- [`skew_symmetric()`](https://adamrsophie.github.io/regcompR/reference/skew_symmetric.md)
+  : Skew-symmetric distributions
+- [`sine_skew()`](https://adamrsophie.github.io/regcompR/reference/sine_skew.md)
+  : Sine-skewed circular distributions
+- [`exponentiated()`](https://adamrsophie.github.io/regcompR/reference/exponentiated.md)
+  [`kumaraswamy_g()`](https://adamrsophie.github.io/regcompR/reference/exponentiated.md)
+  [`beta_g()`](https://adamrsophie.github.io/regcompR/reference/exponentiated.md)
+  [`mcdonald_g()`](https://adamrsophie.github.io/regcompR/reference/exponentiated.md)
+  [`exp_generalized_g()`](https://adamrsophie.github.io/regcompR/reference/exponentiated.md)
+  [`marshall_olkin()`](https://adamrsophie.github.io/regcompR/reference/exponentiated.md)
+  [`transmuted()`](https://adamrsophie.github.io/regcompR/reference/exponentiated.md)
+  [`record_transmuted()`](https://adamrsophie.github.io/regcompR/reference/exponentiated.md)
+  [`odd_log_logistic()`](https://adamrsophie.github.io/regcompR/reference/exponentiated.md)
+  [`odd_burr()`](https://adamrsophie.github.io/regcompR/reference/exponentiated.md)
+  [`weibull_g()`](https://adamrsophie.github.io/regcompR/reference/exponentiated.md)
+  [`gamma_g()`](https://adamrsophie.github.io/regcompR/reference/exponentiated.md)
+  [`topp_leone_g()`](https://adamrsophie.github.io/regcompR/reference/exponentiated.md)
+  [`lindley_g()`](https://adamrsophie.github.io/regcompR/reference/exponentiated.md)
+  [`harris_g()`](https://adamrsophie.github.io/regcompR/reference/exponentiated.md)
+  [`sine_g()`](https://adamrsophie.github.io/regcompR/reference/exponentiated.md)
+  [`dus()`](https://adamrsophie.github.io/regcompR/reference/exponentiated.md)
+  [`km()`](https://adamrsophie.github.io/regcompR/reference/exponentiated.md)
+  [`power_series_max()`](https://adamrsophie.github.io/regcompR/reference/exponentiated.md)
+  [`power_series_min()`](https://adamrsophie.github.io/regcompR/reference/exponentiated.md)
+  : Generated distribution families
+
+## Results and prediction
+
+- [`summary(`*`<regcomp_fit>`*`)`](https://adamrsophie.github.io/regcompR/reference/summary.regcomp_fit.md)
+  : Summarize a fitted model
+- [`predict(`*`<regcomp_fit>`*`)`](https://adamrsophie.github.io/regcompR/reference/predict.regcomp_fit.md)
+  : Predictions from a fitted model
+- [`fitted_distribution()`](https://adamrsophie.github.io/regcompR/reference/fitted_distribution.md)
+  : Fitted distributions
+- [`simulate(`*`<regcomp_fit>`*`)`](https://adamrsophie.github.io/regcompR/reference/simulate.regcomp_fit.md)
+  : Simulate responses from a fitted model
+- [`residuals(`*`<regcomp_fit>`*`)`](https://adamrsophie.github.io/regcompR/reference/residuals.regcomp_fit.md)
+  : Residuals of a fitted model
+- [`vcov(`*`<regcomp_fit>`*`)`](https://adamrsophie.github.io/regcompR/reference/vcov.regcomp_fit.md)
+  : Covariance of the estimates
+- [`log_lik()`](https://adamrsophie.github.io/regcompR/reference/log_lik.md)
+  : Pointwise log likelihood
+- [`ranef_regcomp()`](https://adamrsophie.github.io/regcompR/reference/ranef_regcomp.md)
+  : Random effect estimates
+- [`plot(`*`<regcomp_fit>`*`)`](https://adamrsophie.github.io/regcompR/reference/plot.regcomp_fit.md)
+  : Plot a fitted model
+
+## Model checking and comparison
+
+- [`scoring_rule()`](https://adamrsophie.github.io/regcompR/reference/scoring_rule.md)
+  : Proper scoring rules for predictive distributions
+- [`cv_regcomp()`](https://adamrsophie.github.io/regcompR/reference/cv_regcomp.md)
+  : Cross validation of a fitted model
+- [`compare_models()`](https://adamrsophie.github.io/regcompR/reference/compare_models.md)
+  : Compare fitted models
+- [`identifiability_check()`](https://adamrsophie.github.io/regcompR/reference/identifiability_check.md)
+  : Identifiability diagnostics of a fit
+
+## Bayesian code generation
+
+- [`stan_code()`](https://adamrsophie.github.io/regcompR/reference/stan_code.md)
+  : Generate the Stan program of a model
+- [`bugs_code()`](https://adamrsophie.github.io/regcompR/reference/bugs_code.md)
+  : Generate the BUGS program of a model
+
+## Utilities
+
+- [`log1mexp()`](https://adamrsophie.github.io/regcompR/reference/numerics.md)
+  [`log1pexp()`](https://adamrsophie.github.io/regcompR/reference/numerics.md)
+  [`log_sum_exp()`](https://adamrsophie.github.io/regcompR/reference/numerics.md)
+  [`log_diff_exp()`](https://adamrsophie.github.io/regcompR/reference/numerics.md)
+  : Stable numerical building blocks
+- [`regcomp-conditions`](https://adamrsophie.github.io/regcompR/reference/regcomp-conditions.md)
+  : Conditions raised by regcompR
+- [`regcompR`](https://adamrsophie.github.io/regcompR/reference/regcompR-package.md)
+  [`regcompR-package`](https://adamrsophie.github.io/regcompR/reference/regcompR-package.md)
+  : regcompR: Distributional Regression with a Verified Registry of
+  Probability Distributions
+
+# Articles
+
+### Guides
+
+- [Distributions and
+  operators](https://adamrsophie.github.io/regcompR/articles/distributions.md):
+- [Count data
+  models](https://adamrsophie.github.io/regcompR/articles/count-models.md):
+- [Hierarchical and longitudinal
+  models](https://adamrsophie.github.io/regcompR/articles/hierarchical-longitudinal.md):
+- [Ordinal and categorical
+  responses](https://adamrsophie.github.io/regcompR/articles/ordinal-categorical.md):
+- [Censored data and survival
+  models](https://adamrsophie.github.io/regcompR/articles/survival.md):
+- [Model checking and
+  comparison](https://adamrsophie.github.io/regcompR/articles/model-checking.md):
+- [Bayesian distributional
+  regression](https://adamrsophie.github.io/regcompR/articles/bayesian.md):
