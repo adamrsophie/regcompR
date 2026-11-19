@@ -1,8 +1,7 @@
 # Further count distributions with infinite support.
 
 GSD <- "Rigby, Stasinopoulos, Heller and De Bastiani (2019), Distributions for Modeling Location, Scale, and Shape. Chapman and Hall/CRC."
-gdd <- function(f) { fn <- getExportedValue("gamlss.dist", f)
-  function(y, p) do.call(fn, c(list(y), p[intersect(names(p), names(formals(fn)))], list(log = TRUE))) }
+gdd <- gd
 gammasgn <- function(x) ifelse(x > 0, 1, (-1)^(floor(-x) + 1))
 cnt_par <- function(name, domain = "positive", role = "shape", ...) P(name, domain, role = role, ...)
 

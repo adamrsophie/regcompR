@@ -249,12 +249,19 @@ rfam("holtsmark", "Holtsmark (symmetric stable with index 3/2)", list(loc_par("m
 gstable_mix <- function(x, A, b, s, mu) stats::integrate(function(e) vapply(e, function(ee)
   dstable_s1(x - mu * ee, A, b, s * ee^(1 / A), 0), 0) * exp(-e), 0, Inf, rel.tol = 1e-8, stop.on.error = FALSE)$value
 
+# Symmetric Linnik law through a real integral (Kotz, Kozubowski and Podgorski
+# 2001, sec. 4.3): with z = |x|/sigma and kernel k(v) = 1 + v^(2A) + 2 v^A cos(pi A/2),
+# f = sin(pi A/2)/(pi sigma) int v^A e^(-v z)/k(v) dv and
+# P(X > x) = sin(pi A/2)/pi int v^(A - 1) e^(-v z)/k(v) dv for x > 0.
+linnik_int <- function(z, A, pw) stats::integrate(function(v) exp(pw * log(v) - v * z) / (1 + v^(2 * A) + 2 * v^A * cos(pi * A / 2)),
+  0, Inf, rel.tol = 1e-11, subdivisions = 2000L)$value * sin(pi * A / 2) / pi
 rfam("linnik", "Linnik (symmetric geometric stable)", list(P("alpha", "unit", role = "index", interpretation = "Index A = 2 alpha in (0, 2)"), scale_par("sigma")),
   formula = "phi(t) = 1 / (1 + |sigma t|^A)",
-  lpdf = function(y, p) log(pervec(y, p, function(x, pp) gstable_mix(x, 2 * pp$alpha, 0, pp$sigma, 0))),
-  numeric_moments = FALSE, references = "Linnik (1963); Kotz, Kozubowski and Podgorski (2001), The Laplace Distribution and Generalizations.",
-  reference = ref_impl("characteristic function inversion", function(y, p) log(pervec(y, p, function(x, pp)
-    cf_density(x, function(t) 1 / (1 + (pp$sigma * t)^(2 * pp$alpha)))))),
+  lpdf = function(y, p) log(pervec(y, p, function(x, pp) linnik_int(abs(x) / pp$sigma, 2 * pp$alpha, 2 * pp$alpha) / pp$sigma)),
+  cdf = function(q, p) pervec(q, p, function(x, pp) { if (x == 0) return(0.5)
+    s <- linnik_int(abs(x) / pp$sigma, 2 * pp$alpha, 2 * pp$alpha - 1); if (x > 0) 1 - s else s }),
+  numeric_moments = FALSE, references = "Linnik (1963); Kotz, Kozubowski and Podgorski (2001), The Laplace Distribution and Generalizations, sec. 4.3.",
+  reference = ref_impl("exponential mixture of stable laws", function(y, p) log(pervec(y, p, function(x, pp) gstable_mix(x, 2 * pp$alpha, 0, pp$sigma, 0)))),
   status = "validated")
 
 rfam("geometric_stable", "Geometric stable", list(P("alpha", "unit", role = "index"), P("beta", "symmetric_unit", role = "skewness"), scale_par("sigma"), loc_par("mu")),

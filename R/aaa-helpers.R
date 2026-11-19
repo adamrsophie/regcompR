@@ -219,14 +219,11 @@ modify_family <- function(f, ...) {
 }
 
 GS <- "Rigby, Stasinopoulos, Heller and De Bastiani (2019), Distributions for Modeling Location, Scale, and Shape: Using GAMLSS in R. Chapman and Hall/CRC."
-gd <- function(f, ...) {
-  fn <- getExportedValue("gamlss.dist", f)
-  function(y, p) do.call(fn, c(list(y), p[intersect(names(p), names(formals(fn)))], list(log = TRUE)))
-}
-gp <- function(f) {
-  fn <- getExportedValue("gamlss.dist", f)
-  function(q, p) do.call(fn, c(list(q), p[intersect(names(p), names(formals(fn)))]))
-}
+# Reference wrappers for gamlss.dist (Suggests): resolved only when called.
+gd <- function(f, ...) function(y, p) { fn <- getExportedValue("gamlss.dist", f)
+  do.call(fn, c(list(y), p[intersect(names(p), names(formals(fn)))], list(log = TRUE))) }
+gp <- function(f) function(q, p) { fn <- getExportedValue("gamlss.dist", f)
+  do.call(fn, c(list(q), p[intersect(names(p), names(formals(fn)))])) }
 
 mean_par <- function(name = "mu") P(name, "positive", role = "location", is_mean = TRUE, offset_allowed = TRUE)
 shp <- function(name, ...) P(name, "positive", role = "shape", ...)
