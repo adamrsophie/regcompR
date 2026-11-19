@@ -74,8 +74,9 @@ loglik_eta <- function(spec, eta) {
 # First and second derivatives of per observation log likelihood with
 # respect to each linear predictor, by central finite differences.
 # Returns g (n x K) and W (n x K x K) together with ll.
-eta_derivs <- function(spec, eta, second = TRUE) {
-  K <- length(spec$rpars)
+eta_derivs <- function(spec, eta, second = TRUE, which = spec$rpars) {
+  rp <- which
+  K <- length(rp)
   n <- spec$n
   ll0 <- loglik_eta(spec, eta)
   g <- matrix(0, n, K)
@@ -89,7 +90,7 @@ eta_derivs <- function(spec, eta, second = TRUE) {
   }
   plus <- vector("list", K); minus <- vector("list", K)
   for (a in seq_len(K)) {
-    k <- spec$rpars[a]
+    k <- rp[a]
     lp <- shifted(k, 1); lm <- shifted(k, -1)
     plus[[a]] <- lp; minus[[a]] <- lm
     ga <- (lp - lm) / (2 * h[[k]])
@@ -108,7 +109,7 @@ eta_derivs <- function(spec, eta, second = TRUE) {
     }
   }
   if (second && K > 1) for (a in 1:(K - 1)) for (b in (a + 1):K) {
-    ka <- spec$rpars[a]; kb <- spec$rpars[b]
+    ka <- rp[a]; kb <- rp[b]
     v <- (shifted(ka, 1, kb, 1) - shifted(ka, 1, kb, -1) -
             shifted(ka, -1, kb, 1) + shifted(ka, -1, kb, -1)) / (4 * h[[ka]] * h[[kb]])
     v[!is.finite(v)] <- 0

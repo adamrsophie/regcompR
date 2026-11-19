@@ -361,39 +361,40 @@ ml_gradient <- function(spec, beta, u = NULL) {
 laplace_inner <- function(spec, beta, theta, u0, control) {
   Lam <- re_precision(spec, theta)
   u <- if (is.null(u0)) rep(0, spec$Q) else u0
-  K <- length(spec$rpars)
+  rk <- spec$rpars[!vapply(spec$rpars, function(k) is.null(spec$Z[[k]]), TRUE)]
   fval <- function(u) {
     eta <- compute_eta(spec, beta, u)
     sum(spec$weights * loglik_eta(spec, eta)) - 0.5 * sum(u * as.vector(Lam %*% u))
   }
-  f <- fval(u)
-  H <- NULL
-  for (it in seq_len(control$inner_maxit)) {
-    eta <- compute_eta(spec, beta, u)
-    d <- eta_derivs(spec, eta, second = TRUE)
-    grad <- -as.vector(Lam %*% u)
-    H <- -Lam
-    for (a in seq_len(K)) {
-      ka <- spec$rpars[a]
-      if (is.null(spec$Z[[ka]])) next
-      grad <- grad + as.vector(Matrix::crossprod(spec$Z[[ka]], spec$weights * d$g[, a]))
-      for (b in seq_len(K)) {
-        kb <- spec$rpars[b]
-        if (is.null(spec$Z[[kb]])) next
-        w <- spec$weights * d$W[, a, b]
-        H <- H + Matrix::crossprod(spec$Z[[ka]], Matrix::Diagonal(x = w) %*% spec$Z[[kb]])
-      }
+  # Gradient and negative Hessian in u; derivatives are needed only for the
+  # parameters that carry random effects.
+  derivs <- function(u) {
+    d <- eta_derivs(spec, compute_eta(spec, beta, u), second = TRUE, which = rk)
+    grad <- -as.vector(Lam %*% u); H <- Lam
+    for (a in seq_along(rk)) {
+      Za <- spec$Z[[rk[a]]]
+      grad <- grad + as.vector(Matrix::crossprod(Za, spec$weights * d$g[, a]))
+      for (b in seq_along(rk))
+        H <- H - Matrix::crossprod(Za, spec$Z[[rk[b]]] * (spec$weights * d$W[, a, b]))
     }
-    negH <- Matrix::forceSymmetric(-H)
+    list(grad = grad, negH = Matrix::forceSymmetric(H))
+  }
+  factor <- function(negH) {
     ch <- tryCatch(Matrix::Cholesky(negH, perm = TRUE, LDL = FALSE), error = function(e) NULL)
     lam <- 0
-    while (is.null(ch)) {
+    while (is.null(ch) && lam <= 1e8) {
       lam <- if (lam == 0) 1e-6 else lam * 10
       ch <- tryCatch(Matrix::Cholesky(negH + lam * Matrix::Diagonal(spec$Q), perm = TRUE),
                      error = function(e) NULL)
-      if (lam > 1e8) break
     }
-    step <- as.vector(Matrix::solve(ch, grad))
+    list(ch = ch, lam = lam)
+  }
+  f <- fval(u)
+  for (it in seq_len(control$inner_maxit)) {
+    dd <- derivs(u)
+    fc <- factor(dd$negH)
+    step <- as.vector(Matrix::solve(fc$ch, dd$grad))
+    if (max(abs(step)) < 1e-9) break
     t <- 1
     repeat {
       un <- u + t * step
@@ -402,24 +403,13 @@ laplace_inner <- function(spec, beta, theta, u0, control) {
       t <- t / 2
       if (t < 1e-8) { un <- u; fn <- f; break }
     }
-    conv <- max(abs(un - u)) < 1e-9 || (abs(fn - f) < control$inner_tol * (1 + abs(f)) && max(abs(t * step)) < 1e-9)
+    moved <- max(abs(un - u))
     u <- un; f <- fn
-    if (conv) break
+    if (moved == 0) break
   }
-  # Hessian at the mode.
-  eta <- compute_eta(spec, beta, u)
-  d <- eta_derivs(spec, eta, second = TRUE)
-  H <- -Lam
-  for (a in seq_len(K)) for (b in seq_len(K)) {
-    ka <- spec$rpars[a]; kb <- spec$rpars[b]
-    if (is.null(spec$Z[[ka]]) || is.null(spec$Z[[kb]])) next
-    H <- H + Matrix::crossprod(spec$Z[[ka]],
-      Matrix::Diagonal(x = spec$weights * d$W[, a, b]) %*% spec$Z[[kb]])
-  }
-  negH <- Matrix::forceSymmetric(-H)
-  ld <- tryCatch(as.numeric(Matrix::determinant(negH, logarithm = TRUE)$modulus),
-                 error = function(e) NA_real_)
-  list(u = u, f = f, logdet = ld, negH = negH)
+  ld <- if (fc$lam == 0 && !is.null(fc$ch)) 2 * as.numeric(Matrix::determinant(fc$ch, logarithm = TRUE, sqrt = TRUE)$modulus) else
+    tryCatch(as.numeric(Matrix::determinant(dd$negH, logarithm = TRUE)$modulus), error = function(e) NA_real_)
+  list(u = u, f = f, logdet = ld, negH = dd$negH)
 }
 
 # Laplace approximation of the marginal log likelihood.
