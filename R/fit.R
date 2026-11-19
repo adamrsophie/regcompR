@@ -46,8 +46,13 @@
 #'   crossed and nested factors and random effects in several parameters
 #'   are allowed); the fitted object records `approximation = "laplace"`.
 #'   Penalties (see [penalty()]) give penalized likelihood estimates.
-#' * `"tmb"`: the same model through 'TMB' automatic differentiation for the
-#'   families that declare a TMB implementation (see [capabilities()]).
+#' * `"tmb"`: the same model, random effects and covariance structures
+#'   through automatic differentiation and the Laplace approximation of
+#'   'TMB' (via 'RTMB'), for the normal, Poisson, binomial, Bernoulli,
+#'   NB1, NB2, Student t, gamma, lognormal, Weibull, beta and exponential
+#'   families (see [capabilities()]). It gives the same estimates as
+#'   `"ml"` and is much faster for large multilevel models; the taped
+#'   density is checked against the registry density before fitting.
 #' * `"bayes"`: Bayesian inference. A 'Stan' program is generated from the
 #'   same specification (see [stan_code()]) and run by 'bayescompR'
 #'   (default, no compiler needed), 'cmdstanr' or 'rstan'. Priors are set
@@ -289,6 +294,9 @@ block_theta_names <- function(b) {
     paste0(pre, c("log_sd", "log_range")))
 }
 
+# Matrices that receive taped values must be taped themselves (TMB engine).
+ad_like <- function(M, th) if (inherits(th, "advector")) RTMB::AD(M) else M
+
 # Covariance matrix of one block from its unconstrained parameters.
 block_cov <- function(b, th) {
   q <- b$q
@@ -298,16 +306,18 @@ block_cov <- function(b, th) {
     homdiag = return(diag(exp(2 * th[1]), q)),
     us = {
       sd <- exp(th[seq_len(q)])
-      L <- diag(q)
+      L <- ad_like(diag(q), th)
       L[lower.tri(L)] <- th[-seq_len(q)]
-      L <- L / sqrt(rowSums(L^2))
-      return(outer(sd, sd) * tcrossprod(L))
+      L <- L / sqrt(drop((L * L) %*% rep(1, q)))
+      D <- ad_like(diag(q), th); diag(D) <- sd
+      return(D %*% L %*% t(L) %*% D)
     },
     cs = , homcs = {
       sd <- if (b$struct == "cs") exp(th[seq_len(q)]) else rep(exp(th[1]), q)
       a <- 1 / (q - 1); rho <- stats::plogis(th[length(th)]) * (1 + a) - a
-      R <- matrix(rho, q, q); diag(R) <- 1
-      return(outer(sd, sd) * R)
+      R <- ad_like(matrix(0, q, q), th) + rho; diag(R) <- 1
+      D <- ad_like(diag(q), th); diag(D) <- sd
+      return(D %*% R %*% D)
     },
     ar1 = {
       R <- tanh(th[2])^abs(outer(seq_len(q), seq_len(q), `-`))

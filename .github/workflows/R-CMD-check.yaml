@@ -50,7 +50,7 @@ jobs:
       - uses: r-lib/actions/setup-r-dependencies@f9a764fea8d5c63df6ef9a5c7795bf7deb5d7e05 # v2.14.0
         with:
           dependencies: '"hard"'
-          extra-packages: any::rcmdcheck, any::testthat, any::knitr, any::rmarkdown, any::evd, any::circular, any::extraDistr, any::lme4, any::glmmTMB, any::ordinal, any::nnet, any::mgcv, any::geepack, any::sandwich
+          extra-packages: any::rcmdcheck, any::testthat, any::knitr, any::rmarkdown, any::evd, any::circular, any::extraDistr, any::lme4, any::glmmTMB, any::ordinal, any::nnet, any::mgcv, any::geepack, any::sandwich, any::RTMB, any::scoringRules, any::copula, any::quantreg
           needs: check
 
       - uses: r-lib/actions/check-r-package@f9a764fea8d5c63df6ef9a5c7795bf7deb5d7e05 # v2.14.0

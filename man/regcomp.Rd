@@ -110,8 +110,13 @@ approximated by the Laplace method (joint over all random effects, so
 crossed and nested factors and random effects in several parameters
 are allowed); the fitted object records \code{approximation = "laplace"}.
 Penalties (see \code{\link[=penalty]{penalty()}}) give penalized likelihood estimates.
-\item \code{"tmb"}: the same model through 'TMB' automatic differentiation for the
-families that declare a TMB implementation (see \code{\link[=capabilities]{capabilities()}}).
+\item \code{"tmb"}: the same model, random effects and covariance structures
+through automatic differentiation and the Laplace approximation of
+'TMB' (via 'RTMB'), for the normal, Poisson, binomial, Bernoulli,
+NB1, NB2, Student t, gamma, lognormal, Weibull, beta and exponential
+families (see \code{\link[=capabilities]{capabilities()}}). It gives the same estimates as
+\code{"ml"} and is much faster for large multilevel models; the taped
+density is checked against the registry density before fitting.
 \item \code{"bayes"}: Bayesian inference. A 'Stan' program is generated from the
 same specification (see \code{\link[=stan_code]{stan_code()}}) and run by 'bayescompR'
 (default, no compiler needed), 'cmdstanr' or 'rstan'. Priors are set

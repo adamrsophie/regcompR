@@ -42,7 +42,7 @@ capabilities <- function(x) {
     ml = length(regression_pars(fam)) > 0 && !isTRUE(fam$extra$no_regression),
     stan = if (is.null(fam$stan)) "unavailable"
            else if (isTRUE(fam$stan$native)) "native" else "generated",
-    tmb = if (is.null(fam$tmb)) "unavailable" else "available",
+    tmb = if (is.null(tmb_family_key(fam))) "unavailable" else "available",
     bugs = if (is.null(fam$bugs)) "unavailable"
            else if (!is.null(fam$bugs$native)) "native" else "zeros_trick",
     status = fam$status

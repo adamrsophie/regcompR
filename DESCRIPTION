@@ -83,6 +83,7 @@ Suggests:
     RMTstat,
     rmutil,
     rstan,
+    RTMB,
     sandwich,
     scoringRules,
     sgt,

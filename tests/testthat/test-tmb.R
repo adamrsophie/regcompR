@@ -1,0 +1,15 @@
+test_that("TMB engine reproduces the ML engine", {
+  skip_on_cran(); skip_if_not_installed("RTMB"); skip_if_not_installed("lme4")
+  data(sleepstudy, package = "lme4")
+  a <- regcomp(Reaction ~ Days + (1 + Days | Subject), family = "normal", data = sleepstudy, engine = "tmb")
+  m <- lme4::lmer(Reaction ~ Days + (1 + Days | Subject), sleepstudy, REML = FALSE)
+  expect_equal(a$logLik, as.numeric(logLik(m)), tolerance = 1e-6)
+  expect_equal(unname(sqrt(diag(vcov(a)))[1:2]), unname(sqrt(diag(as.matrix(vcov(m))))), tolerance = 0.01)
+  set.seed(4); G <- 30; Tn <- 6
+  e <- unlist(lapply(1:G, function(i) as.numeric(arima.sim(list(ar = .6), Tn, sd = .8)))); x <- rnorm(G * Tn)
+  dl <- data.frame(y = rpois(G * Tn, exp(.2 + .5 * x + e)), x, g = factor(rep(1:G, each = Tn)), times = factor(rep(1:Tn, G)))
+  a <- regcomp(y ~ x + ar1(0 + times | g), family = "poisson", data = dl, engine = "tmb")
+  b <- regcomp(y ~ x + ar1(0 + times | g), family = "poisson", data = dl)
+  expect_equal(a$logLik, b$logLik, tolerance = 1e-6)
+  expect_error(regcomp(y ~ x, family = "sichel", data = dl, engine = "tmb"), "not available")
+})
