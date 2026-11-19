@@ -156,7 +156,7 @@ regcomp_control <- function(maxit = 1000, rel_tol = 1e-10, inner_maxit = 50,
 # Assemble everything the engines need.
 build_spec <- function(formula, dots, fam, data, weights = NULL, links = NULL,
                        fixed = NULL, env = parent.frame(), xlev = NULL,
-                       prev = NULL) {
+                       prev = NULL, response = is.null(prev)) {
   is_formula <- vapply(dots, function(d) {
     v <- tryCatch(eval(d, env), error = function(e) NULL)
     inherits(v, "formula")
@@ -173,9 +173,9 @@ build_spec <- function(formula, dots, fam, data, weights = NULL, links = NULL,
   }
   rpars <- names(fl)
   n <- nrow(data)
-  y <- if (is.null(prev)) get_response(formula, data) else NULL
+  y <- if (response) get_response(formula, data) else NULL
   ylev <- if (!is.null(prev)) prev$ylev else if (is.factor(y)) levels(y)
-  if (is.factor(y)) y <- as.integer(y)
+  if (is.factor(y)) y <- if (!is.null(prev)) match(as.character(y), ylev) else as.integer(y)
   cmat <- NULL
   if (inherits(y, "regcomp_cens")) { cmat <- unclass(y); y <- cmat[, "lower"] }
   # Links.
