@@ -24,3 +24,16 @@ test_that("multinomial logit matches nnet::multinom", {
   expect_equal(f$logLik, as.numeric(logLik(m)), tolerance = 1e-6)
   expect_equal(unname(f$coefficients), as.vector(t(coef(m))), tolerance = 1e-4)
 })
+
+test_that("plots and prediction on new data work for ordinal and Weibull fits", {
+  pdf(NULL); on.exit(grDevices::dev.off())
+  set.seed(1); n <- 200; x <- rnorm(n)
+  d <- data.frame(x, o = cut(x + rlogis(n), c(-Inf, -1, .5, Inf), ordered_result = TRUE),
+                  time = rweibull(n, 1.5, exp(1 + .3 * x)), ev = rbinom(n, 1, .8), g = factor(rep(1:20, each = 10)))
+  fo <- regcomp(o ~ x, family = "cumulative_logit", data = d)
+  for (w in c("qq", "pit", "residuals", "effects")) expect_silent(plot(fo, which = w, variable = "x"))
+  fw <- regcomp(surv(time, ev) ~ x, family = "weibull", data = d)
+  expect_equal(predict(fw, newdata = d[1:3, ], type = "median"), predict(fw, type = "median")[1:3], tolerance = 1e-10)
+  fr <- regcomp(time ~ x + (1 | g), family = "lognormal", data = d)
+  expect_silent(plot(fr, which = "ranef"))
+})

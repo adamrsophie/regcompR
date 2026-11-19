@@ -151,6 +151,7 @@ mlogit_family <- function(K) {
   family_def(paste0("multinomial_logit"), sprintf("Multinomial logit (%d categories)", K), "categorical",
     lapply(nm, function(k) P(k, "real", role = sprintf("log odds of category %s versus 1", sub("eta", "", k)), link = "identity")),
     discrete = TRUE, variate_type = "categorical", numeric_moments = FALSE,
+    support = function(p) list(lower = 1, upper = K),
     lpdf = function(y, p) { E <- cbind(0, do.call(cbind, p[nm]))
       m <- apply(E, 1, max); E[cbind(seq_along(y), y)] - m - log(rowSums(exp(E - m))) },
     extra = list(share_formula = TRUE), status = "validated",

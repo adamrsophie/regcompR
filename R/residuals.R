@@ -35,8 +35,8 @@ residuals.regcomp_fit <- function(object, type = c("quantile", "pit", "response"
 
 pit_values <- function(fam, y, pars, cmat = NULL) {
   n <- length(y)
-  pars <- recycle_pars(pars, n)
-  if (fam$variate_type != "scalar") stop_unsupported("PIT values for a vector valued response", fam$id)
+  if (!fam$variate_type %in% c("scalar", "categorical")) stop_unsupported("PIT values for a vector valued response", fam$id)
+  if (fam$variate_type == "scalar") pars <- recycle_pars(pars, n)
   lo <- y; up <- y
   if (!is.null(cmat)) { lo <- cmat[, "lower"]; up <- cmat[, "upper"] }
   Fup <- ifelse(is.infinite(up) & up > 0, 1, family_cdf(fam, ifelse(is.finite(up), up, 0), pars))

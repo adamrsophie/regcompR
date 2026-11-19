@@ -30,11 +30,7 @@
 scoring_rule <- function(object, newdata = NULL, rule = c("log", "crps", "dss", "brier", "rps"),
                          re = c("conditional", "zero")) {
   rule <- match.arg(rule); re <- match.arg(re)
-  spec <- if (is.null(newdata)) object$spec else
-    build_spec(object$spec$formulas[[primary_par(object$spec$fam, object$spec$rpars)]],
-               new_spec_dots(object$spec), object$spec$fam, as.data.frame(newdata),
-               fixed = object$spec$fixed, env = environment(object$spec$formulas[[1]]), xlev = NULL, prev = object$spec,
-               response = TRUE)
+  spec <- new_spec(object, newdata, response = TRUE)
   beta <- if (object$inference == "bayesian") colMeans(object$draws[, spec$beta_names, drop = FALSE]) else object$coefficients
   u <- if (object$inference == "bayesian" && length(object$u_draws)) colMeans(object$u_draws) else object$u
   pars <- pars_from(spec, unname(beta), u, re)

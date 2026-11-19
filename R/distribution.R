@@ -197,7 +197,18 @@ cdf.regcomp_dist <- function(x, q, lower_tail = TRUE, log_p = FALSE, ...) {
   if (log_p) log(val) else val
 }
 
+# Category probabilities of an ordinal or nominal law (n x K matrix).
+cat_probs <- function(fam, p, n) {
+  K <- fam$support(p)$upper
+  matrix(vapply(seq_len(K), function(k) exp(eval_lpdf(fam, rep(k, n), p)), numeric(n)), n, K)
+}
+
 family_cdf <- function(fam, q, p) {
+  if (fam$variate_type == "categorical") {
+    P <- cat_probs(fam, p, length(q))
+    k <- pmin(pmax(floor(q), 0), ncol(P))
+    return(rowSums(P * (col(P) <= k)))
+  }
   if (!is.null(fam$cdf)) return(fam$cdf(q, p))
   if (!isTRUE(fam$numeric_cdf)) stop_unsupported("The CDF", fam$id)
   s <- fam$support(p)
@@ -286,6 +297,10 @@ scalar_vecpar <- function(fam) grepl("^scalar_.*_parameter$", fam$variate_type)
 
 family_rng <- function(fam, n, pars) {
   if (!is.null(fam$rng)) return(fam$rng(n, pars))
+  if (fam$variate_type == "categorical") {
+    P <- cat_probs(fam, pars, n)
+    return(apply(P, 1, function(pr) sample.int(length(pr), 1L, prob = pr)))
+  }
   if (fam$variate_type != "scalar" && !scalar_vecpar(fam)) stop_unsupported("Random generation", fam$id)
   family_quantile(fam, stats::runif(n), pars)
 }

@@ -129,6 +129,12 @@ plot_multivariate <- function(x, ...) {
 #'   a confidence or credible band.
 #' * `"fitted"`: fitted distributions of a few observations.
 #' * `"trace"`: trace plots of posterior draws (Bayesian fits).
+#' * `"ranef"`: caterpillar plot of the random effects of each grouping
+#'   term with approximate 95% intervals (conditional standard deviations
+#'   from the Laplace Hessian, or posterior quantiles).
+#'
+#' For ordinal and nominal families `"effects"` draws the category
+#' probabilities against the covariate.
 #'
 #' @param x A fitted model.
 #' @param which Plot type(s).
@@ -151,13 +157,14 @@ plot.regcomp_fit <- function(x, which = c("qq", "pit", "residuals", "rootogram")
                              variable = NULL, par = "mean", nsim = 50, rows = 1:4,
                              ask = FALSE, ...) {
   which <- match.arg(which, c("qq", "pit", "residuals", "rootogram", "ppc", "effects",
-                              "fitted", "trace"), several.ok = TRUE)
+                              "fitted", "trace", "ranef"), several.ok = TRUE)
   if (!x$family$discrete) which <- setdiff(which, "rootogram")
   if (length(which) > 1 && ask) { op <- grDevices::devAskNewPage(TRUE); on.exit(grDevices::devAskNewPage(op)) }
   for (w in which) switch(w,
     qq = plot_qq(x, nsim, ...), pit = plot_pit(x, ...), residuals = plot_resid(x, ...),
     rootogram = plot_rootogram(x, ...), ppc = plot_ppc(x, nsim, ...),
     effects = plot_effects(x, variable, par, ...), fitted = plot(fitted_distribution(x)[rows], ...),
+    ranef = plot_ranef(x, ...),
     trace = plot_trace(x, ...))
   invisible(x)
 }
@@ -191,6 +198,7 @@ plot_pit <- function(fit, ...) {
 plot_resid <- function(fit, ...) {
   r <- residuals(fit, "quantile")
   m <- suppressWarnings(predict(fit, type = "mean"))
+  if (is.matrix(m)) m <- drop(m %*% seq_len(ncol(m)))   # expected category score
   graphics::plot(m, r, pch = 16, cex = 0.6, col = grDevices::adjustcolor("#1b6ca8", 0.6),
                  xlab = "fitted mean", ylab = "quantile residual", main = "Residuals against fitted", ...)
   graphics::abline(h = c(-2, 0, 2), lty = c(2, 1, 2), col = "#d1495b")
@@ -244,6 +252,15 @@ plot_effects <- function(fit, variable, par = "mean", level = 0.95, n = 50, ...)
     variable <- vars[1]
   }
   nd <- reference_grid(data, variable, n)
+  if (fit$family$variate_type == "categorical") {
+    P <- predict(fit, nd, type = "probability")
+    xv <- nd[[variable]]; xn <- if (is.numeric(xv)) xv else seq_along(xv)
+    lab <- fit$spec$ylev %||% seq_len(ncol(P))
+    graphics::matplot(xn, P, type = "l", lty = 1, lwd = 2, col = palette_rc(ncol(P)), ylim = c(0, 1),
+                      xlab = variable, ylab = "probability", main = paste("Category probabilities by", variable), ...)
+    graphics::legend("topright", legend = lab, col = palette_rc(ncol(P)), lty = 1, lwd = 2, bty = "n")
+    return(invisible(NULL))
+  }
   type <- if (par %in% c("mean", "median", "variance", "sd")) par else "parameter"
   pr <- tryCatch(predict(fit, nd, type = type, interval = "confidence", level = level, ndraws = 300),
                  error = function(e) NULL)
@@ -294,4 +311,29 @@ reference_grid <- function(data, variable, n = 50) {
   for (nm in names(data)) if (is.factor(data[[nm]])) nd[[nm]] <- factor(nd[[nm]], levels = levels(data[[nm]]))
   nd[[variable]] <- vals
   nd
+}
+
+plot_ranef <- function(fit, ...) {
+  spec <- fit$spec
+  if (!spec$Q) stop_input("The model has no random effects.")
+  if (fit$inference == "bayesian") {
+    est <- colMeans(fit$u_draws); lo <- apply(fit$u_draws, 2, stats::quantile, 0.025); hi <- apply(fit$u_draws, 2, stats::quantile, 0.975)
+  } else {
+    inner <- laplace_inner(spec, unname(fit$coefficients), unname(fit$theta), fit$u, regcomp_control())
+    sdv <- sqrt(pmax(Matrix::diag(Matrix::solve(inner$negH)), 0))
+    est <- fit$u; lo <- est - 1.96 * sdv; hi <- est + 1.96 * sdv
+  }
+  for (j in seq_along(spec$blocks)) {
+    b <- spec$blocks[[j]]; if (b$type == "smooth") next
+    for (e in seq_len(b$q)) {
+      idx <- spec$u_idx[[j]][(seq_len(b$L) - 1) * b$q + e]
+      o <- order(est[idx]); k <- seq_along(idx)
+      graphics::plot(est[idx][o], k, xlim = range(c(lo[idx], hi[idx])), pch = 16, col = "#1b6ca8", yaxt = "n",
+        xlab = "random effect", ylab = b$group, main = paste(b$par, ":", b$label, b$terms[e]), ...)
+      graphics::segments(lo[idx][o], k, hi[idx][o], k, col = "#1b6ca8")
+      graphics::abline(v = 0, lty = 2, col = "grey50")
+      if (length(idx) <= 40) graphics::axis(2, k, b$levels[o], las = 1, cex.axis = 0.6)
+    }
+  }
+  invisible(fit)
 }

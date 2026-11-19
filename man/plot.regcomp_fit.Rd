@@ -51,7 +51,14 @@ covariate, other covariates at their mean or most frequent level, with
 a confidence or credible band.
 \item \code{"fitted"}: fitted distributions of a few observations.
 \item \code{"trace"}: trace plots of posterior draws (Bayesian fits).
+\item \code{"ranef"}: caterpillar plot of the random effects of each grouping
+term with approximate 95\% intervals (conditional standard deviations
+from the Laplace Hessian, or posterior quantiles).
 }
+}
+\details{
+For ordinal and nominal families \code{"effects"} draws the category
+probabilities against the covariate.
 }
 \examples{
 set.seed(1)

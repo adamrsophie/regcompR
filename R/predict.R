@@ -1,15 +1,11 @@
 # Predictions, fitted distributions, simulation and pointwise likelihood.
 
-new_spec <- function(fit, newdata) {
+new_spec <- function(fit, newdata, response = FALSE) {
   if (is.null(newdata)) return(fit$spec)
   spec <- fit$spec
-  newdata <- as.data.frame(newdata)
-  two_sided <- function(f, k) if (length(f) == 3) f else
-    stats::as.formula(call("~", as.name(k), f[[2]]), env = environment(f))
-  dots <- c(unname(Map(two_sided, spec$formulas[-1], names(spec$formulas)[-1])), spec$data_args)
-  ns <- build_spec(spec$formulas[[1]], dots, spec$fam, newdata,
-                   fixed = c(spec$fixed), env = environment(spec$formulas[[1]]),
-                   prev = spec)
+  main <- spec$formulas[[primary_par(spec$fam, spec$rpars)]]
+  ns <- build_spec(main, new_spec_dots(spec), spec$fam, as.data.frame(newdata),
+                   fixed = c(spec$fixed), env = environment(main), prev = spec, response = response)
   ns$links <- spec$links
   ns
 }
@@ -238,10 +234,7 @@ simulate.regcomp_fit <- function(object, nsim = 1, seed = NULL, newdata = NULL,
 #' @export
 log_lik <- function(object, newdata = NULL, ...) {
   spec <- if (is.null(newdata)) object$spec else {
-    s <- new_spec(object, newdata)
-    y <- get_response(object$spec$formulas[[1]], as.data.frame(newdata))
-    if (inherits(y, "regcomp_cens")) { s$cmat <- unclass(y); s$y <- s$cmat[, "lower"] } else s$y <- y
-    s
+    new_spec(object, newdata, response = TRUE)
   }
   f <- function(beta, u) obs_loglik(spec$fam, spec$y, pars_from(spec, beta, u, "conditional"), spec$cmat)
   if (object$inference == "bayesian") {
