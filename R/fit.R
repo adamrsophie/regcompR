@@ -136,8 +136,9 @@ model_family <- function(family, parameterization, formula, data) {
 #' @param hessian Compute the covariance of the estimates.
 #' @param trace Print progress.
 #' @param chains,iter_warmup,iter_sampling,seed,runner,cores Bayesian
-#'   settings: chains, iterations, seed, the Stan runner (`"bayescompR"`,
-#'   `"cmdstanr"` or `"rstan"`) and parallel chains.
+#'   settings: chains, iterations, seed, the runner (`"bayescompR"`,
+#'   `"cmdstanr"` or `"rstan"` for Stan, `"jags"` through 'R2jags' or
+#'   `"openbugs"` through 'R2OpenBUGS') and parallel chains.
 #' @param adapt_delta Target acceptance for NUTS.
 #' @param start Optional named list of starting values for the coefficients
 #'   of each parameter (vectors on the link scale).
@@ -149,7 +150,7 @@ regcomp_control <- function(maxit = 1000, rel_tol = 1e-10, inner_maxit = 50,
                             inner_tol = 1e-8, restarts = 2, hessian = TRUE,
                             trace = FALSE, chains = 4, iter_warmup = 1000,
                             iter_sampling = 1000, seed = 1,
-                            runner = c("bayescompR", "cmdstanr", "rstan"),
+                            runner = c("bayescompR", "cmdstanr", "rstan", "jags", "openbugs"),
                             cores = 1, adapt_delta = 0.8, start = NULL) {
   list(maxit = maxit, rel_tol = rel_tol, inner_maxit = inner_maxit,
        inner_tol = inner_tol, restarts = restarts, hessian = hessian,

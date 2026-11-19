@@ -12,3 +12,14 @@ test_that("Stan code covers ordinal, multinomial, structured and multiple member
   expect_match(sc$code, "W_1 \\*")
   expect_equal(dim(sc$data$W_1), c(n, 5L))
 })
+
+test_that("JAGS runner fits a Poisson GLMM", {
+  skip_on_cran(); skip_if_not_installed("R2jags")
+  skip_if(Sys.which("jags") == "" && !file.exists("/opt/homebrew/bin/jags"), "JAGS not installed")
+  set.seed(2); g <- rep(1:15, each = 8); x <- rnorm(120)
+  d <- data.frame(y = rpois(120, exp(.5 + .4 * x + rnorm(15, 0, .5)[g])), x, g = factor(g))
+  fj <- suppressWarnings(regcomp(y ~ x + (1 | g), family = "poisson", data = d, engine = "bayes",
+    control = regcomp_control(runner = "jags", chains = 2, iter_warmup = 500, iter_sampling = 500)))
+  fm <- regcomp(y ~ x + (1 | g), family = "poisson", data = d)
+  expect_equal(unname(coef(fj)), unname(coef(fm)), tolerance = 0.1)
+})
