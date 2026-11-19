@@ -4,7 +4,9 @@ new_spec <- function(fit, newdata) {
   if (is.null(newdata)) return(fit$spec)
   spec <- fit$spec
   newdata <- as.data.frame(newdata)
-  dots <- c(lapply(spec$formulas[-1], function(f) f), spec$data_args)
+  two_sided <- function(f, k) if (length(f) == 3) f else
+    stats::as.formula(call("~", as.name(k), f[[2]]), env = environment(f))
+  dots <- c(unname(Map(two_sided, spec$formulas[-1], names(spec$formulas)[-1])), spec$data_args)
   ns <- build_spec(spec$formulas[[1]], dots, spec$fam, newdata,
                    fixed = c(spec$fixed), env = environment(spec$formulas[[1]]),
                    prev = spec)

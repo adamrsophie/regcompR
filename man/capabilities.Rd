@@ -31,7 +31,7 @@ and which fitting engines support it. \code{supports()} answers a single
 question with \code{TRUE} or \code{FALSE}.
 }
 \examples{
-capabilities("com_poisson_rate")
+capabilities("conway_maxwell_poisson")
 supports("cauchy", "mean")
 supports("poisson", backend = "stan")
 }

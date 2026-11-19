@@ -412,18 +412,18 @@ fit_ml <- function(spec, control, penalty = NULL) {
     theta0 <- unlist(lapply(spec$blocks, function(b)
       c(rep(log(0.5), b$q), if (b$corr) rep(0, b$q * (b$q - 1) / 2))))
     state <- new.env(); state$u <- rep(0, spec$Q)
-    obj <- function(par) {
+    obj_re <- function(par) {
       v <- laplace_objective(spec, par[seq_len(np)], par[-seq_len(np)], state, control) -
         pen_val(par[seq_len(np)])
       if (!is.finite(v)) 1e300 else -v
     }
-    opt <- robust_nlminb(c(b1, theta0), obj, NULL, control)
+    opt <- robust_nlminb(c(b1, theta0), obj_re, NULL, control)
     beta <- opt$par[seq_len(np)]; theta <- opt$par[-seq_len(np)]
     inner <- laplace_inner(spec, beta, theta, state$u, control)
     u <- inner$u
     cov <- NULL
     if (control$hessian) {
-      H <- num_hessian(function(p) -obj(p), opt$par)
+      H <- num_hessian(function(p) -obj_re(p), opt$par)
       cov <- safe_inverse(-H)
     }
     ll <- -opt$objective + pen_val(beta)

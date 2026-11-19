@@ -24,7 +24,7 @@
 #' cdf(d, 3)
 #' quantile(d, c(0.1, 0.5, 0.9))
 #' mean(d); variance(d)
-#' distribution("com_poisson", parameterization = "mean", mu = 3, nu = 1.5)
+#' distribution("conway_maxwell_poisson_mean", mu = 3, nu = 1.5)
 distribution <- function(family, ..., parameterization = NULL) {
   fam <- get_family(family, parameterization)
   vals <- list(...)

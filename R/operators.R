@@ -359,7 +359,7 @@ mixture <- function(...) {
   if (K < 2) stop_input("A mixture needs at least two components.")
   disc <- vapply(comps, `[[`, TRUE, "discrete")
   if (length(unique(disc)) > 1) stop_input("Mixture components must all be discrete or all continuous.")
-  pars <- list(); cmap <- list()
+  pars <- list(); cmap <- vector("list", K)
   for (k in seq_len(K)) {
     for (p in comps[[k]]$pars) {
       nm <- paste0(p$name, ".", k)

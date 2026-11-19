@@ -113,3 +113,18 @@ export(variance)
 export(weibull_g)
 export(weighted)
 export(wrap)
+importFrom(stats,
+  AIC,
+  BIC,
+  coef,
+  confint,
+  fitted,
+  formula,
+  logLik,
+  nobs,
+  predict,
+  quantile,
+  residuals,
+  simulate,
+  vcov
+)

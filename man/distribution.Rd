@@ -31,7 +31,7 @@ prob(d, 0:5)
 cdf(d, 3)
 quantile(d, c(0.1, 0.5, 0.9))
 mean(d); variance(d)
-distribution("com_poisson", parameterization = "mean", mu = 3, nu = 1.5)
+distribution("conway_maxwell_poisson_mean", mu = 3, nu = 1.5)
 }
 \seealso{
 \code{\link[=log_prob]{log_prob()}}, \code{\link[=cdf]{cdf()}}, \code{\link[=quantile.regcomp_dist]{quantile.regcomp_dist()}}, \code{\link[=rng]{rng()}},

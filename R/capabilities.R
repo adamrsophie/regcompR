@@ -16,7 +16,7 @@
 #' @return `capabilities()`: a named list. `supports()`: a logical scalar.
 #' @export
 #' @examples
-#' capabilities("com_poisson_rate")
+#' capabilities("conway_maxwell_poisson")
 #' supports("cauchy", "mean")
 #' supports("poisson", backend = "stan")
 capabilities <- function(x) {
