@@ -276,6 +276,19 @@ block_Z <- function(b, n) {
   Matrix::sparseMatrix(i = i, j = j, x = x, dims = c(n, b$q * b$L))
 }
 
+# The parameter that takes the main formula: the mean if a parameter equals
+# it, else the location, scale or rate, else the first regression parameter.
+primary_par <- function(fam, rp = regression_pars(fam)) {
+  if (!is.null(fam$extra$primary)) return(fam$extra$primary)
+  m <- rp[vapply(rp, function(k) isTRUE(fam$pars[[k]]$is_mean), TRUE)]
+  if (length(m)) return(m[1])
+  for (r in c("location", "scale", "rate")) {
+    m <- rp[vapply(rp, function(k) identical(fam$pars[[k]]$role, r), TRUE)]
+    if (length(m)) return(m[1])
+  }
+  rp[1]
+}
+
 # Parse the user's formulas into one formula per regression parameter.
 parse_formulas <- function(formula, dots, fam) {
   rp <- regression_pars(fam)
@@ -283,7 +296,8 @@ parse_formulas <- function(formula, dots, fam) {
   fl <- list()
   if (!inherits(formula, "formula") || length(formula) != 3)
     stop_input("The first formula must be two sided: response ~ predictors.")
-  fl[[rp[1]]] <- formula
+  prim <- primary_par(fam, rp)
+  fl[[prim]] <- formula
   for (f in dots) {
     if (length(f) != 3 || !is.name(f[[2]]))
       stop_input("Formulas for further parameters must look like 'sigma ~ x'.")
@@ -298,7 +312,7 @@ parse_formulas <- function(formula, dots, fam) {
   for (k in rp) if (is.null(fl[[k]])) fl[[k]] <- if (isTRUE(fam$extra$share_formula))
     stats::as.formula(call("~", formula[[3]]), env = environment(formula)) else
     stats::as.formula("~ 1", env = environment(formula))
-  attr(fl, "given") <- c(rp[1], names(fl)[vapply(names(fl), function(k) k != rp[1] && k %in% vapply(dots, function(f) as.character(f[[2]]), ""), TRUE)])
+  attr(fl, "given") <- c(prim, names(fl)[vapply(names(fl), function(k) k != prim && k %in% vapply(dots, function(f) as.character(f[[2]]), ""), TRUE)])
   structure(fl[rp], given = attr(fl, "given"))
 }
 
