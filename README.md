@@ -1,4 +1,4 @@
-# regcompR: Distributional Regression with a Verified Registry of Distributions
+# regcompR: Distributional Regression with a Verified Registry of Distributions <img src="man/figures/logo.png" align="right" height="139" alt="regcompR logo" />
 
 <!-- badges: start -->
 [![R-CMD-check](https://github.com/adamrsophie/regcompR/actions/workflows/R-CMD-check.yaml/badge.svg)](https://github.com/adamrsophie/regcompR/actions/workflows/R-CMD-check.yaml)
