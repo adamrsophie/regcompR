@@ -1,0 +1,68 @@
+Package: regcompR
+Title: Distributional Regression with a Verified Registry of Probability Distributions
+Version: 0.1.0
+Authors@R:
+    person("Adam R", "Sophie", email = "adamrsophie@gmail.com",
+           role = c("aut", "cre", "cph"))
+Description: A framework for distributional regression in which every
+    parameter of a response distribution can depend on covariates through
+    its own formula (Rigby and Stasinopoulos 2005
+    <doi:10.1111/j.1467-9876.2005.00510.x>). Distributions are held in a
+    machine readable registry that records support, parameter domains,
+    links, moments and their existence conditions, available methods,
+    references and validation status. Count, binary, bounded, categorical,
+    ordinal, real line, positive, unit interval, simplex, circular,
+    extreme value, multivariate and matrix valued laws are provided, each
+    with density or mass, distribution function, quantile, random
+    generation and moments where these exist. Operators build new laws
+    from old ones: inflation, hurdles, truncation, censoring, monotone
+    transformation, discretization, rounding, finite mixtures, convolution,
+    compounding and splicing. Models are fitted by maximum or penalized
+    likelihood with a Laplace approximation for random effects and
+    smooth terms, optionally through 'TMB' (Kristensen et al. 2016
+    <doi:10.18637/jss.v070.i05>), or by Bayesian inference through
+    generated 'Stan' programs run by 'bayescompR', 'cmdstanr' or 'rstan'.
+    Predictions, quantiles, event probabilities, randomized quantile
+    residuals, proper scoring rules, cross validation, average predictions
+    and contrasts, and plots for every distribution and fit are included.
+License: GPL-3
+Encoding: UTF-8
+Language: en-US
+Roxygen: list(markdown = TRUE)
+Depends: R (>= 4.3.0)
+Imports:
+    graphics,
+    grDevices,
+    Matrix,
+    methods,
+    stats,
+    utils
+Suggests:
+    actuar,
+    bayescompR,
+    circular,
+    cmdstanr,
+    COMPoissonReg,
+    distributions3,
+    extraDistr,
+    gamlss.dist,
+    GeneralizedHyperbolic,
+    glmmTMB,
+    hermite,
+    knitr,
+    mgcv,
+    numDeriv,
+    rmarkdown,
+    rstan,
+    scoringRules,
+    sn,
+    testthat (>= 3.0.0),
+    TMB,
+    VGAM,
+    yaml
+VignetteBuilder: knitr
+Config/testthat/edition: 3
+URL: https://github.com/adamrsophie/regcompR, https://adamrsophie.github.io/regcompR/
+BugReports: https://github.com/adamrsophie/regcompR/issues
+Additional_repositories: https://adamrsophie.r-universe.dev
+Config/roxygen2/version: 8.1.1
