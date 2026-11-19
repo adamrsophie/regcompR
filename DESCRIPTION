@@ -74,6 +74,7 @@ Suggests:
     poilog,
     PoissonBinomial,
     polyaAeppli,
+    quantreg,
     R2jags,
     R2OpenBUGS,
     rmarkdown,

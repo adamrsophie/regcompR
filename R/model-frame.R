@@ -197,16 +197,30 @@ build_predictor <- function(rhs, data, par, xlev = NULL, smooth_specs = NULL,
     if (ncol(Xr) == 1 && struct %in% c("us", "cs", "homcs")) struct <- "diag"
     corr <- struct == "us"
     gexpr <- b[[3]]
-    g <- eval_group(gexpr, data, env)
     key <- paste(deparse(bb$key, width.cutoff = 500L), collapse = "")
-    lev <- if (!is.null(re_levels[[key]])) re_levels[[key]] else
-      levels(droplevels(as.factor(g)))
-    gi <- match(as.character(g), lev)
+    W <- NULL
+    if (is.call(gexpr) && identical(gexpr[[1]], as.name("mm"))) {
+      # Multiple membership: mm(g1, g2, ..., weights = cbind(w1, w2, ...)).
+      args <- as.list(gexpr)[-1]
+      wexpr <- args$weights; args$weights <- NULL
+      G <- lapply(args, function(a) as.character(eval(a, data, env)))
+      Wm <- if (is.null(wexpr)) matrix(1 / length(G), length(G[[1]]), length(G)) else as.matrix(eval(wexpr, data, env))
+      lev <- if (!is.null(re_levels[[key]])) re_levels[[key]] else sort(unique(stats::na.omit(unlist(G))))
+      ii <- rep(seq_along(G[[1]]), length(G)); ll <- match(unlist(G), lev); ww <- as.vector(Wm)
+      keep <- !is.na(ll) & ww != 0
+      W <- Matrix::sparseMatrix(i = ii[keep], j = ll[keep], x = ww[keep], dims = c(length(G[[1]]), length(lev)))
+      gi <- rep(NA_integer_, length(G[[1]]))
+    } else {
+      g <- eval_group(gexpr, data, env)
+      lev <- if (!is.null(re_levels[[key]])) re_levels[[key]] else
+        levels(droplevels(as.factor(g)))
+      gi <- match(as.character(g), lev)
+    }
     blocks[[length(blocks) + 1L]] <- list(
       label = key, group = paste(deparse(gexpr), collapse = ""),
       terms = colnames(Xr), Xr = Xr, gi = gi, levels = lev,
       q = ncol(Xr), L = length(lev), corr = corr && ncol(Xr) > 1,
-      struct = struct, coords = coords, type = "re", par = par)
+      struct = struct, coords = coords, W = W, type = "re", par = par)
   }
   # Smooth terms through mgcv's mixed model representation.
   sm <- find_smooths(rhs[[length(rhs)]])
@@ -250,6 +264,11 @@ build_predictor <- function(rhs, data, par, xlev = NULL, smooth_specs = NULL,
 # (all q effects of level 1, then level 2, ...).
 block_Z <- function(b, n) {
   if (b$type == "smooth") return(Matrix::Matrix(b$Xr, sparse = TRUE))
+  if (!is.null(b$W)) {
+    tw <- Matrix::summary(b$W)
+    return(Matrix::sparseMatrix(i = rep(tw$i, b$q), j = as.vector(outer((tw$j - 1L) * b$q, seq_len(b$q), `+`)),
+      x = as.vector(tw$x * b$Xr[tw$i, , drop = FALSE]), dims = c(n, b$q * b$L)))
+  }
   ok <- !is.na(b$gi)
   i <- rep(which(ok), b$q)
   j <- as.vector(outer((b$gi[ok] - 1L) * b$q, seq_len(b$q), `+`))

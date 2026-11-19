@@ -4,6 +4,8 @@ fit_bayes <- function(spec, priors, control) {
   runner <- control$runner
   if (length(spec$aux))
     stop_unsupported("Bayesian fitting of ordinal thresholds (use engine = \"ml\")")
+  if (any(vapply(spec$blocks, function(b) !is.null(b$W), TRUE)))
+    stop_unsupported("Bayesian fitting of multiple membership random effects (use engine = \"ml\")")
   st <- vapply(spec$blocks, function(b) b$struct, "")
   if (any(!st %in% c("us", "diag")))
     stop_unsupported(sprintf("Bayesian fitting of '%s' random effect structures (use engine = \"ml\")",
