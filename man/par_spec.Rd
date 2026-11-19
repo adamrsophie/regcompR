@@ -56,6 +56,10 @@ arguments such as binomial trials use \code{FALSE} together with \code{data = TR
 \item{lower, upper}{Optional numeric bounds overriding the domain.}
 
 \item{default}{Optional value used by \code{distribution()} when omitted.}
+
+\item{estimate}{For a non regression parameter, \code{"ordered"} or \code{"free"} to
+estimate it as a vector whose length comes from the response (ordinal
+thresholds); \code{NULL} otherwise.}
 }
 \value{
 An object of class \code{regcomp_par}.

@@ -62,8 +62,11 @@ An object of class \code{regcomp_fit}.
 \description{
 Every regression parameter of the response distribution gets its own
 linear predictor on its link scale. The first formula gives the response
-and the predictor of the first regression parameter (usually the
-location); further formulas such as \code{sigma ~ x} give predictors for other
+and the predictor of the main parameter: the parameter equal to the mean
+if there is one, else the location, scale or rate parameter, else the
+first regression parameter (for example \code{scale} of the Weibull law, so
+that survival models are accelerated failure time models); further
+formulas such as \code{sigma ~ x} or \code{shape ~ x} give predictors for other
 parameters, which otherwise are constant. Predictors may contain
 offsets, factors and interactions, random effects in \code{lme4} syntax
 (\code{(1 | g)}, \code{(1 + x | g)}, uncorrelated \code{(1 + x || g)}, nested \code{(1 | a/b)},

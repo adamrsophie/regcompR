@@ -36,6 +36,9 @@ domain_bounds <- list(
 #' @param interpretation Text shown in documentation.
 #' @param lower,upper Optional numeric bounds overriding the domain.
 #' @param default Optional value used by `distribution()` when omitted.
+#' @param estimate For a non regression parameter, `"ordered"` or `"free"` to
+#'   estimate it as a vector whose length comes from the response (ordinal
+#'   thresholds); `NULL` otherwise.
 #' @return An object of class `regcomp_par`.
 #' @export
 #' @examples
