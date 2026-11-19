@@ -18,7 +18,8 @@ par_spec(
   interpretation = "",
   lower = NULL,
   upper = NULL,
-  default = NULL
+  default = NULL,
+  estimate = NULL
 )
 }
 \arguments{

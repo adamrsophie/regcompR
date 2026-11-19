@@ -44,7 +44,7 @@ par_spec <- function(name, domain = "real", role = "shape", link = NULL,
                      links = NULL, symbol = name, is_mean = FALSE,
                      offset_allowed = FALSE, regression = TRUE, data = FALSE,
                      interpretation = "", lower = NULL, upper = NULL,
-                     default = NULL) {
+                     default = NULL, estimate = NULL) {
   if (!domain %in% names(domain_bounds))
     stop_input(sprintf("Unknown parameter domain '%s'.", domain))
   if (is.null(link)) link <- default_link_for(domain)
@@ -57,7 +57,7 @@ par_spec <- function(name, domain = "real", role = "shape", link = NULL,
     interpretation = interpretation,
     lower = if (is.null(lower)) b[1] else lower,
     upper = if (is.null(upper)) b[2] else upper,
-    default = default
+    default = default, estimate = estimate
   ), class = "regcomp_par")
 }
 

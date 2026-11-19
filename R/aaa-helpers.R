@@ -239,3 +239,5 @@ cf_density <- function(x, cf, upper = Inf) vapply(x, function(xx)
 pervec <- function(y, p, fun) { r <- recycle_pars(c(list(.y = y), p))
   vapply(seq_along(r$.y), function(i) fun(r$.y[i], lapply(r[-1], `[`, i)), 0) }
 
+
+`%||%` <- function(a, b) if (is.null(a)) b else a

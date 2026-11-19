@@ -90,6 +90,10 @@ regcomp <- function(formula, ..., family, data, engine = c("ml", "tmb", "bayes")
   engine <- match.arg(engine)
   cl <- match.call()
   fam <- get_family(family, parameterization)
+  if (!is.null(fam$extra$expand)) {
+    y0 <- eval(formula[[2]], if (missing(data)) environment(formula) else data, environment(formula))
+    fam <- fam$extra$expand(if (is.factor(y0)) nlevels(y0) else max(y0, na.rm = TRUE))
+  }
   if (isTRUE(fam$extra$no_regression))
     stop_unsupported("Regression", fam$id)
   if (missing(data)) data <- environment(formula)
@@ -153,6 +157,8 @@ build_spec <- function(formula, dots, fam, data, weights = NULL, links = NULL,
   if (length(forms)) names(forms) <- NULL
   dargs <- dots[!is_formula]
   fl <- parse_formulas(formula, forms, fam)
+  for (k in setdiff(fam$extra$fixed_unless_formula, attr(fl, "given")))
+    if (is.null(fixed[[k]])) fixed[[k]] <- fam$pars[[k]]$default
   for (k in names(fixed)) {
     if (!k %in% names(fam$pars)) stop_input(sprintf("Unknown fixed parameter '%s'.", k))
     fl[[k]] <- NULL
@@ -160,6 +166,8 @@ build_spec <- function(formula, dots, fam, data, weights = NULL, links = NULL,
   rpars <- names(fl)
   n <- nrow(data)
   y <- if (is.null(prev)) get_response(formula, data) else NULL
+  ylev <- if (!is.null(prev)) prev$ylev else if (is.factor(y)) levels(y)
+  if (is.factor(y)) y <- as.integer(y)
   cmat <- NULL
   if (inherits(y, "regcomp_cens")) { cmat <- unclass(y); y <- cmat[, "lower"] }
   # Links.
@@ -198,6 +206,10 @@ build_spec <- function(formula, dots, fam, data, weights = NULL, links = NULL,
     wv <- eval(weights, data, env)
     if (is.null(wv)) rep(1, n) else as.numeric(wv)
   }
+  for (k in intersect(fam$extra$no_intercept, rpars)) {
+    X <- preds[[k]]$X; keep <- colnames(X) != "(Intercept)"
+    preds[[k]]$X <- X[, keep, drop = FALSE]
+  }
   # Coefficient layout.
   beta_idx <- list(); off <- 0
   for (k in rpars) {
@@ -206,6 +218,22 @@ build_spec <- function(formula, dots, fam, data, weights = NULL, links = NULL,
   }
   beta_names <- unlist(lapply(rpars, function(k)
     paste0(k, ":", colnames(preds[[k]]$X))))
+  # Estimated vector parameters that are not regression parameters (ordinal
+  # thresholds and similar); their size comes from the response.
+  aux <- if (!is.null(prev)) prev$aux else {
+    a <- list()
+    for (k in names(fam$pars)) { sp <- fam$pars[[k]]
+      if (is.null(sp$estimate) || k %in% names(fixed)) next
+      K <- if (!is.null(ylev)) length(ylev) else max(y, na.rm = TRUE)
+      a[[k]] <- list(type = sp$estimate, size = K - 1L,
+                     labels = if (!is.null(ylev)) paste0(ylev[-K], "|", ylev[-1]) else paste0(seq_len(K - 1), "|", seq_len(K - 1) + 1))
+    }
+    a
+  }
+  for (k in names(aux)) {
+    beta_idx[[k]] <- off + seq_len(aux[[k]]$size); off <- off + aux[[k]]$size
+    beta_names <- c(beta_names, paste0(k, ":", aux[[k]]$labels))
+  }
   # Random effect layout.
   blocks <- unlist(lapply(rpars, function(k) preds[[k]]$blocks), recursive = FALSE)
   Z <- list(); theta_idx <- list(); u_idx <- list(); toff <- 0; uoff <- 0
@@ -228,7 +256,8 @@ build_spec <- function(formula, dots, fam, data, weights = NULL, links = NULL,
     y = y, cmat = cmat, n = n, weights = w, data_pars = dp, fixed = fixed,
     beta_idx = beta_idx, beta_names = beta_names, blocks = blocks,
     theta_idx = theta_idx, u_idx = u_idx, Z = Z, Q = Q, ntheta = toff,
-    data_args = dargs, response_name = paste(deparse(formula[[2]]), collapse = "")
+    data_args = dargs, response_name = paste(deparse(formula[[2]]), collapse = ""),
+    aux = aux, ylev = ylev
   ), class = "regcomp_spec")
 }
 
@@ -316,6 +345,11 @@ ml_gradient <- function(spec, beta, u = NULL) {
   for (a in seq_along(spec$rpars)) {
     k <- spec$rpars[a]
     out[spec$beta_idx[[k]]] <- drop(crossprod(spec$preds[[k]]$X, spec$weights * d$g[, a]))
+  }
+  for (k in names(spec$aux)) for (j in spec$beta_idx[[k]]) {
+    h <- 1e-6 * max(1, abs(beta[j])); bp <- beta; bm <- beta
+    bp[j] <- bp[j] + h; bm[j] <- bm[j] - h
+    out[j] <- (ml_objective(spec, bp, u) - ml_objective(spec, bm, u)) / (2 * h)
   }
   out
 }
@@ -412,8 +446,22 @@ start_values <- function(spec, control) {
     if (length(ic)) beta[spec$beta_idx[[k]][ic]] <- lv
     if (!is.null(control$start[[k]])) beta[spec$beta_idx[[k]]] <- control$start[[k]]
   }
+  for (k in names(spec$aux)) {
+    K <- spec$aux[[k]]$size + 1
+    cp <- cumsum(tabulate(y[ok], K))[-K] / sum(ok)
+    v <- stats::qlogis(pmin(pmax(cp, 0.02), 0.98))
+    if (spec$aux[[k]]$type == "ordered") v <- sort(v + seq_along(v) * 1e-3)
+    beta[spec$beta_idx[[k]]] <- aux_untransform(spec$aux[[k]]$type, v)
+    if (!is.null(control$start[[k]])) beta[spec$beta_idx[[k]]] <- control$start[[k]]
+  }
   beta
 }
+
+# Estimated vector parameters are optimized on their natural scale so that
+# coefficients and covariances need no back transformation; ordering of
+# thresholds is enforced by the likelihood (out of order values give -Inf).
+aux_transform <- function(type, b) b
+aux_untransform <- function(type, v) v
 
 generic_start <- function(par, y) {
   if (!is.null(par$default)) return(par$default)

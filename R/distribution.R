@@ -478,7 +478,8 @@ print.regcomp_dist <- function(x, ...) {
 
 #' @export
 length.regcomp_dist <- function(x) {
-  if (x$family$variate_type == "scalar") max(vapply(x$pars, length, 1L)) else 1L
+  switch(x$family$variate_type, scalar = max(vapply(x$pars, length, 1L)),
+         categorical = length(x$pars[[1]]), 1L)
 }
 
 #' @export

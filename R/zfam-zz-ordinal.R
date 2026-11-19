@@ -3,14 +3,17 @@
 # predictor `mu` is the location; `cuts` holds the K - 1 increasing
 # thresholds (or intercepts) and `scale` gives location-scale models.
 
-ord_pars <- function(scale = TRUE) c(list(P("mu", "real", role = "location", link = "identity", offset_allowed = TRUE),
-  P("cuts", "real", role = "thresholds (K - 1, increasing)", regression = FALSE)),
-  if (scale) list(P("scale", "positive", role = "scale", default = 1)))
+ord_pars <- function(cuts = "ordered") list(P("mu", "real", role = "location", link = "identity", offset_allowed = TRUE),
+  P("cuts", "real", role = if (cuts == "ordered") "thresholds (K - 1, increasing)" else "intercepts (K - 1)", regression = FALSE, estimate = cuts),
+  P("scale", "positive", role = "scale", default = 1))
+# The location has no intercept (the thresholds absorb it); the scale is 1
+# unless it gets a formula, which then has no intercept either.
+ord_extra <- list(no_intercept = c("mu", "scale"), fixed_unless_formula = "scale")
 ord_obs <- function(y, p) { n <- length(y); K <- length(p$cuts) + 1
   list(n = n, K = K, mu = rep_len(p$mu, n), s = if (is.null(p$scale)) rep(1, n) else rep_len(p$scale, n)) }
 ord_check <- function(p) if (any(diff(p$cuts) <= 0)) "Thresholds must be strictly increasing."
-ord_reg <- function(id, display, lpmf, formula, refs, reference, check = ord_check, ...) register_family(family_def(id, display, "ordinal", ord_pars(...),
-  discrete = TRUE, variate_type = "categorical", check = check, formula = formula, lpdf = lpmf,
+ord_reg <- function(id, display, lpmf, formula, refs, reference, check = ord_check, cuts = "ordered") register_family(family_def(id, display, "ordinal", ord_pars(cuts),
+  discrete = TRUE, variate_type = "categorical", check = check, extra = ord_extra, formula = formula, lpdf = lpmf,
   support = function(p) list(lower = 1, upper = length(p$cuts) + 1), numeric_moments = FALSE,
   references = refs, reference = reference, status = "validated"))
 
@@ -49,7 +52,7 @@ cr_lpmf <- function(F) function(y, p) { o <- ord_obs(y, p)
     h <- F((p$cuts - o$mu[i]) / o$s[i]); sum(log1p(-h[seq_len(k - 1)])) + if (k < o$K) log(h[k]) else 0 }, 0) }
 for (lk in c("logit", "probit", "cloglog")) local({
   F <- link(lk)$linkinv
-  ord_reg(paste0("continuation_ratio_", lk), sprintf("Continuation ratio %s (sequential ordinal)", lk), cr_lpmf(F),
+  ord_reg(paste0("continuation_ratio_", lk), sprintf("Continuation ratio %s (sequential ordinal)", lk), cr_lpmf(F), check = NULL, cuts = "free",
     formula = sprintf("P(Y = k | Y >= k) = %s^-1(theta_k - mu)", lk),
     refs = c("Fienberg (1980), The Analysis of Cross-Classified Categorical Data.", "Tutz (1991), Sequential models in categorical regression. Comput. Stat. Data Anal., 11, 275-295."),
     reference = ref_impl("product of conditional probabilities", local({ G <- F; function(y, p) { h <- G((p$cuts - p$mu[1]) / p$scale[1])
@@ -63,7 +66,7 @@ ac_lpmf <- function(y, p) { o <- ord_obs(y, p)
     eta <- c(0, cumsum((o$mu[i] - p$cuts) / o$s[i])); eta[k] - log_sum_exp(eta) }, 0) }
 ord_reg("adjacent_category_logit", "Adjacent category logit (ordinal)", ac_lpmf,
   formula = "log(P(Y = k + 1) / P(Y = k)) = (mu - theta_k) / scale",
-  refs = "Agresti (2010), Analysis of Ordinal Categorical Data, 2nd ed., ch. 4.", check = NULL,
+  refs = "Agresti (2010), Analysis of Ordinal Categorical Data, 2nd ed., ch. 4.", check = NULL, cuts = "free",
   reference = ref_impl("VGAM acat", function(y, p) { eta <- c(0, cumsum((p$mu[1] - p$cuts) / p$scale[1])); (eta - log(sum(exp(eta))))[y] }))
 
 # Stereotype model (Anderson 1984): P(Y = k) proportional to exp(alpha_k + phi_k mu).
@@ -73,7 +76,7 @@ register_family(family_def("stereotype", "Stereotype (ordinal)", "ordinal",
   discrete = TRUE, variate_type = "categorical", numeric_moments = FALSE, support = function(p) list(lower = 1, upper = length(p$alpha)),
   formula = "P(Y = k) = exp(alpha_k + phi_k mu) / sum_j exp(alpha_j + phi_j mu)",
   lpdf = function(y, p) { mu <- rep_len(p$mu, length(y)); vapply(seq_along(y), function(i) { e <- p$alpha + p$phi * mu[i]; e[y[i]] - log_sum_exp(e) }, 0) },
-  references = "Anderson (1984), Regression and ordered categorical variables. JRSS B, 46, 1-30.",
+  references = "Anderson (1984), Regression and ordered categorical variables. JRSS B, 46, 1-30.", extra = list(no_regression = TRUE),
   reference = ref_impl("softmax", function(y, p) { e <- exp(p$alpha + p$phi * p$mu[1]); log(e / sum(e))[y] }), status = "validated"))
 
 # Multinomial (baseline category) logit: one linear predictor per non baseline category.
@@ -83,7 +86,8 @@ register_family(family_def("multinomial_logit", "Multinomial logit (nominal)", "
   formula = "P(Y = k) = exp(eta_k) / (1 + sum_j exp(eta_j)), eta_1 = 0",
   lpdf = function(y, p) { E <- if (is.matrix(p$eta)) cbind(0, p$eta) else matrix(c(0, p$eta), length(y), length(p$eta) + 1, byrow = TRUE)
     vapply(seq_along(y), function(i) E[i, y[i]] - log_sum_exp(E[i, ]), 0) },
-  regression_notes = "Each eta_k takes its own linear predictor (baseline category logit; McCullagh and Nelder 1989, sec. 5.2.4).",
+  regression_notes = "Each eta_k takes its own linear predictor (baseline category logit; McCullagh and Nelder 1989, sec. 5.2.4). In regcomp() the family expands to parameters eta2, ..., etaK that share the main formula unless given their own.",
+  extra = list(expand = function(K) mlogit_family(K)),
   references = "McCullagh and Nelder (1989), Generalized Linear Models, 2nd ed., ch. 5.",
   reference = ref_impl("VGAM multinomial", function(y, p) { e <- exp(c(0, p$eta)); log(e / sum(e))[y] }), status = "validated"))
 
@@ -107,3 +111,14 @@ register_family(family_def("bivariate_binary_odds_ratio", "Bivariate binary with
       q <- stats::uniroot(function(x) log(x * (1 - a - b + x)) - log((a - x) * (b - x)) - log(p$psi[i]), c(max(0, a + b - 1) + 1e-12, min(a, b) - 1e-12), tol = 1e-14)$root
       log(c(1 - a - b + q, b - q, a - q, q))[1 + y[i, 2] + 2 * y[i, 1]] }, 0) }),
   status = "validated"))
+
+# Multinomial logit with K categories as K - 1 regression parameters.
+mlogit_family <- function(K) {
+  nm <- paste0("eta", 2:K)
+  family_def(paste0("multinomial_logit"), sprintf("Multinomial logit (%d categories)", K), "categorical",
+    lapply(nm, function(k) P(k, "real", role = sprintf("log odds of category %s versus 1", sub("eta", "", k)), link = "identity")),
+    discrete = TRUE, variate_type = "categorical", numeric_moments = FALSE,
+    lpdf = function(y, p) { E <- cbind(0, do.call(cbind, p[nm]))
+      m <- apply(E, 1, max); E[cbind(seq_along(y), y)] - m - log(rowSums(exp(E - m))) },
+    extra = list(share_formula = TRUE), status = "validated")
+}

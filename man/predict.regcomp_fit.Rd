@@ -28,7 +28,9 @@
 \item{type}{What to predict: \code{"parameter"} (all distribution parameters),
 \code{"link"} (linear predictors), \code{"mean"}, \code{"variance"}, \code{"sd"},
 \code{"median"}, \code{"quantile"} (at \code{probs}), \code{"probability"} (mass or
-density at \code{at}), \code{"density"}, \code{"cdf"} or \code{"survival"} (at \code{at}).}
+density at \code{at}), \code{"density"}, \code{"cdf"} or \code{"survival"} (at \code{at}).
+For ordinal and nominal families \code{"mean"} and \code{"probability"} give
+the matrix of category probabilities (all categories by default).}
 
 \item{probs}{Probabilities for \code{type = "quantile"}.}
 

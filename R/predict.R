@@ -83,6 +83,8 @@ quantity_from_pars <- function(fam, pars, type, probs, at) {
 #'   `"link"` (linear predictors), `"mean"`, `"variance"`, `"sd"`,
 #'   `"median"`, `"quantile"` (at `probs`), `"probability"` (mass or
 #'   density at `at`), `"density"`, `"cdf"` or `"survival"` (at `at`).
+#'   For ordinal and nominal families `"mean"` and `"probability"` give
+#'   the matrix of category probabilities (all categories by default).
 #' @param probs Probabilities for `type = "quantile"`.
 #' @param at Response values for `"probability"`, `"density"`, `"cdf"` and
 #'   `"survival"`.
@@ -115,6 +117,10 @@ predict.regcomp_fit <- function(object, newdata = NULL,
   if (!is.null(seed)) set.seed(seed)
   spec <- new_spec(object, newdata)
   fam <- spec$fam
+  if (fam$variate_type == "categorical") {
+    if (type == "mean") type <- "probability"
+    if (missing(at)) at <- seq_along(spec$ylev %||% seq_len(max(object$spec$y, na.rm = TRUE)))
+  }
   one <- function(beta, u, theta) {
     if (type == "link") return(do.call(cbind, pred_eta(spec, beta, u, if (re == "marginal") "zero" else re)))
     if (type == "parameter") return(do.call(cbind, pars_from(spec, beta, u, if (re == "marginal") "zero" else re)))

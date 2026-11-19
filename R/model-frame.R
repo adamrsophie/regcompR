@@ -276,8 +276,11 @@ parse_formulas <- function(formula, dots, fam) {
       stop_input(sprintf("Parameter '%s' of '%s' cannot have a predictor.", nm, fam$id))
     fl[[nm]] <- f
   }
-  for (k in rp) if (is.null(fl[[k]])) fl[[k]] <- stats::as.formula("~ 1", env = environment(formula))
-  fl[rp]
+  for (k in rp) if (is.null(fl[[k]])) fl[[k]] <- if (isTRUE(fam$extra$share_formula))
+    stats::as.formula(call("~", formula[[3]]), env = environment(formula)) else
+    stats::as.formula("~ 1", env = environment(formula))
+  attr(fl, "given") <- c(rp[1], names(fl)[vapply(names(fl), function(k) k != rp[1] && k %in% vapply(dots, function(f) as.character(f[[2]]), ""), TRUE)])
+  structure(fl[rp], given = attr(fl, "given"))
 }
 
 # Expand `.` in a one sided formula to every data column except the
