@@ -81,6 +81,7 @@ Suggests:
     testthat (>= 3.0.0),
     TMB,
     trapezoid,
+    truncnorm,
     tweedie,
     VGAM,
     yaml
