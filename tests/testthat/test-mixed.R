@@ -1,0 +1,38 @@
+test_that("linear mixed model matches lme4 (ML)", {
+  skip_on_cran(); skip_if_not_installed("lme4")
+  data(sleepstudy, package = "lme4")
+  f <- regcomp(Reaction ~ Days + (1 + Days | Subject), family = "normal", data = sleepstudy)
+  m <- lme4::lmer(Reaction ~ Days + (1 + Days | Subject), sleepstudy, REML = FALSE)
+  expect_equal(f$logLik, as.numeric(logLik(m)), tolerance = 1e-5)
+  expect_equal(unname(f$coefficients[1:2]), unname(lme4::fixef(m)), tolerance = 1e-4)
+  se <- sqrt(diag(f$vcov))[1:2]
+  expect_equal(unname(se), unname(sqrt(diag(as.matrix(vcov(m))))), tolerance = 0.02)
+})
+
+test_that("nested grouping a/b and interaction a:b are expanded", {
+  skip_on_cran(); skip_if_not_installed("lme4")
+  set.seed(3); a <- rep(1:10, each = 20); b <- rep(rep(1:4, each = 5), 10)
+  d <- data.frame(y = 1 + rnorm(10)[a] + rnorm(40, 0, .7)[(a - 1) * 4 + b] + rnorm(200, 0, .5), a, b)
+  f <- regcomp(y ~ 1 + (1 | a/b), family = "normal", data = d)
+  m <- lme4::lmer(y ~ 1 + (1 | a/b), d, REML = FALSE)
+  expect_equal(f$logLik, as.numeric(logLik(m)), tolerance = 1e-5)
+})
+
+test_that("binomial GLMM matches lme4 Laplace", {
+  skip_on_cran(); skip_if_not_installed("lme4")
+  data(cbpp, package = "lme4")
+  f <- regcomp(incidence ~ period + (1 | herd), size = size, family = "binomial", data = cbpp)
+  m <- lme4::glmer(cbind(incidence, size - incidence) ~ period + (1 | herd), cbpp, family = binomial)
+  expect_equal(f$logLik, as.numeric(logLik(m)), tolerance = 1e-4)
+  expect_equal(unname(f$coefficients), unname(lme4::fixef(m)), tolerance = 1e-3)
+  expect_equal(unname(sqrt(diag(f$vcov))[1:4]), unname(sqrt(diag(as.matrix(vcov(m))))), tolerance = 0.03)
+})
+
+test_that("prediction on new data works when a parameter has no formula", {
+  set.seed(1); d <- data.frame(x = runif(100))
+  d$y <- rgamma(100, shape = 4, rate = 4 / exp(1 + d$x))
+  fit <- regcomp(y ~ x, family = "gamma", data = d)
+  fd <- fitted_distribution(fit, data.frame(x = c(0, 1)))
+  expect_length(quantile(fd, 0.9), 2)
+  expect_equal(predict(fit, newdata = d[1:5, ], type = "mean"), predict(fit, type = "mean")[1:5], tolerance = 1e-10)
+})

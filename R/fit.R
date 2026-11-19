@@ -304,7 +304,7 @@ laplace_inner <- function(spec, beta, theta, u0, control) {
       t <- t / 2
       if (t < 1e-8) { un <- u; fn <- f; break }
     }
-    conv <- abs(fn - f) < control$inner_tol * (1 + abs(f)) && max(abs(un - u)) < 1e-6
+    conv <- max(abs(un - u)) < 1e-9 || (abs(fn - f) < control$inner_tol * (1 + abs(f)) && max(abs(t * step)) < 1e-9)
     u <- un; f <- fn
     if (conv) break
   }
@@ -435,7 +435,12 @@ fit_ml <- function(spec, control, penalty = NULL) {
 robust_nlminb <- function(start, obj, gr, control) {
   best <- NULL
   starts <- list(start)
-  for (r in seq_len(control$restarts)) starts[[r + 1]] <- start + stats::rnorm(length(start), 0, 0.1 * r)
+  if (control$restarts > 0) {
+    seed <- if (exists(".Random.seed", globalenv())) get(".Random.seed", globalenv())
+    on.exit(if (is.null(seed)) rm(".Random.seed", envir = globalenv()) else assign(".Random.seed", seed, globalenv()))
+    set.seed(control$seed)
+    for (r in seq_len(control$restarts)) starts[[r + 1]] <- start + stats::rnorm(length(start), 0, 0.1 * r)
+  }
   for (s in starts) {
     o <- tryCatch(stats::nlminb(s, obj, gr, control = list(
       iter.max = control$maxit, eval.max = 2 * control$maxit, rel.tol = control$rel_tol,
@@ -462,14 +467,15 @@ num_jacobian <- function(f, x) {
   J
 }
 
-# Central difference Hessian of a scalar function.
-num_hessian <- function(f, x) {
+# Central difference Hessian of a scalar function with one Richardson
+# extrapolation step, which tolerates the small noise left by the inner
+# Laplace solver (steps much below 1e-3 amplify that noise).
+num_hessian <- function(f, x, rel = 1e-2) {
   d <- length(x)
-  H <- matrix(0, d, d)
-  h <- 1e-4 * pmax(1, abs(x))
   f0 <- f(x)
-  for (i in seq_len(d)) {
-    for (j in i:d) {
+  hess_h <- function(h) {
+    H <- matrix(0, d, d)
+    for (i in seq_len(d)) for (j in i:d) {
       if (i == j) {
         xp <- x; xp[i] <- xp[i] + h[i]; xm <- x; xm[i] <- xm[i] - h[i]
         H[i, i] <- (f(xp) - 2 * f0 + f(xm)) / h[i]^2
@@ -478,8 +484,10 @@ num_hessian <- function(f, x) {
         H[i, j] <- H[j, i] <- (e(1, 1) - e(1, -1) - e(-1, 1) + e(-1, -1)) / (4 * h[i] * h[j])
       }
     }
+    H
   }
-  H
+  h <- rel * pmax(1, abs(x))
+  (4 * hess_h(h / 2) - hess_h(h)) / 3
 }
 
 safe_inverse <- function(A) {

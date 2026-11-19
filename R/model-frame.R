@@ -94,6 +94,25 @@ drop_bars <- function(term) {
   term
 }
 
+# Nested grouping: (x | a/b) is (x | a) + (x | a:b).
+expand_nested <- function(bars) unlist(lapply(bars, function(b) {
+  g <- b[[3]]
+  if (is.call(g) && identical(g[[1]], as.name("/"))) {
+    inner <- b; inner[[3]] <- call(":", g[[2]], g[[3]]); outer <- b; outer[[3]] <- g[[2]]
+    return(c(expand_nested(list(outer)), list(inner)))
+  }
+  list(b)
+}), recursive = FALSE)
+
+# Grouping factor; a:b is the interaction of a and b, not a sequence.
+eval_group <- function(gexpr, data, env) {
+  if (is.call(gexpr) && identical(gexpr[[1]], as.name(":")))
+    return(interaction(eval_group(gexpr[[2]], data, env), eval_group(gexpr[[3]], data, env), drop = TRUE, sep = ":"))
+  g <- eval(gexpr, data, env)
+  if (is.list(g)) g <- interaction(g, drop = TRUE)
+  g
+}
+
 is_smooth_call <- function(x) is.call(x) &&
   as.character(x[[1]]) %in% c("s", "te", "ti", "t2")
 
@@ -134,15 +153,14 @@ build_predictor <- function(rhs, data, par, xlev = NULL, smooth_specs = NULL,
   off <- stats::model.offset(mf)
   if (is.null(off)) off <- rep(0, nrow(X))
   # Random effects.
-  bars <- find_bars(rhs[[length(rhs)]])
+  bars <- expand_nested(find_bars(rhs[[length(rhs)]]))
   blocks <- list()
   for (b in bars) {
     corr <- b[[1]] == as.name("|")
     lhs <- stats::as.formula(call("~", b[[2]]), env = env)
     Xr <- stats::model.matrix(lhs, stats::model.frame(lhs, data, na.action = stats::na.pass))
     gexpr <- b[[3]]
-    g <- eval(gexpr, data, env)
-    if (is.list(g)) g <- interaction(g, drop = TRUE)
+    g <- eval_group(gexpr, data, env)
     key <- paste(deparse(b, width.cutoff = 500L), collapse = "")
     lev <- if (!is.null(re_levels[[key]])) re_levels[[key]] else
       levels(droplevels(as.factor(g)))
