@@ -2,6 +2,10 @@
 
 fit_bayes <- function(spec, priors, control) {
   runner <- control$runner
+  st <- vapply(spec$blocks, function(b) b$struct, "")
+  if (any(!st %in% c("us", "diag")))
+    stop_unsupported(sprintf("Bayesian fitting of '%s' random effect structures (use engine = \"ml\")",
+                             paste(unique(st[!st %in% c("us", "diag")]), collapse = "', '")))
   if (runner %in% c("jags", "openbugs")) {
     res <- run_bugs(spec, priors, control, runner)
   } else {

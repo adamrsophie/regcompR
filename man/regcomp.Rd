@@ -66,10 +66,37 @@ and the predictor of the first regression parameter (usually the
 location); further formulas such as \code{sigma ~ x} give predictors for other
 parameters, which otherwise are constant. Predictors may contain
 offsets, factors and interactions, random effects in \code{lme4} syntax
-(\code{(1 | g)}, \code{(1 + x | g)}, uncorrelated \code{(1 + x || g)}), and smooth terms
+(\code{(1 | g)}, \code{(1 + x | g)}, uncorrelated \code{(1 + x || g)}, nested \code{(1 | a/b)},
+crossed \code{(1 | a) + (1 | b)}), structured random effects for longitudinal and
+spatial data written as glmmTMB style wrappers, and smooth terms
 \code{s()}, \code{te()}, \code{ti()} and \code{t2()} from 'mgcv', which are fitted in their
 mixed model representation.
 }
+\section{Random effect structures}{
+
+A bar term may be wrapped in a covariance structure:
+\itemize{
+\item \code{us(x | g)}: unstructured (the default for \code{|}); \code{diag(x | g)} and
+\code{homdiag(x | g)}: independent effects with separate or common variance
+(the default for \code{||}).
+\item \code{cs(0 + time | g)} and \code{homcs(0 + time | g)}: compound symmetry with
+heterogeneous or common variances.
+\item \code{ar1(0 + time | g)}: first order autoregressive correlation
+\verb{rho^|i - j|} across the columns (time must be a factor with equally
+spaced, ordered levels), with a common variance.
+\item \code{ou(t | g)} or \code{exp(t | g)}: continuous time autoregressive
+(Ornstein-Uhlenbeck) correlation \verb{exp(-|t_i - t_j| / range)} for
+unequally spaced numeric times; \code{gau(x + y | g)} and
+\code{matern32(x + y | g)} give Gaussian and Matern (smoothness 3/2)
+correlation in the coordinates on the left of the bar, for spatial
+effects. One random effect is created per distinct coordinate.
+}
+
+Structured random effects are available in every parameter and for every
+family, so a latent autoregressive process can enter a count, survival or
+ordinal model. The Bayesian engine supports \code{us} and \code{diag} structures.
+}
+
 \section{Engines}{
 
 \itemize{

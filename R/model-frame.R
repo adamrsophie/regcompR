@@ -64,6 +64,7 @@ find_bars <- function(term) {
   if (is.name(term) || !is.language(term)) return(NULL)
   if (term[[1]] == as.name("(")) return(find_bars(term[[2]]))
   if (term[[1]] == as.name("|") || term[[1]] == as.name("||")) return(list(term))
+  if (is_struct_call(term)) return(list(term))
   if (length(term) == 2) return(find_bars(term[[2]]))
   c(find_bars(term[[2]]), find_bars(term[[3]]))
 }
@@ -92,6 +93,20 @@ drop_bars <- function(term) {
     return(term)
   }
   term
+}
+
+# Covariance structures of random effect blocks (glmmTMB style wrappers):
+# us (unstructured), diag, homdiag, cs (heterogeneous compound symmetry),
+# homcs, ar1 (homogeneous first order autoregressive over the columns), and
+# the distance based ou / exp (exponential), gau (Gaussian) and Matern
+# with smoothness fixed at 3/2, matern32) whose left side gives the coordinates.
+re_structs <- c("us", "diag", "homdiag", "cs", "homcs", "ar1", "ou", "exp", "gau", "matern32")
+coord_structs <- c("ou", "exp", "gau", "matern32")
+is_struct_call <- function(x) is.call(x) && is.name(x[[1]]) && as.character(x[[1]]) %in% re_structs &&
+  length(x) == 2 && length(find_bars_plain(x[[2]])) == 1
+find_bars_plain <- function(x) {
+  while (is.call(x) && identical(x[[1]], as.name("("))) x <- x[[2]]
+  if (is.call(x) && (identical(x[[1]], as.name("|")) || identical(x[[1]], as.name("||")))) list(x) else NULL
 }
 
 # Nested grouping: (x | a/b) is (x | a) + (x | a:b).
@@ -153,15 +168,37 @@ build_predictor <- function(rhs, data, par, xlev = NULL, smooth_specs = NULL,
   off <- stats::model.offset(mf)
   if (is.null(off)) off <- rep(0, nrow(X))
   # Random effects.
-  bars <- expand_nested(find_bars(rhs[[length(rhs)]]))
+  bars <- find_bars(rhs[[length(rhs)]])
+  bars <- unlist(lapply(bars, function(b) {
+    st <- if (is_struct_call(b)) as.character(b[[1]]) else NULL
+    inner <- if (is.null(st)) b else find_bars_plain(b[[2]])[[1]]
+    lapply(expand_nested(list(inner)), function(x) list(bar = x, struct = st,
+      key = if (is.null(st)) x else call(st, x)))
+  }), recursive = FALSE)
   blocks <- list()
-  for (b in bars) {
-    corr <- b[[1]] == as.name("|")
-    lhs <- stats::as.formula(call("~", b[[2]]), env = env)
-    Xr <- stats::model.matrix(lhs, stats::model.frame(lhs, data, na.action = stats::na.pass))
+  for (bb in bars) {
+    b <- bb$bar
+    struct <- if (!is.null(bb$struct)) bb$struct else if (b[[1]] == as.name("|")) "us" else "diag"
+    coords <- NULL
+    if (struct %in% coord_structs) {
+      vars <- all.vars(b[[2]])
+      C <- do.call(cbind, lapply(vars, function(v) as.numeric(eval(as.name(v), data, env))))
+      ck <- do.call(paste, c(lapply(seq_len(ncol(C)), function(k) C[, k]), sep = "\r"))
+      coords <- if (!is.null(re_levels[[paste0(".coords.", paste(deparse(bb$key, width.cutoff = 500L), collapse = ""))]]))
+        re_levels[[paste0(".coords.", paste(deparse(bb$key, width.cutoff = 500L), collapse = ""))]] else
+        unique(C[order(ck), , drop = FALSE])
+      uk <- do.call(paste, c(lapply(seq_len(ncol(coords)), function(k) coords[, k]), sep = "\r"))
+      Xr <- outer(match(ck, uk), seq_along(uk), `==`) * 1
+      colnames(Xr) <- paste0("(", apply(coords, 1, paste, collapse = ","), ")")
+    } else {
+      lhs <- stats::as.formula(call("~", b[[2]]), env = env)
+      Xr <- stats::model.matrix(lhs, stats::model.frame(lhs, data, na.action = stats::na.pass))
+    }
+    if (ncol(Xr) == 1 && struct %in% c("us", "cs", "homcs")) struct <- "diag"
+    corr <- struct == "us"
     gexpr <- b[[3]]
     g <- eval_group(gexpr, data, env)
-    key <- paste(deparse(b, width.cutoff = 500L), collapse = "")
+    key <- paste(deparse(bb$key, width.cutoff = 500L), collapse = "")
     lev <- if (!is.null(re_levels[[key]])) re_levels[[key]] else
       levels(droplevels(as.factor(g)))
     gi <- match(as.character(g), lev)
@@ -169,7 +206,7 @@ build_predictor <- function(rhs, data, par, xlev = NULL, smooth_specs = NULL,
       label = key, group = paste(deparse(gexpr), collapse = ""),
       terms = colnames(Xr), Xr = Xr, gi = gi, levels = lev,
       q = ncol(Xr), L = length(lev), corr = corr && ncol(Xr) > 1,
-      type = "re", par = par)
+      struct = struct, coords = coords, type = "re", par = par)
   }
   # Smooth terms through mgcv's mixed model representation.
   sm <- find_smooths(rhs[[length(rhs)]])
@@ -201,7 +238,7 @@ build_predictor <- function(rhs, data, par, xlev = NULL, smooth_specs = NULL,
       blocks[[length(blocks) + 1L]] <- list(
         label = paste0(key, if (length(nr) > 1) paste0(".", r)), group = key,
         terms = "smooth", Xr = Zr, gi = NULL, levels = paste0("b", seq_along(nr[[r]])),
-        q = 1, L = length(nr[[r]]), corr = FALSE, type = "smooth", par = par)
+        q = 1, L = length(nr[[r]]), corr = FALSE, struct = "diag", type = "smooth", par = par)
     }
     smooth_info[[key]] <- spec
   }

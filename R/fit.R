@@ -8,9 +8,32 @@
 #' location); further formulas such as `sigma ~ x` give predictors for other
 #' parameters, which otherwise are constant. Predictors may contain
 #' offsets, factors and interactions, random effects in `lme4` syntax
-#' (`(1 | g)`, `(1 + x | g)`, uncorrelated `(1 + x || g)`), and smooth terms
+#' (`(1 | g)`, `(1 + x | g)`, uncorrelated `(1 + x || g)`, nested `(1 | a/b)`,
+#' crossed `(1 | a) + (1 | b)`), structured random effects for longitudinal and
+#' spatial data written as glmmTMB style wrappers, and smooth terms
 #' `s()`, `te()`, `ti()` and `t2()` from 'mgcv', which are fitted in their
 #' mixed model representation.
+#'
+#' @section Random effect structures:
+#' A bar term may be wrapped in a covariance structure:
+#' * `us(x | g)`: unstructured (the default for `|`); `diag(x | g)` and
+#'   `homdiag(x | g)`: independent effects with separate or common variance
+#'   (the default for `||`).
+#' * `cs(0 + time | g)` and `homcs(0 + time | g)`: compound symmetry with
+#'   heterogeneous or common variances.
+#' * `ar1(0 + time | g)`: first order autoregressive correlation
+#'   `rho^|i - j|` across the columns (time must be a factor with equally
+#'   spaced, ordered levels), with a common variance.
+#' * `ou(t | g)` or `exp(t | g)`: continuous time autoregressive
+#'   (Ornstein-Uhlenbeck) correlation `exp(-|t_i - t_j| / range)` for
+#'   unequally spaced numeric times; `gau(x + y | g)` and
+#'   `matern32(x + y | g)` give Gaussian and Matern (smoothness 3/2)
+#'   correlation in the coordinates on the left of the bar, for spatial
+#'   effects. One random effect is created per distinct coordinate.
+#'
+#' Structured random effects are available in every parameter and for every
+#' family, so a latent autoregressive process can enter a count, survival or
+#' ordinal model. The Bayesian engine supports `us` and `diag` structures.
 #'
 #' @section Engines:
 #' * `"ml"`: maximum likelihood in R. Without random effects or smooths the
@@ -153,9 +176,8 @@ build_spec <- function(formula, dots, fam, data, weights = NULL, links = NULL,
     preds[[k]] <- build_predictor(expand_dot(rhs_of(fl[[k]]), data, all.vars(formula[[2]])), data, k,
       xlev = if (!is.null(prev)) prev$preds[[k]]$xlev,
       smooth_specs = if (!is.null(prev)) prev$preds[[k]]$smooths,
-      re_levels = if (!is.null(prev)) stats::setNames(
-        lapply(prev$preds[[k]]$blocks, `[[`, "levels"),
-        vapply(prev$preds[[k]]$blocks, `[[`, "", "label")))
+      re_levels = if (!is.null(prev)) { pb <- prev$preds[[k]]$blocks; lab <- vapply(pb, `[[`, "", "label")
+        c(stats::setNames(lapply(pb, `[[`, "levels"), lab), stats::setNames(lapply(pb, `[[`, "coords"), paste0(".coords.", lab))) })
     if (any(preds[[k]]$offset != 0) && !fam$pars[[k]]$offset_allowed &&
         is.null(prev))
       stop_input(sprintf("An offset is not allowed for parameter '%s' of '%s'.", k, fam$id))
@@ -190,7 +212,7 @@ build_spec <- function(formula, dots, fam, data, weights = NULL, links = NULL,
   Q <- sum(vapply(blocks, function(b) b$q * b$L, 1))
   for (j in seq_along(blocks)) {
     b <- blocks[[j]]
-    nt <- b$q + if (b$corr) b$q * (b$q - 1) / 2 else 0
+    nt <- block_ntheta(b)
     theta_idx[[j]] <- toff + seq_len(nt); toff <- toff + nt
     u_idx[[j]] <- uoff + seq_len(b$q * b$L); uoff <- uoff + b$q * b$L
   }
@@ -210,15 +232,54 @@ build_spec <- function(formula, dots, fam, data, weights = NULL, links = NULL,
   ), class = "regcomp_spec")
 }
 
+# Number of covariance parameters of a block, starting values and names.
+block_ntheta <- function(b) switch(b$struct, us = b$q + b$q * (b$q - 1) / 2, diag = b$q,
+  homdiag = 1, cs = b$q + 1, homcs = 2, 2)
+block_theta_start <- function(b) {
+  rng <- if (!is.null(b$coords) && nrow(b$coords) > 1) log(stats::median(stats::dist(b$coords))) else 0
+  switch(b$struct, us = c(rep(log(0.5), b$q), rep(0, b$q * (b$q - 1) / 2)), diag = rep(log(0.5), b$q),
+    homdiag = log(0.5), cs = c(rep(log(0.5), b$q), 0), homcs = c(log(0.5), 0), ar1 = c(log(0.5), 0),
+    c(log(0.5), rng))
+}
+block_theta_names <- function(b) {
+  pre <- paste0(b$par, ":", b$label, ":")
+  sdn <- paste0(pre, "log_sd(", b$terms, ")")
+  switch(b$struct,
+    us = { idx <- which(lower.tri(diag(b$q)), arr.ind = TRUE)
+           c(sdn, paste0(pre, "chol(", b$terms[idx[, 1]], ",", b$terms[idx[, 2]], ")")) },
+    diag = sdn, homdiag = paste0(pre, "log_sd"), cs = c(sdn, paste0(pre, "rho_raw")),
+    homcs = paste0(pre, c("log_sd", "rho_raw")), ar1 = paste0(pre, c("log_sd", "atanh_rho")),
+    paste0(pre, c("log_sd", "log_range")))
+}
+
 # Covariance matrix of one block from its unconstrained parameters.
 block_cov <- function(b, th) {
-  sd <- exp(th[seq_len(b$q)])
-  if (!b$corr) return(diag(sd^2, b$q))
-  L <- diag(b$q)
-  L[lower.tri(L)] <- th[-seq_len(b$q)]
-  L <- L / sqrt(rowSums(L^2))
-  R <- tcrossprod(L)
-  outer(sd, sd) * R
+  q <- b$q
+  if (is.null(b$struct)) b$struct <- if (b$corr) "us" else "diag"
+  switch(b$struct,
+    diag = return(diag(exp(2 * th[seq_len(q)]), q)),
+    homdiag = return(diag(exp(2 * th[1]), q)),
+    us = {
+      sd <- exp(th[seq_len(q)])
+      L <- diag(q)
+      L[lower.tri(L)] <- th[-seq_len(q)]
+      L <- L / sqrt(rowSums(L^2))
+      return(outer(sd, sd) * tcrossprod(L))
+    },
+    cs = , homcs = {
+      sd <- if (b$struct == "cs") exp(th[seq_len(q)]) else rep(exp(th[1]), q)
+      a <- 1 / (q - 1); rho <- stats::plogis(th[length(th)]) * (1 + a) - a
+      R <- matrix(rho, q, q); diag(R) <- 1
+      return(outer(sd, sd) * R)
+    },
+    ar1 = {
+      R <- tanh(th[2])^abs(outer(seq_len(q), seq_len(q), `-`))
+      return(exp(2 * th[1]) * R)
+    })
+  d <- as.matrix(stats::dist(b$coords)) / exp(th[2])
+  R <- switch(b$struct, ou = , exp = exp(-d), gau = exp(-d^2),
+              matern32 = (1 + sqrt(3) * d) * exp(-sqrt(3) * d))
+  exp(2 * th[1]) * (R + diag(1e-10, q))
 }
 
 # Sparse precision of all random effects.
@@ -409,8 +470,7 @@ fit_ml <- function(spec, control, penalty = NULL) {
     obj0 <- function(b) { v <- ml_objective(spec, b) - pen_val(b); if (!is.finite(v)) 1e300 else -v }
     gr0 <- function(b) -(ml_gradient(spec, b) - pen_grad(b))
     b1 <- tryCatch(robust_nlminb(beta0, obj0, gr0, control)$par, error = function(e) beta0)
-    theta0 <- unlist(lapply(spec$blocks, function(b)
-      c(rep(log(0.5), b$q), if (b$corr) rep(0, b$q * (b$q - 1) / 2))))
+    theta0 <- unlist(lapply(spec$blocks, block_theta_start))
     state <- new.env(); state$u <- rep(0, spec$Q)
     obj_re <- function(par) {
       v <- laplace_objective(spec, par[seq_len(np)], par[-seq_len(np)], state, control) -
@@ -523,18 +583,7 @@ new_fit <- function(spec, beta, theta, u, cov, ll, opt, approx, pen = NULL,
   fit
 }
 
-theta_names <- function(spec) {
-  unlist(lapply(seq_along(spec$blocks), function(j) {
-    b <- spec$blocks[[j]]
-    nm <- paste0(b$par, ":", b$label, ":log_sd(", b$terms, ")")
-    if (b$corr) {
-      idx <- which(lower.tri(diag(b$q)), arr.ind = TRUE)
-      nm <- c(nm, paste0(b$par, ":", b$label, ":chol(", b$terms[idx[, 1]], ",",
-                         b$terms[idx[, 2]], ")"))
-    }
-    nm
-  }))
-}
+theta_names <- function(spec) unlist(lapply(spec$blocks, block_theta_names))
 
 fit_diagnostics <- function(fit) {
   spec <- fit$spec
