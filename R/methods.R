@@ -23,14 +23,6 @@ coef.regcomp_fit <- function(object, ...) {
 }
 
 #' @export
-vcov.regcomp_fit <- function(object, ...) {
-  if (object$inference == "bayesian") return(stats::cov(object$draws[, object$spec$beta_names, drop = FALSE]))
-  v <- object$vcov
-  if (is.null(v)) stop_unsupported("A covariance matrix for this fit (penalized or hessian = FALSE)")
-  v[object$spec$beta_names, object$spec$beta_names, drop = FALSE]
-}
-
-#' @export
 logLik.regcomp_fit <- function(object, ...) {
   if (object$inference == "bayesian")
     stop_unsupported("A maximized log likelihood for a Bayesian fit; use log_lik() for pointwise values")
