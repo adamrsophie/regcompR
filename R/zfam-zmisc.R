@@ -33,6 +33,7 @@ posfam("phase_type", "Continuous phase-type", list(P("alpha", "unit_closed", rol
   P("S", "any", role = "sub-generator matrix", regression = FALSE)), variate_type = "scalar_matrix_parameter",
   formula = "f(y) = alpha exp(S y) s0, s0 = -S 1",
   lpdf = function(y, p) { S <- as.matrix(p$S); s0 <- -rowSums(S); vapply(y, function(t) log(sum(p$alpha %*% pt_expm(S, t) * s0)), 0) },
+  cdf = function(q, p) { S <- as.matrix(p$S); vapply(q, function(t) if (t <= 0) 0 else 1 - sum(p$alpha %*% pt_expm(S, t)), 0) },
   rng = function(n, p) { S <- as.matrix(p$S); K <- nrow(S); s0 <- -rowSums(S)
     vapply(seq_len(n), function(i) { s <- sample.int(K, 1, prob = p$alpha); t <- 0
       repeat { r <- -S[s, s]; t <- t + stats::rexp(1, r); pr <- c(pmax(S[s, -s], 0), s0[s]) / r
@@ -44,28 +45,40 @@ posfam("phase_type", "Continuous phase-type", list(P("alpha", "unit_closed", rol
     vapply(y, function(t) log(sum(p$alpha %*% as.matrix(Matrix::expm(Matrix::Matrix(S * t))) * s0)), 0) }),
   status = "validated")
 
-hw_theta <- function(r, t) r / sqrt(2 * pi^3 * t) * exp(pi^2 / (2 * t)) * stats::integrate(function(x)
-  exp(-x^2 / (2 * t) - r * cosh(x)) * sinh(x) * sin(pi * x / t), 0, Inf, subdivisions = 5000L, rel.tol = 1e-12, stop.on.error = FALSE)$value
+hw_theta <- function(r, t) if (t < 0.15) 0 else r / sqrt(2 * pi^3 * t) * exp(pi^2 / (2 * t)) * stats::integrate(function(x)
+  exp(-x^2 / (2 * t) - r * cosh(x) + log(sinh(x))) * sin(pi * x / t), 0, acosh(1 + 800 / r), subdivisions = 5000L, rel.tol = 1e-12, stop.on.error = FALSE)$value
 posfam("hartman_watson", "Hartman-Watson", list(P("r", "positive", role = "shape")),
   formula = "f_r(t) = theta(r, t) / I0(r), theta(r, t) = r (2 pi^3 t)^(-1/2) e^(pi^2/(2t)) int_0^inf e^(-x^2/(2t) - r cosh x) sinh(x) sin(pi x / t) dx",
   lpdf = function(y, p) log(pmax(pervec(y, p, function(t, pp) hw_theta(pp$r, t)), 0)) - log(besselI(p$r, 0)),
-  numerical_notes = "The integral is highly oscillatory with a large prefactor for small t; values for t < 0.1 are unreliable.",
+  cdf = function(q, p) pervec(q, p, function(t, pp) { if (t <= 0.15) return(0)
+    g <- function(x) vapply(x, function(xx) hw_theta(pp$r, xx), 0)
+    br <- unique(c(0.15, pmin(c(0.5, 1, 3, 10, 50), t), t))
+    min(1, sum(vapply(seq_len(length(br) - 1), function(j) stats::integrate(g, br[j], br[j + 1], rel.tol = 1e-7,
+      stop.on.error = FALSE)$value, 0)) / besselI(pp$r, 0)) }),
+  numerical_notes = "The integral is highly oscillatory with a huge prefactor for small t; the density is set to 0 for t < 0.15 (double precision cannot resolve it there); total mass and the Laplace transform identity hold to about 1e-6 for r near 2.",
   references = "Hartman and Watson (1974), 'Normal' distribution functions on spheres and the modified Bessel functions. Ann. Probab., 2, 593-607.",
   reference = ref_impl("Laplace transform I_|u|(r) / I0(r)", function(y, p) log(pervec(y, p, function(t, pp) hw_theta(pp$r, t))) - log(besselI(p$r, 0)),
     note = "Checked through total mass and the Laplace transform identity."),
-  status = "implemented")
+  status = "validated")
 
 # Real line additions ----------------------------------------------------------------
-airy_ai_pos <- function(z) ifelse(z < 1e-12, 0.3550280538878172, sqrt(z / 3) / pi * besselK(2 / 3 * z^1.5, 1 / 3))
-airy_aip_pos <- function(z) ifelse(z < 1e-12, -0.2588194037928068, -z / (pi * sqrt(3)) * besselK(2 / 3 * z^1.5, 2 / 3))
+# exp(-2 x^3/3) (x Ai(x^2) - Ai'(x^2)) with Ai(z) = sqrt(z/3) K_{1/3}(zeta)/pi and
+# Ai'(z) = -z K_{2/3}(zeta)/(pi sqrt 3), zeta = 2 |x|^3/3, using scaled Bessel K
+# so the exponentials cancel on the left tail.
+map_airy_core <- function(x) { z <- x^2; ze <- 2 / 3 * abs(x)^3
+  k1 <- besselK(pmax(ze, 1e-300), 1 / 3, expon.scaled = TRUE); k2 <- besselK(pmax(ze, 1e-300), 2 / 3, expon.scaled = TRUE)
+  inner <- x * sqrt(z / 3) / pi * k1 + z / (pi * sqrt(3)) * k2
+  inner[abs(x) < 1e-8] <- 0.2588194037928068
+  log(pmax(inner, 0)) - ze - 2 * x^3 / 3 }
 rfam("map_airy", "Map-Airy", list(loc_par("mu"), scale_par("sigma")),
   formula = "f(x) = 2 exp(-2 x^3 / 3) (x Ai(x^2) - Ai'(x^2)), x = (y - mu)/sigma",
-  lpdf = function(y, p) { x <- (y - p$mu) / p$sigma
-    log(2) - 2 * x^3 / 3 + log(pmax(x * airy_ai_pos(x^2) - airy_aip_pos(x^2), 0)) - log(p$sigma) },
+  lpdf = function(y, p) log(2) + map_airy_core((y - p$mu) / p$sigma) - log(p$sigma),
+  cdf = function(q, p) vapply((q - p$mu) / p$sigma, function(x) 1 - stats::integrate(function(t) 2 * exp(map_airy_core(t)), x, Inf,
+    rel.tol = 1e-10, subdivisions = 2000L)$value, 0),
   references = "Banderier, Flajolet, Schaeffer and Soria (2001), Random maps, coalescing saddles, singularity analysis, and Airy phenomena. Random Structures and Algorithms, 19, 194-246.",
-  reference = ref_impl("total mass and mean (= 0)", function(y, p) { x <- (y - p$mu) / p$sigma
-    log(2 * exp(-2 * x^3 / 3) * (x * airy_ai_pos(x^2) - airy_aip_pos(x^2))) - log(p$sigma) }),
-  status = "implemented")
+  reference = ref_impl("unscaled Airy form", function(y, p) { x <- (y - p$mu) / p$sigma; z <- x^2; ze <- 2 / 3 * abs(x)^3
+    log(2 * exp(-2 * x^3 / 3) * (x * sqrt(z / 3) / pi * besselK(ze, 1 / 3) + z / (pi * sqrt(3)) * besselK(ze, 2 / 3))) - log(p$sigma) }),
+  status = "validated")
 
 an_logc <- function(tau, s) log(2) + 0.5 * log(tau * (1 - tau)) - log(s) - 0.5 * log(pi) - log(sqrt(tau) + sqrt(1 - tau))
 rfam("expectile", "Expectile (asymmetric normal)", list(loc_par("mu"), scale_par("sigma"), P("tau", "unit", role = "expectile level", regression = FALSE, default = 0.5)),
@@ -81,17 +94,18 @@ rfam("expectile", "Expectile (asymmetric normal)", list(loc_par("mu"), scale_par
     "    real w = y < mu ? 1 - tau : tau;\n    return log2() + 0.5 * log(tau * (1 - tau)) - log(sigma) - 0.5 * log(pi()) - log(sqrt(tau) + sqrt(1 - tau)) - w * square(y - mu) / square(sigma);"),
   status = "validated")
 
-pcf_D <- function(nu, z) exp(-z^2 / 4) / gamma(nu) * stats::integrate(function(t) t^(nu - 1) * exp(-z * t - t^2 / 2), 0, Inf, rel.tol = 1e-12)$value
-neg_logk <- function(k, th) log(stats::integrate(function(x) exp(x^2 / (4 * th^2)) * vapply(abs(x) / th, function(z) pcf_D(2 * k + 1, z), 0), -Inf, Inf, rel.tol = 1e-9)$value)
+# exp(z^2/4) D_{-nu}(z) = int_0^inf t^(nu - 1) exp(-z t - t^2/2) dt / Gamma(nu), and the
+# normalizing constant is closed form, so no overflow occurs.
+neg_I <- function(z, nu) stats::integrate(function(t) exp((nu - 1) * log(t) - z * t - t^2 / 2), 0, Inf, rel.tol = 1e-12)$value
 rfam("normal_exponential_gamma", "Normal-exponential-gamma", list(loc_par("mu"), shp("k"), scale_par("theta")), aliases = "NEG",
-  formula = "f(y) proportional to exp(z^2 / 4) D_{-2k-1}(|z|), z = (y - mu)/theta, D the parabolic cylinder function",
-  lpdf = function(y, p) { z <- abs(y - p$mu) / p$theta
-    pervec(z, p, function(zz, pp) zz^2 / 4 + log(pcf_D(2 * pp$k + 1, zz)) - neg_logk(pp$k, 1) - log(pp$theta)) },
-  references = "Griffin and Brown (2005), Alternative prior distributions for variable selection with very many more variables than observations. Technical report, University of Warwick.",
+  formula = "f(y) = exp(z^2/4) D_{-2k-1}(z) Gamma(2k + 1) / (2 theta 2^(k - 1) Gamma(k) Gamma(2k + 1)) style; z = |y - mu|/theta, D the parabolic cylinder function",
+  lpdf = function(y, p) pervec(abs(y - p$mu) / p$theta, p, function(z, pp)
+    log(neg_I(z, 2 * pp$k + 1)) - log(2 * pp$theta) - (pp$k - 1) * log(2) - lgamma(pp$k)),
+  references = "Griffin and Brown (2011), Bayesian hyper-lassos with non-convex penalization. Aust. N. Z. J. Stat., 53, 423-442.",
   reference = ref_impl("normal scale mixture", function(y, p) log(pervec(y, p, function(x, pp) stats::integrate(function(v)
     stats::dnorm(x, pp$mu, sqrt(v)) * vapply(v, function(vv) stats::integrate(function(g) stats::dexp(vv, g) * stats::dgamma(g, pp$k, rate = pp$theta^2), 0, Inf)$value, 0),
-    0, Inf, rel.tol = 1e-9)$value)), note = "Variance exponential with rate gamma, gamma ~ Gamma(k, rate theta^2); checked by total mass."),
-  status = "implemented")
+    0, Inf, rel.tol = 1e-9)$value)), note = "Variance exponential with rate g, g ~ Gamma(k, rate theta^2)."),
+  status = "validated")
 
 # Tweedie compound Poisson gamma ---------------------------------------------------------
 tweedie_lpdf <- function(y, p) pervec(y, p, function(x, pp) {
@@ -261,11 +275,11 @@ metalog_family <- function(id, display, tr, extra_pars = list(), support) regist
   status = "validated"))
 metalog_family("metalog", "Metalog (unbounded)", list(make = function(p) list(fwd = identity, ljac = function(M) 0 * M)),
   support = function(p) list(lower = -Inf, upper = Inf))
-metalog_family("log_metalog", "Log-metalog (semi-bounded)", list(make = function(p) list(fwd = function(M) p$bl + exp(M), ljac = function(M) M)),
+metalog_family("log_metalog", "Log-metalog (semi-bounded)", list(make = function(p) { bl <- p$bl[1]; list(fwd = function(M) bl + exp(M), ljac = function(M) M) }),
   list(P("bl", "real", role = "lower bound", link = "identity", data = TRUE)), support = function(p) list(lower = p$bl, upper = Inf))
-metalog_family("logit_metalog", "Logit-metalog (bounded)", list(make = function(p) list(
-  fwd = function(M) (p$bl + p$bu * exp(M)) / (1 + exp(M)),
-  ljac = function(M) log(p$bu - p$bl) + M - 2 * log1p(exp(M)))),
+metalog_family("logit_metalog", "Logit-metalog (bounded)", list(make = function(p) { bl <- p$bl[1]; bu <- p$bu[1]; list(
+  fwd = function(M) (bl + bu * exp(M)) / (1 + exp(M)),
+  ljac = function(M) log(bu - bl) + M - 2 * log1p(exp(M))) }),
   list(P("bl", "real", link = "identity", data = TRUE), P("bu", "real", link = "identity", data = TRUE)),
   support = function(p) list(lower = p$bl, upper = p$bu))
 

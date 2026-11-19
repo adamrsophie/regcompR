@@ -47,7 +47,7 @@
 #' estimates. For `"firth"`, `"log_f"` and `"cauchy"` the inverse penalized
 #' Hessian is reported as the covariance and is the usual large sample
 #' approximation; for the others it is not a valid frequentist covariance
-#' and p values are suppressed. Use [cv_regcomp()] to choose `lambda`.
+#' and p values are suppressed. Choose `lambda` by cross validation.
 #'
 #' @param type Penalty type, see Details.
 #' @param lambda Non-negative penalty weight.

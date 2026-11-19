@@ -344,7 +344,7 @@ truncate_dist <- function(base, lower = -Inf, upper = Inf) {
 #' wK` on the multinomial logit scale relative to the first component
 #' (`w1` is implied), each with an identity link. Likelihoods are
 #' marginalized over the component labels; label switching is possible and
-#' is reported by [identifiability_check()].
+#' is reported by `identifiability_check()`.
 #'
 #' @param ... Component families.
 #' @return A `regcomp_family`.

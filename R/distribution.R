@@ -185,9 +185,9 @@ cdf <- function(x, q, ...) UseMethod("cdf")
 #' @export
 cdf.regcomp_dist <- function(x, q, lower_tail = TRUE, log_p = FALSE, ...) {
   fam <- x$family
-  if (fam$variate_type != "scalar") stop_unsupported("A univariate CDF", fam$id)
-  r <- recycle_pars(c(list(.q = q), x$pars))
-  q <- r$.q; p <- r[-1]
+  if (fam$variate_type == "scalar") { r <- recycle_pars(c(list(.q = q), x$pars)); q <- r$.q; p <- r[-1] }
+  else if (scalar_vecpar(fam)) p <- x$pars
+  else stop_unsupported("A univariate CDF", fam$id)
   if (!lower_tail && !is.null(fam$lccdf)) {
     out <- fam$lccdf(q, p)
     return(if (log_p) out else exp(out))
@@ -237,9 +237,10 @@ survival.regcomp_dist <- function(x, q, log_p = FALSE, ...)
 quantile.regcomp_dist <- function(x, probs = c(0.025, 0.5, 0.975),
                                   lower_tail = TRUE, log_p = FALSE, ...) {
   fam <- x$family
-  if (fam$variate_type != "scalar") stop_unsupported("A univariate quantile function", fam$id)
+  if (fam$variate_type != "scalar" && !scalar_vecpar(fam)) stop_unsupported("A univariate quantile function", fam$id)
   if (log_p) probs <- exp(probs)
   if (!lower_tail) probs <- 1 - probs
+  if (scalar_vecpar(fam)) return(family_quantile(fam, probs, x$pars))
   r <- recycle_pars(c(list(.p = probs), x$pars))
   family_quantile(fam, r$.p, r[-1])
 }
@@ -257,6 +258,8 @@ family_quantile <- function(fam, p, pars) {
   lo <- rep_len(s$lower, n); hi <- rep_len(s$upper, n)
   start <- pmin(pmax(start, ifelse(is.finite(lo), lo + 1e-8, start)),
                 ifelse(is.finite(hi), hi - 1e-8, start))
+  if (scalar_vecpar(fam))
+    return(invert_cdf(function(q, pp) family_cdf(fam, q, pars), p, list(), fam$discrete, lo, hi, start))
   invert_cdf(function(q, pp) family_cdf(fam, q, pp), p, pars, fam$discrete,
              lo, hi, start)
 }
@@ -277,9 +280,13 @@ rng.regcomp_dist <- function(x, n = NULL, ...) {
   family_rng(fam, n, p)
 }
 
+# Scalar variates whose parameters include a vector or matrix (metalog
+# coefficients, phase-type generators): never recycle the parameters.
+scalar_vecpar <- function(fam) grepl("^scalar_.*_parameter$", fam$variate_type)
+
 family_rng <- function(fam, n, pars) {
   if (!is.null(fam$rng)) return(fam$rng(n, pars))
-  if (fam$variate_type != "scalar") stop_unsupported("Random generation", fam$id)
+  if (fam$variate_type != "scalar" && !scalar_vecpar(fam)) stop_unsupported("Random generation", fam$id)
   family_quantile(fam, stats::runif(n), pars)
 }
 

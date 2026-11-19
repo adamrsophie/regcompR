@@ -13,7 +13,7 @@ domain_bounds <- list(
 #'
 #' Describes one parameter of a distribution: its domain, links, role and
 #' how it enters regression. Used when defining distributions with
-#' [custom_family()].
+#' `custom_family()`.
 #'
 #' @param name Parameter name used in formulas and `distribution()`.
 #' @param domain One of `"real"`, `"positive"`, `"nonneg"`, `"unit"`,

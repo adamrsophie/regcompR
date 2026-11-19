@@ -62,7 +62,7 @@ An object of class \code{regcomp_par}.
 \description{
 Describes one parameter of a distribution: its domain, links, role and
 how it enters regression. Used when defining distributions with
-\code{\link[=custom_family]{custom_family()}}.
+\code{custom_family()}.
 }
 \examples{
 par_spec("mu", "positive", role = "location", is_mean = TRUE)
