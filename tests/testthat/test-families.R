@@ -47,3 +47,13 @@ test_that("multivariate laws are normalized", {
   l <- distribution("lkj", eta = 2.5)
   expect_equal(log_prob(l, list(matrix(c(1, 0.4, 0.4, 1), 2))), dbeta(0.7, 2.5, 2.5, log = TRUE) - log(2))
 })
+
+test_that("count laws from the count regression literature are normalized", {
+  for (d in list(distribution("generalized_waring", mu = 2.3, k = 1.7, rho = 4.5),
+                 distribution("generalized_negative_binomial", mu = 2.5, m = 1.8, beta = 1.4),
+                 distribution("poisson_lognormal", mu = 1.3, sigma = 1.3))) {
+    expect_equal(sum(exp(log_prob(d, 0:20000))), 1, tolerance = 1e-5)
+  }
+  cp <- distribution(censor("poisson", upper = 3), lambda = 2.2)
+  expect_equal(exp(log_prob(cp, 3)), 1 - ppois(2, 2.2))
+})

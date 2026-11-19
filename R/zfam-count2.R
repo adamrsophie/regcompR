@@ -333,10 +333,16 @@ register_family(family_def(
   start = function(y) list(lambda = max(mean(y) / 2, 0.1), prob = 0.3), status = "validated"))
 
 # Poisson lognormal -------------------------------------------------------
+# Integrate over the latent normal z in log space, centered at the mode of
+# g(z) = y (mu + sigma z) - exp(mu + sigma z) - z^2/2 with a window of 40
+# curvature standard deviations, so narrow peaks at large y are not missed.
 pln_lpmf <- function(y, p) vapply(seq_along(y), function(i) {
-  f <- function(z) exp(stats::dpois(y[i], exp(p$mu[i] + p$sigma[i] * z), log = TRUE) + stats::dnorm(z, log = TRUE))
-  m <- (log(max(y[i], 0.5)) - p$mu[i]) / p$sigma[i]
-  log(stats::integrate(f, -Inf, Inf, rel.tol = 1e-12)$value) }, 0)
+  yy <- y[i]; mu <- p$mu[i]; s <- p$sigma[i]
+  g <- function(z) yy * (mu + s * z) - exp(mu + s * z) - z^2 / 2
+  zs <- stats::uniroot(function(z) yy * s - s * exp(mu + s * z) - z, c(-40, 40), extendInt = "yes", tol = 1e-12)$root
+  sd <- 1 / sqrt(s^2 * exp(mu + s * zs) + 1); g0 <- g(zs)
+  v <- stats::integrate(function(z) exp(g(z) - g0), zs - 40 * sd, zs + 40 * sd, rel.tol = 1e-12, subdivisions = 1000L)$value
+  log(v) + g0 - lgamma(yy + 1) - 0.5 * log(2 * pi) }, 0)
 register_family(family_def(
   "poisson_lognormal", "Poisson lognormal", cnt, discrete = TRUE, aliases = "poilog",
   pars = list(P("mu", "real", role = "location", offset_allowed = TRUE, interpretation = "Mean of log lambda"),

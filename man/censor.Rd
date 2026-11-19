@@ -7,7 +7,7 @@
 censor(base, lower = -Inf, upper = Inf)
 }
 \arguments{
-\item{base}{Continuous base family.}
+\item{base}{Base family (continuous or count).}
 
 \item{lower, upper}{Censoring points.}
 }
@@ -19,7 +19,10 @@ Censors a continuous law at \code{lower} and/or \code{upper}: values beyond a bo
 are recorded at the bound, which then carries the tail probability as a
 point mass. \code{censor("normal", lower = 0)} is the Tobit model and the
 rectified Gaussian; \code{censor("beta", ...)} style limits give two limit
-models. Data at the bounds contribute log tail probabilities.
+models. Data at the bounds contribute log tail probabilities. Count
+laws can be censored too (\code{censor("poisson", upper = 3)} records
+every count of 3 or more as 3), as in censored Poisson and negative
+binomial regression.
 }
 \examples{
 tobit <- censor("normal", lower = 0)

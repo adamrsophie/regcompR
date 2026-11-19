@@ -136,9 +136,12 @@ register_family(family_def("tweedie", "Tweedie (compound Poisson-gamma, 1 < powe
 #' are recorded at the bound, which then carries the tail probability as a
 #' point mass. `censor("normal", lower = 0)` is the Tobit model and the
 #' rectified Gaussian; `censor("beta", ...)` style limits give two limit
-#' models. Data at the bounds contribute log tail probabilities.
+#' models. Data at the bounds contribute log tail probabilities. Count
+#' laws can be censored too (`censor("poisson", upper = 3)` records
+#' every count of 3 or more as 3), as in censored Poisson and negative
+#' binomial regression.
 #'
-#' @param base Continuous base family.
+#' @param base Base family (continuous or count).
 #' @param lower,upper Censoring points.
 #' @return A `regcomp_family` with mixed support.
 #' @references Tobin (1958), Estimation of relationships for limited dependent variables. Econometrica, 26, 24-36.
@@ -149,8 +152,9 @@ register_family(family_def("tweedie", "Tweedie (compound Poisson-gamma, 1 < powe
 #' prob(d, c(0, 1))
 censor <- function(base, lower = -Inf, upper = Inf) {
   base <- get_family(base)
-  if (base$discrete) stop_unsupported("Censoring a discrete law (use truncate_dist() or aggregate categories)", base$id)
-  lccdf <- function(q, p) if (!is.null(base$lccdf)) base$lccdf(q, p) else log1p(-family_cdf(base, q, p))
+  # Upper censoring keeps P(Y >= upper); for counts that is 1 - F(upper - 1).
+  lccdf <- function(q, p) { if (base$discrete) q <- q - 1
+    if (!is.null(base$lccdf)) base$lccdf(q, p) else log1p(-family_cdf(base, q, p)) }
   lpdf <- function(y, p) {
     out <- eval_lpdf(base, y, p)
     lo <- y <= lower; hi <- y >= upper
@@ -167,7 +171,7 @@ censor <- function(base, lower = -Inf, upper = Inf) {
                  quantile = function(pr, p) pmin(pmax(family_quantile(base, pr, p), lower), upper),
                  support = support, operator = list(type = "censor", base = base, lower = lower, upper = upper),
                  formula = "point masses F(lower) and 1 - F(upper) at the bounds; f(y) inside")
-  f$category <- "mixed"; f$numeric_moments <- FALSE
+  if (!base$discrete) f$category <- "mixed"; f$numeric_moments <- FALSE
   f
 }
 

@@ -108,7 +108,7 @@ register_family(modify_family(censor("normal", lower = 0), id = "rectified_gauss
 
 # Aliases for laws listed under other names.
 local({
-  al <- c(polya_eggenberger = "negative_binomial_nb2", compound_poisson_gamma = "tweedie", type1_gumbel = "gumbel",
+  al <- c(compound_poisson_gamma = "tweedie", type1_gumbel = "gumbel",
           type2_gumbel = "frechet", fisher_tippett_type1 = "gumbel", levy_skew_alpha_stable = "stable")
   for (a in names(al)) assign(a, al[[a]], envir = .aliases)
 })
