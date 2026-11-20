@@ -39,6 +39,7 @@ Imports:
     utils
 Suggests:
     actuar,
+    AER,
     ald,
     bayescompR,
     BiasedUrn,
@@ -81,6 +82,7 @@ Suggests:
     numDeriv,
     ordinal,
     PearsonDS,
+    plm,
     poilog,
     PoissonBinomial,
     polyaAeppli,

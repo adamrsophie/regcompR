@@ -99,6 +99,11 @@ reference:
   - johnson_neyman
   - vif
   - step_regcomp
+- title: Econometrics
+  contents:
+  - iv_regcomp
+  - panel_within
+  - hausman_test
 - title: Results and prediction
   contents:
   - summary.regcomp_fit

@@ -200,3 +200,23 @@ sims <- simulate(fnb, nsim = 200, seed = 1)
 c(observed_zeros = mean(d$y == 0), simulated_zeros = mean(sims == 0))
 length(log_lik(fnb))
 ```
+
+## Instrumental variables, panel fixed effects and the Hausman test
+
+`iv_regcomp()` fits two stage least squares from an ivreg style formula
+(`y ~ regressors | instruments`) and reports the weak instrument,
+Wu-Hausman and Sargan tests; the results equal `ivreg()`.
+`panel_within()` is the fixed effects (within) estimator of `plm()`, and
+`hausman_test()` compares it with a random effects fit.
+
+```{r}
+set.seed(2)
+n <- 400; z1 <- rnorm(n); z2 <- rnorm(n); u <- rnorm(n)
+xe <- z1 + 0.5 * z2 + u + rnorm(n)
+iv_regcomp(y ~ xe | z1 + z2, data = data.frame(y = 1 + 2 * xe + u, xe, z1, z2))
+pd <- data.frame(id = factor(rep(1:60, each = 5)), x = rnorm(300))
+pd$y <- 1 + 0.5 * pd$x + rnorm(60)[pd$id] + rnorm(300)
+fe <- panel_within(y ~ x, data = pd, id = "id")
+re <- regcomp(y ~ x + (1 | id), family = "normal", data = pd)
+hausman_test(fe, re)
+```
