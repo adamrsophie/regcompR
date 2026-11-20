@@ -117,7 +117,8 @@ atoms keeps the atoms.
 [`convolve_dist()`](https://adamrsophie.github.io/regcompR/reference/convolve_dist.md)
 gives the law of a sum of two independent variables. When one of them
 has point masses at known places (a zero inflated or hurdle law) the
-density of the sum is the continuous part plus the shifted atoms.
+density of the sum is the continuous part plus the shifted atoms; when
+both have, the sum also has point masses at the sums of their locations.
 
 ``` r
 
@@ -127,13 +128,18 @@ prob(distribution(emg, mu.1 = 0, sigma.1 = 1, lambda.2 = 2), c(0, 1, 2))
 pp <- convolve_dist("poisson", "poisson")
 all.equal(prob(distribution(pp, lambda.1 = 1.5, lambda.2 = 2.2), 0:5), dpois(0:5, 3.7))
 #> [1] TRUE
+zz <- convolve_dist(inflate("gamma"), censor("normal", lower = 0))
+prob(distribution(zz, mu.1 = 2, sigma.1 = 0.5, zi.1 = 0.3, mu.2 = 0.2, sigma.2 = 1), 0)   # 0.3 * P(N < 0)
+#> [1] 0.1262221
 ```
 
 [`splice()`](https://adamrsophie.github.io/regcompR/reference/splice.md)
 joins a body law below a threshold with a tail law above it;
 [`copula_dist()`](https://adamrsophie.github.io/regcompR/reference/copula_dist.md)
 builds a bivariate law from two margins and a Gaussian, Clayton, Gumbel
-or Frank copula.
+or Frank copula. Margins may be continuous, discrete, or continuous with
+point masses, and need not be of the same type: at a jump of a margin
+the copula is differenced across the jump.
 
 ``` r
 
@@ -152,6 +158,27 @@ names(cp$pars)
 dc <- distribution(cp, mu.1 = 0, sigma.1 = 1, mu.2 = 2, sigma.2 = 0.5, theta = 2)
 log_prob(dc, cbind(0.2, 1.5))
 #> [1] -1.639693
+hc <- copula_dist("poisson", inflate("gamma"), "frank")       # a count and a zero inflated amount
+log_prob(distribution(hc, lambda.1 = 2, mu.2 = 2, sigma.2 = 0.5, zi.2 = 0.3, theta = 3), rbind(c(1, 0), c(1, 2.5)))
+#> [1] -2.160720 -3.496421
+```
+
+Every other operator also accepts a law with point masses: truncation
+keeps the atoms inside `[lower, upper]` and rescales them, censoring
+adds the tail mass to the bounds, rounding puts each atom in its bin,
+monotone transformations move the atoms, splicing keeps the body atoms
+below the threshold and the tail atoms above it, and CDF generators give
+an atom at `c` the mass `T(G(c)) - T(G(c-))`.
+
+``` r
+
+zg <- inflate("gamma")
+prob(distribution(truncate_dist(zg, 0, 3), mu = 2, sigma = 0.5, zi = 0.3), 0)
+#> [1] 0.3355114
+prob(distribution(round_dist(zg), mu = 2, sigma = 0.5, zi = 0.3), 0:2)
+#> [1] 0.3132917 0.2336460 0.2675442
+prob(distribution(exponentiated(zg), mu = 2, sigma = 0.5, zi = 0.3, a = 2), 0)
+#> [1] 0.09
 ```
 
 ### Cure models, compounding, weighting and transformations
@@ -292,17 +319,13 @@ quantile(distribution(myexp, rate = 2), 0.5)
 
 ## What is refused
 
-Operators refuse combinations whose density is not defined, instead of
-returning a wrong answer:
+Operators refuse combinations whose result is not well defined, instead
+of returning a wrong answer:
 
-- [`round_dist()`](https://adamrsophie.github.io/regcompR/reference/discretize.md),
-  [`splice()`](https://adamrsophie.github.io/regcompR/reference/splice.md),
-  [`copula_dist()`](https://adamrsophie.github.io/regcompR/reference/copula_dist.md)
-  and
-  [`censor()`](https://adamrsophie.github.io/regcompR/reference/censor.md)
-  of a law that already has point masses;
-- the convolution of two laws that both have point masses, or of a law
-  whose atom locations are unknown;
+- convolution, censoring or a monotone transformation of a law whose
+  point masses are at unknown places (a custom family with an `atom`
+  function but no `atom_points`), since the result’s masses cannot be
+  located;
 - a mixture of discrete laws on different lattices;
 - inflation or hurdle points that are not on the lattice of a discrete
   base.

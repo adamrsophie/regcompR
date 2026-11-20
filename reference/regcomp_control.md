@@ -22,7 +22,8 @@ regcomp_control(
   adapt_delta = 0.8,
   start = NULL,
   prox_maxit = 5000,
-  prox_tol = 1e-08
+  prox_tol = 1e-08,
+  init = NULL
 )
 ```
 
@@ -77,6 +78,14 @@ regcomp_control(
   Iteration limit and relative step tolerance of the proximal gradient
   (FISTA) solver used for lasso type penalties (`maxit` and `rel_tol`
   apply to [`nlminb()`](https://rdrr.io/r/stats/nlminb.html) only).
+
+- init:
+
+  Initial values for the Stan runners: a radius for uniform initial
+  values on the unconstrained scale (the default is 2), or a list with
+  one named list per chain using the parameter names of the generated
+  program (`b_mu`, `b_mu_1`, ...). Useful for multimodal posteriors such
+  as mixtures, where a chain started in another mode stays there.
 
 ## Value
 
@@ -136,5 +145,8 @@ regcomp_control(maxit = 500)
 #> 
 #> $prox_tol
 #> [1] 1e-08
+#> 
+#> $init
+#> NULL
 #> 
 ```

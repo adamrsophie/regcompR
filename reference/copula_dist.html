@@ -4,14 +4,20 @@
 (theta &amp;gt; 1, parameterized as 1 + exp(eta)) or &quot;frank&quot; (theta
 real, not 0). For continuous margins the log density is
 log c(F1(y1), F2(y2)) + log f1(y1) + log f2(y2); for discrete margins
-the rectangle probability C(F1, F2) - C(F1-, F2) - C(F1, F2-) + C(F1-, F2-) is used (Trivedi and Zimmer 2007). Margin parameters get
+the rectangle probability C(F1, F2) - C(F1-, F2) - C(F1, F2-) + C(F1-, F2-) is used (Trivedi and Zimmer 2007). Margins may differ in
+type, and continuous margins may have point masses: at a jump of one
+margin and a continuous value of the other the density is
+(h(F1, F2) - h(F1-, F2)) f2(y2) with h = dC/dv. Margin parameters get
 suffixes .1 and .2; every parameter can take a formula, giving
 copula regression. The response is cbind(y1, y2)."><meta property="og:description" content="Joint law of a pair (y1, y2) with margins m1, m2 and a copula:
 &quot;gaussian&quot; (correlation rho), &quot;clayton&quot; (theta &amp;gt; 0), &quot;gumbel&quot;
 (theta &amp;gt; 1, parameterized as 1 + exp(eta)) or &quot;frank&quot; (theta
 real, not 0). For continuous margins the log density is
 log c(F1(y1), F2(y2)) + log f1(y1) + log f2(y2); for discrete margins
-the rectangle probability C(F1, F2) - C(F1-, F2) - C(F1, F2-) + C(F1-, F2-) is used (Trivedi and Zimmer 2007). Margin parameters get
+the rectangle probability C(F1, F2) - C(F1-, F2) - C(F1, F2-) + C(F1-, F2-) is used (Trivedi and Zimmer 2007). Margins may differ in
+type, and continuous margins may have point masses: at a jump of one
+margin and a continuous value of the other the density is
+(h(F1, F2) - h(F1-, F2)) f2(y2) with h = dC/dv. Margin parameters get
 suffixes .1 and .2; every parameter can take a formula, giving
 copula regression. The response is cbind(y1, y2)."><meta property="og:image" content="https://adamrsophie.github.io/regcompR/logo.svg"></head><body>
     <a href="#main" class="visually-hidden-focusable">Skip to contents</a>
@@ -71,7 +77,10 @@ copula regression. The response is cbind(y1, y2)."><meta property="og:image" con
 (<code>theta &gt; 1</code>, parameterized as <code>1 + exp(eta)</code>) or <code>"frank"</code> (<code>theta</code>
 real, not 0). For continuous margins the log density is
 <code>log c(F1(y1), F2(y2)) + log f1(y1) + log f2(y2)</code>; for discrete margins
-the rectangle probability <code>C(F1, F2) - C(F1-, F2) - C(F1, F2-) + C(F1-, F2-)</code> is used (Trivedi and Zimmer 2007). Margin parameters get
+the rectangle probability <code>C(F1, F2) - C(F1-, F2) - C(F1, F2-) + C(F1-, F2-)</code> is used (Trivedi and Zimmer 2007). Margins may differ in
+type, and continuous margins may have point masses: at a jump of one
+margin and a continuous value of the other the density is
+<code>(h(F1, F2) - h(F1-, F2)) f2(y2)</code> with <code>h = dC/dv</code>. Margin parameters get
 suffixes <code>.1</code> and <code>.2</code>; every parameter can take a formula, giving
 copula regression. The response is <code>cbind(y1, y2)</code>.</p>
     </div>
@@ -86,7 +95,8 @@ copula regression. The response is <code>cbind(y1, y2)</code>.</p>
 
 
 <dl><dt id="arg-m-m-">m1, m2<a class="anchor" aria-label="anchor" href="#arg-m-m-"></a></dt>
-<dd><p>Margin families (both continuous or both discrete).</p></dd>
+<dd><p>Scalar margin families (continuous, discrete, or continuous
+with point masses).</p></dd>
 
 
 <dt id="arg-copula">copula<a class="anchor" aria-label="anchor" href="#arg-copula"></a></dt>

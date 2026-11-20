@@ -74,7 +74,8 @@
 <span>  adapt_delta <span class="op">=</span> <span class="fl">0.8</span>,</span>
 <span>  start <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  prox_maxit <span class="op">=</span> <span class="fl">5000</span>,</span>
-<span>  prox_tol <span class="op">=</span> <span class="fl">1e-08</span></span>
+<span>  prox_tol <span class="op">=</span> <span class="fl">1e-08</span>,</span>
+<span>  init <span class="op">=</span> <span class="cn">NULL</span></span>
 <span><span class="op">)</span></span></code></pre></div>
     </div>
 
@@ -131,6 +132,15 @@ of each parameter (vectors on the link scale).</p></dd>
 <dd><p>Iteration limit and relative step tolerance of
 the proximal gradient (FISTA) solver used for lasso type penalties
 (<code>maxit</code> and <code>rel_tol</code> apply to <code><a href="https://rdrr.io/r/stats/nlminb.html" class="external-link">nlminb()</a></code> only).</p></dd>
+
+
+<dt id="arg-init">init<a class="anchor" aria-label="anchor" href="#arg-init"></a></dt>
+<dd><p>Initial values for the Stan runners: a radius for uniform
+initial values on the unconstrained scale (the default is 2), or a list
+with one named list per chain using the parameter names of the
+generated program (<code>b_mu</code>, <code>b_mu_1</code>, ...). Useful for multimodal
+posteriors such as mixtures, where a chain started in another mode
+stays there.</p></dd>
 
 </dl></div>
     <div class="section level2">
@@ -191,6 +201,9 @@ the proximal gradient (FISTA) solver used for lasso type penalties
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> $prox_tol</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> [1] 1e-08</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> $init</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> NULL</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 </code></pre></div>
     </div>

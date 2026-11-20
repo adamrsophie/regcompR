@@ -59,6 +59,9 @@
 <code>scoring_rule(re = "marginal")</code> scores the predictive law of a new group, mixing over draws of its random effects. <code>cv_regcomp(group = )</code> now scores held out groups this way by default (previously with the effects set to zero; <code>re = "zero"</code> restores that) and clusters the standard error by group.</li>
 <li>The multivariate hypergeometric law takes the number of draws <code>size</code>.</li>
 <li>Finite difference scores and Hessians respect joint parameter constraints.</li>
+<li>Truncation, censoring, rounding, monotone transformations, splicing, CDF generators, convolutions (including two laws that both have point masses) and copulas now accept continuous laws with point masses; copula margins may also differ in type (a count and a continuous amount, say).</li>
+<li>
+<code>regcomp_control(init = )</code> sets initial values for the Stan runners.</li>
 <li>Registry of 278 distribution families with densities, distribution functions, quantiles, random generation, moments and references.</li>
 <li>Distributional regression by maximum likelihood with a Laplace approximation for random effects and smooths, through TMB (RTMB), and by Bayesian inference in Stan, JAGS and OpenBUGS.</li>
 <li>Random effects in any parameter with nested, crossed, structured (AR(1), compound symmetry, unstructured, Ornstein Uhlenbeck, spatial kernels) and multiple membership terms.</li>

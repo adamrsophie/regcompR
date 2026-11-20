@@ -182,17 +182,24 @@ with atoms keeps the atoms.</p>
 <p><code><a href="../reference/convolve_dist.html">convolve_dist()</a></code> gives the law of a sum of two
 independent variables. When one of them has point masses at known places
 (a zero inflated or hurdle law) the density of the sum is the continuous
-part plus the shifted atoms.</p>
+part plus the shifted atoms; when both have, the sum also has point
+masses at the sums of their locations.</p>
 <div class="sourceCode" id="cb7"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">emg</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/convolve_dist.html">convolve_dist</a></span><span class="op">(</span><span class="st">"normal"</span>, <span class="st">"exponential"</span><span class="op">)</span>      <span class="co"># exponentially modified Gaussian</span></span>
 <span><span class="fu"><a href="../reference/probability-interface.html">prob</a></span><span class="op">(</span><span class="fu"><a href="../reference/distribution.html">distribution</a></span><span class="op">(</span><span class="va">emg</span>, mu.1 <span class="op">=</span> <span class="fl">0</span>, sigma.1 <span class="op">=</span> <span class="fl">1</span>, lambda.2 <span class="op">=</span> <span class="fl">2</span><span class="op">)</span>, <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">0</span>, <span class="fl">1</span>, <span class="fl">2</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="co">#&gt; [1] 0.3362040 0.3173105 0.1353353</span></span>
 <span><span class="va">pp</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/convolve_dist.html">convolve_dist</a></span><span class="op">(</span><span class="st">"poisson"</span>, <span class="st">"poisson"</span><span class="op">)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/all.equal.html" class="external-link">all.equal</a></span><span class="op">(</span><span class="fu"><a href="../reference/probability-interface.html">prob</a></span><span class="op">(</span><span class="fu"><a href="../reference/distribution.html">distribution</a></span><span class="op">(</span><span class="va">pp</span>, lambda.1 <span class="op">=</span> <span class="fl">1.5</span>, lambda.2 <span class="op">=</span> <span class="fl">2.2</span><span class="op">)</span>, <span class="fl">0</span><span class="op">:</span><span class="fl">5</span><span class="op">)</span>, <span class="fu"><a href="https://rdrr.io/r/stats/Poisson.html" class="external-link">dpois</a></span><span class="op">(</span><span class="fl">0</span><span class="op">:</span><span class="fl">5</span>, <span class="fl">3.7</span><span class="op">)</span><span class="op">)</span></span>
-<span><span class="co">#&gt; [1] TRUE</span></span></code></pre></div>
+<span><span class="co">#&gt; [1] TRUE</span></span>
+<span><span class="va">zz</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/convolve_dist.html">convolve_dist</a></span><span class="op">(</span><span class="fu"><a href="../reference/inflate.html">inflate</a></span><span class="op">(</span><span class="st">"gamma"</span><span class="op">)</span>, <span class="fu"><a href="../reference/censor.html">censor</a></span><span class="op">(</span><span class="st">"normal"</span>, lower <span class="op">=</span> <span class="fl">0</span><span class="op">)</span><span class="op">)</span></span>
+<span><span class="fu"><a href="../reference/probability-interface.html">prob</a></span><span class="op">(</span><span class="fu"><a href="../reference/distribution.html">distribution</a></span><span class="op">(</span><span class="va">zz</span>, mu.1 <span class="op">=</span> <span class="fl">2</span>, sigma.1 <span class="op">=</span> <span class="fl">0.5</span>, zi.1 <span class="op">=</span> <span class="fl">0.3</span>, mu.2 <span class="op">=</span> <span class="fl">0.2</span>, sigma.2 <span class="op">=</span> <span class="fl">1</span><span class="op">)</span>, <span class="fl">0</span><span class="op">)</span>   <span class="co"># 0.3 * P(N &lt; 0)</span></span>
+<span><span class="co">#&gt; [1] 0.1262221</span></span></code></pre></div>
 <p><code><a href="../reference/splice.html">splice()</a></code> joins a body law below a threshold with a tail
 law above it; <code><a href="../reference/copula_dist.html">copula_dist()</a></code> builds a bivariate law from two
-margins and a Gaussian, Clayton, Gumbel or Frank copula.</p>
+margins and a Gaussian, Clayton, Gumbel or Frank copula. Margins may be
+continuous, discrete, or continuous with point masses, and need not be
+of the same type: at a jump of a margin the copula is differenced across
+the jump.</p>
 <div class="sourceCode" id="cb8"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">sp</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/splice.html">splice</a></span><span class="op">(</span><span class="st">"lognormal"</span>, <span class="st">"lomax"</span><span class="op">)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="fu"><a href="../reference/distribution.html">distribution</a></span><span class="op">(</span><span class="va">sp</span>, mu.b <span class="op">=</span> <span class="fl">0</span>, sigma.b <span class="op">=</span> <span class="fl">0.6</span>, scale.t <span class="op">=</span> <span class="fl">2</span>, alpha.t <span class="op">=</span> <span class="fl">2.5</span>,</span>
@@ -204,12 +211,30 @@ margins and a Gaussian, Clayton, Gumbel or Frank copula.</p>
 <span><span class="co">#&gt; [1] "mu.1"    "sigma.1" "mu.2"    "sigma.2" "theta"</span></span>
 <span><span class="va">dc</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/distribution.html">distribution</a></span><span class="op">(</span><span class="va">cp</span>, mu.1 <span class="op">=</span> <span class="fl">0</span>, sigma.1 <span class="op">=</span> <span class="fl">1</span>, mu.2 <span class="op">=</span> <span class="fl">2</span>, sigma.2 <span class="op">=</span> <span class="fl">0.5</span>, theta <span class="op">=</span> <span class="fl">2</span><span class="op">)</span></span>
 <span><span class="fu"><a href="../reference/probability-interface.html">log_prob</a></span><span class="op">(</span><span class="va">dc</span>, <span class="fu"><a href="https://rdrr.io/r/base/cbind.html" class="external-link">cbind</a></span><span class="op">(</span><span class="fl">0.2</span>, <span class="fl">1.5</span><span class="op">)</span><span class="op">)</span></span>
-<span><span class="co">#&gt; [1] -1.639693</span></span></code></pre></div>
+<span><span class="co">#&gt; [1] -1.639693</span></span>
+<span><span class="va">hc</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/copula_dist.html">copula_dist</a></span><span class="op">(</span><span class="st">"poisson"</span>, <span class="fu"><a href="../reference/inflate.html">inflate</a></span><span class="op">(</span><span class="st">"gamma"</span><span class="op">)</span>, <span class="st">"frank"</span><span class="op">)</span>       <span class="co"># a count and a zero inflated amount</span></span>
+<span><span class="fu"><a href="../reference/probability-interface.html">log_prob</a></span><span class="op">(</span><span class="fu"><a href="../reference/distribution.html">distribution</a></span><span class="op">(</span><span class="va">hc</span>, lambda.1 <span class="op">=</span> <span class="fl">2</span>, mu.2 <span class="op">=</span> <span class="fl">2</span>, sigma.2 <span class="op">=</span> <span class="fl">0.5</span>, zi.2 <span class="op">=</span> <span class="fl">0.3</span>, theta <span class="op">=</span> <span class="fl">3</span><span class="op">)</span>, <span class="fu"><a href="https://rdrr.io/r/base/cbind.html" class="external-link">rbind</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">1</span>, <span class="fl">0</span><span class="op">)</span>, <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">1</span>, <span class="fl">2.5</span><span class="op">)</span><span class="op">)</span><span class="op">)</span></span>
+<span><span class="co">#&gt; [1] -2.160720 -3.496421</span></span></code></pre></div>
+<p>Every other operator also accepts a law with point masses: truncation
+keeps the atoms inside <code>[lower, upper]</code> and rescales them,
+censoring adds the tail mass to the bounds, rounding puts each atom in
+its bin, monotone transformations move the atoms, splicing keeps the
+body atoms below the threshold and the tail atoms above it, and CDF
+generators give an atom at <code>c</code> the mass
+<code>T(G(c)) - T(G(c-))</code>.</p>
+<div class="sourceCode" id="cb10"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">zg</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/inflate.html">inflate</a></span><span class="op">(</span><span class="st">"gamma"</span><span class="op">)</span></span>
+<span><span class="fu"><a href="../reference/probability-interface.html">prob</a></span><span class="op">(</span><span class="fu"><a href="../reference/distribution.html">distribution</a></span><span class="op">(</span><span class="fu"><a href="../reference/truncate_dist.html">truncate_dist</a></span><span class="op">(</span><span class="va">zg</span>, <span class="fl">0</span>, <span class="fl">3</span><span class="op">)</span>, mu <span class="op">=</span> <span class="fl">2</span>, sigma <span class="op">=</span> <span class="fl">0.5</span>, zi <span class="op">=</span> <span class="fl">0.3</span><span class="op">)</span>, <span class="fl">0</span><span class="op">)</span></span>
+<span><span class="co">#&gt; [1] 0.3355114</span></span>
+<span><span class="fu"><a href="../reference/probability-interface.html">prob</a></span><span class="op">(</span><span class="fu"><a href="../reference/distribution.html">distribution</a></span><span class="op">(</span><span class="fu"><a href="../reference/discretize.html">round_dist</a></span><span class="op">(</span><span class="va">zg</span><span class="op">)</span>, mu <span class="op">=</span> <span class="fl">2</span>, sigma <span class="op">=</span> <span class="fl">0.5</span>, zi <span class="op">=</span> <span class="fl">0.3</span><span class="op">)</span>, <span class="fl">0</span><span class="op">:</span><span class="fl">2</span><span class="op">)</span></span>
+<span><span class="co">#&gt; [1] 0.3132917 0.2336460 0.2675442</span></span>
+<span><span class="fu"><a href="../reference/probability-interface.html">prob</a></span><span class="op">(</span><span class="fu"><a href="../reference/distribution.html">distribution</a></span><span class="op">(</span><span class="fu"><a href="../reference/exponentiated.html">exponentiated</a></span><span class="op">(</span><span class="va">zg</span><span class="op">)</span>, mu <span class="op">=</span> <span class="fl">2</span>, sigma <span class="op">=</span> <span class="fl">0.5</span>, zi <span class="op">=</span> <span class="fl">0.3</span>, a <span class="op">=</span> <span class="fl">2</span><span class="op">)</span>, <span class="fl">0</span><span class="op">)</span></span>
+<span><span class="co">#&gt; [1] 0.09</span></span></code></pre></div>
 </div>
 <div class="section level3">
 <h3 id="cure-models-compounding-weighting-and-transformations">Cure models, compounding, weighting and transformations<a class="anchor" aria-label="anchor" href="#cure-models-compounding-weighting-and-transformations"></a>
 </h3>
-<div class="sourceCode" id="cb10"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb11"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">cw</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/cure.html">cure</a></span><span class="op">(</span><span class="st">"weibull"</span><span class="op">)</span>                              <span class="co"># S(t) = cure + (1 - cure) S0(t)</span></span>
 <span><span class="fu"><a href="../reference/probability-interface.html">survival</a></span><span class="op">(</span><span class="fu"><a href="../reference/distribution.html">distribution</a></span><span class="op">(</span><span class="va">cw</span>, shape <span class="op">=</span> <span class="fl">1.5</span>, scale <span class="op">=</span> <span class="fl">2</span>, cure <span class="op">=</span> <span class="fl">0.3</span><span class="op">)</span>, <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">1</span>, <span class="fl">10</span>, <span class="fl">100</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="co">#&gt; [1] 0.7915320 0.3000098 0.3000000</span></span>
@@ -238,7 +263,7 @@ regression.</p>
 <div class="section level3">
 <h3 id="skewing">Skewing<a class="anchor" aria-label="anchor" href="#skewing"></a>
 </h3>
-<div class="sourceCode" id="cb11"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb12"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">sl</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/skew_symmetric.html">skew_symmetric</a></span><span class="op">(</span><span class="st">"logistic"</span>, <span class="st">"logistic"</span><span class="op">)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/names.html" class="external-link">names</a></span><span class="op">(</span><span class="va">sl</span><span class="op">$</span><span class="va">pars</span><span class="op">)</span></span>
 <span><span class="co">#&gt; [1] "mu"    "sigma" "alpha"</span></span>
@@ -345,7 +370,7 @@ formulas.</p>
 </tr>
 </tbody>
 </table>
-<div class="sourceCode" id="cb12"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb13"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">kw</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/exponentiated.html">kumaraswamy_g</a></span><span class="op">(</span><span class="st">"weibull"</span><span class="op">)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/names.html" class="external-link">names</a></span><span class="op">(</span><span class="va">kw</span><span class="op">$</span><span class="va">pars</span><span class="op">)</span></span>
 <span><span class="co">#&gt; [1] "shape" "scale" "a"     "b"</span></span>
@@ -380,7 +405,7 @@ formulas.</p>
 <span><span class="co">#&gt; 17   poisson maximum (power series) of Exponential    lambda, theta</span></span>
 <span><span class="co">#&gt; 18 geometric minimum (power series) of Exponential    lambda, theta</span></span></code></pre></div>
 <p>A generated family is fitted like any other:</p>
-<div class="sourceCode" id="cb13"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb14"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">y</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/stats/Weibull.html" class="external-link">rweibull</a></span><span class="op">(</span><span class="fl">300</span>, shape <span class="op">=</span> <span class="fl">1.5</span>, scale <span class="op">=</span> <span class="fl">2</span><span class="op">)</span></span>
 <span><span class="va">fk</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/regcomp.html">regcomp</a></span><span class="op">(</span><span class="va">y</span> <span class="op">~</span> <span class="fl">1</span>, family <span class="op">=</span> <span class="fu"><a href="../reference/exponentiated.html">marshall_olkin</a></span><span class="op">(</span><span class="st">"weibull"</span><span class="op">)</span>, data <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span>y <span class="op">=</span> <span class="va">y</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/stats/coef.html" class="external-link">coef</a></span><span class="op">(</span><span class="va">fk</span><span class="op">)</span></span>
@@ -394,7 +419,7 @@ formulas.</p>
 The total mass is checked numerically at the parameter values given in
 <code>check</code>; cdf, quantile, rng and moments are optional and fall
 back to numerical methods.</p>
-<div class="sourceCode" id="cb14"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb15"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">myexp</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/custom_family.html">custom_family</a></span><span class="op">(</span><span class="st">"my_exponential"</span>, <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span><span class="fu"><a href="../reference/par_spec.html">par_spec</a></span><span class="op">(</span><span class="st">"rate"</span>, <span class="st">"positive"</span>, role <span class="op">=</span> <span class="st">"rate"</span><span class="op">)</span><span class="op">)</span>,</span>
 <span>  lpdf <span class="op">=</span> <span class="kw">function</span><span class="op">(</span><span class="va">y</span>, <span class="va">p</span><span class="op">)</span> <span class="fu"><a href="https://rdrr.io/r/stats/Exponential.html" class="external-link">dexp</a></span><span class="op">(</span><span class="va">y</span>, <span class="va">p</span><span class="op">$</span><span class="va">rate</span>, log <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span>,</span>
 <span>  support <span class="op">=</span> <span class="kw">function</span><span class="op">(</span><span class="va">p</span><span class="op">)</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>lower <span class="op">=</span> <span class="fl">0</span>, upper <span class="op">=</span> <span class="cn">Inf</span><span class="op">)</span>, check <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>rate <span class="op">=</span> <span class="fl">2</span><span class="op">)</span><span class="op">)</span></span>
@@ -407,15 +432,13 @@ back to numerical methods.</p>
 <div class="section level2">
 <h2 id="what-is-refused">What is refused<a class="anchor" aria-label="anchor" href="#what-is-refused"></a>
 </h2>
-<p>Operators refuse combinations whose density is not defined, instead
-of returning a wrong answer:</p>
+<p>Operators refuse combinations whose result is not well defined,
+instead of returning a wrong answer:</p>
 <ul>
-<li>
-<code><a href="../reference/discretize.html">round_dist()</a></code>, <code><a href="../reference/splice.html">splice()</a></code>,
-<code><a href="../reference/copula_dist.html">copula_dist()</a></code> and <code><a href="../reference/censor.html">censor()</a></code> of a law that
-already has point masses;</li>
-<li>the convolution of two laws that both have point masses, or of a law
-whose atom locations are unknown;</li>
+<li>convolution, censoring or a monotone transformation of a law whose
+point masses are at unknown places (a custom family with an
+<code>atom</code> function but no <code>atom_points</code>), since the
+result’s masses cannot be located;</li>
 <li>a mixture of discrete laws on different lattices;</li>
 <li>inflation or hurdle points that are not on the lattice of a discrete
 base.</li>
@@ -425,7 +448,7 @@ with point masses inside a continuous density (an inflated or hurdle
 continuous law, for example) are fitted by the <code>"ml"</code> and
 <code>"tmb"</code> engines only. <code><a href="../reference/family_capabilities.html">family_capabilities()</a></code>
 reports what is available for a given family.</p>
-<div class="sourceCode" id="cb15"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb16"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="../reference/family_capabilities.html">family_capabilities</a></span><span class="op">(</span><span class="fu"><a href="../reference/hurdle.html">hurdle</a></span><span class="op">(</span><span class="st">"poisson"</span><span class="op">)</span><span class="op">)</span><span class="op">$</span><span class="va">stan</span></span>
 <span><span class="co">#&gt; [1] "generated"</span></span>
 <span><span class="fu"><a href="../reference/family_capabilities.html">family_capabilities</a></span><span class="op">(</span><span class="fu"><a href="../reference/inflate.html">inflate</a></span><span class="op">(</span><span class="st">"gamma"</span><span class="op">)</span><span class="op">)</span><span class="op">$</span><span class="va">stan</span></span>
