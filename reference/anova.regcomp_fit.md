@@ -29,13 +29,12 @@ AIC, the likelihood ratio statistic, its degrees of freedom and p value.
 
 ``` r
 d <- data.frame(x = rnorm(200), z = rnorm(200)); d$y <- rpois(200, exp(0.5 + 0.3 * d$x))
-anova(regcomp(y ~ x, family = "poisson", data = d), regcomp(y ~ x + z, family = "poisson", data = d))
+f1 <- regcomp(y ~ x, family = "poisson", data = d)
+f2 <- regcomp(y ~ x + z, family = "poisson", data = d)
+anova(f1, f2)
 #> Likelihood ratio tests
 #> 
-#>                                                  df  logLik    AIC  Chisq
-#> regcomp(y ~ x, family = "poisson", data = d)      2 -312.23 628.45       
-#> regcomp(y ~ x + z, family = "poisson", data = d)  3 -312.02 630.04 0.4059
-#>                                                  Chi Df Pr(>Chisq)
-#> regcomp(y ~ x, family = "poisson", data = d)                      
-#> regcomp(y ~ x + z, family = "poisson", data = d)      1     0.5241
+#>    df  logLik    AIC  Chisq Chi Df Pr(>Chisq)
+#> f1  2 -312.23 628.45                         
+#> f2  3 -312.02 630.04 0.4059      1     0.5241
 ```
