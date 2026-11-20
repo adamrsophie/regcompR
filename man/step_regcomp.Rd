@@ -8,7 +8,7 @@ step_regcomp(
   object,
   scope = NULL,
   direction = c("both", "backward", "forward"),
-  criterion = c("AIC", "BIC"),
+  criterion = c("AIC", "BIC", "AICc", "HQ"),
   par = NULL,
   trace = FALSE
 )
@@ -21,7 +21,7 @@ for \code{par}; by default the terms of the starting model (backward only).}
 
 \item{direction}{\code{"both"}, \code{"backward"} or \code{"forward"}.}
 
-\item{criterion}{\code{"AIC"} or \code{"BIC"}.}
+\item{criterion}{\code{"AIC"}, \code{"BIC"}, \code{"AICc"} (small sample AIC) or \code{"HQ"} (Hannan-Quinn).}
 
 \item{par}{Distribution parameter whose formula is searched; the main
 one by default. Random effect terms are kept.}

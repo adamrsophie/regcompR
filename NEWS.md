@@ -1,6 +1,10 @@
 # regcompR 0.1.0
 
 * First release.
+* Inference: `vcov(type = "HC1")` to `"HC3"` (equal to sandwich::vcovHC),
+  `boot_regcomp()` (parametric and case bootstrap, clustered),
+  `power_sim()` (power by simulation), `vuong_test()` and `best_subset()`;
+  `step_regcomp()` and `best_subset()` also use AICc and Hannan-Quinn.
 * Random effect structures `relmat()` (known relatedness matrix),
   `car()`, `leroux()` and `icar()` (areal models; `icar()` plus an iid term
   is BYM) and `spacetime()` (separable Leroux by AR(1)); exact normal

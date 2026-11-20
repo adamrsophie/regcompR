@@ -100,6 +100,10 @@ reference:
   - johnson_neyman
   - vif
   - step_regcomp
+  - best_subset
+  - vuong_test
+  - boot_regcomp
+  - power_sim
 - title: Econometrics
   contents:
   - iv_regcomp

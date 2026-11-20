@@ -4,12 +4,17 @@
 \alias{vcov.regcomp_fit}
 \title{Covariance of the estimates}
 \usage{
-\method{vcov}{regcomp_fit}(object, type = c("model", "sandwich", "quasi"), cluster = NULL, ...)
+\method{vcov}{regcomp_fit}(
+  object,
+  type = c("model", "sandwich", "quasi", "HC0", "HC1", "HC2", "HC3"),
+  cluster = NULL,
+  ...
+)
 }
 \arguments{
 \item{object}{A fitted model.}
 
-\item{type}{\code{"model"}, \code{"sandwich"} or \code{"quasi"}.}
+\item{type}{\code{"model"}, \code{"sandwich"} (\code{"HC0"}), \code{"HC1"}, \code{"HC2"}, \code{"HC3"} or \code{"quasi"}.}
 
 \item{cluster}{Optional cluster identifier: a vector, or a one sided
 formula evaluated in the model data.}
@@ -33,6 +38,11 @@ dispersion \code{sum(r^2) / (n - p)} of the Pearson residuals \code{r}: the
 quasi-likelihood covariance of \code{glm(family = quasibinomial)} and
 \code{quasipoisson} (McCullagh and Nelder 1989, ch. 9) when the family is
 binomial or Poisson, whose estimates are the same.
+\code{"HC0"} is the sandwich; \code{"HC1"} multiplies it by \code{n / (n - p)} with \code{p}
+the number of coefficients; \code{"HC2"} and \code{"HC3"} divide each score by
+\code{sqrt(1 - h_i)} and \code{1 - h_i}, with leverages \code{h_i} the diagonal of the
+weighted hat matrix (MacKinnon and White 1985). For a one parameter GLM
+(Poisson, binomial) they equal \code{sandwich::vcovHC()}.
 }
 \examples{
 set.seed(1)

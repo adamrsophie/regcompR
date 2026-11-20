@@ -37,9 +37,14 @@ obs_scores <- function(fit) {
 #' quasi-likelihood covariance of `glm(family = quasibinomial)` and
 #' `quasipoisson` (McCullagh and Nelder 1989, ch. 9) when the family is
 #' binomial or Poisson, whose estimates are the same.
+#' `"HC0"` is the sandwich; `"HC1"` multiplies it by `n / (n - p)` with `p`
+#' the number of coefficients; `"HC2"` and `"HC3"` divide each score by
+#' `sqrt(1 - h_i)` and `1 - h_i`, with leverages `h_i` the diagonal of the
+#' weighted hat matrix (MacKinnon and White 1985). For a one parameter GLM
+#' (Poisson, binomial) they equal `sandwich::vcovHC()`.
 #'
 #' @param object A fitted model.
-#' @param type `"model"`, `"sandwich"` or `"quasi"`.
+#' @param type `"model"`, `"sandwich"` (`"HC0"`), `"HC1"`, `"HC2"`, `"HC3"` or `"quasi"`.
 #' @param cluster Optional cluster identifier: a vector, or a one sided
 #'   formula evaluated in the model data.
 #' @param ... Unused.
@@ -51,8 +56,9 @@ obs_scores <- function(fit) {
 #' d$y <- rpois(150, exp(0.3 + 0.5 * d$x + rnorm(30, 0, 0.5)[d$g]))
 #' fit <- regcomp(y ~ x, family = "poisson", data = d)
 #' sqrt(diag(vcov(fit, type = "sandwich", cluster = ~ g)))
-vcov.regcomp_fit <- function(object, type = c("model", "sandwich", "quasi"), cluster = NULL, ...) {
+vcov.regcomp_fit <- function(object, type = c("model", "sandwich", "quasi", "HC0", "HC1", "HC2", "HC3"), cluster = NULL, ...) {
   type <- match.arg(type)
+  if (type == "HC0") type <- "sandwich"
   bn <- object$spec$beta_names
   if (object$inference == "bayesian") {
     if (type != "model") stop_unsupported(sprintf("A %s covariance for a Bayesian fit", type))
@@ -65,7 +71,13 @@ vcov.regcomp_fit <- function(object, type = c("model", "sandwich", "quasi"), clu
   if (object$spec$Q > 0) stop_unsupported(sprintf("A %s covariance for models with random effects or smooths", type))
   if (type == "quasi") return(V * sum(stats::residuals(object, type = "pearson")^2) / (object$nobs - length(bn)))
   S <- obs_scores(object)
+  if (type %in% c("HC2", "HC3")) {
+    if (!is.null(cluster)) stop_unsupported("HC2 and HC3 with clusters")
+    h <- obs_leverage(object, V)
+    S <- S / (1 - h)^(if (type == "HC2") 0.5 else 1)
+  }
   if (!is.null(cluster)) {
+    if (type != "sandwich") stop_unsupported(sprintf("%s with clusters (the clustered sandwich uses G / (G - 1))", type))
     if (inherits(cluster, "formula"))
       cluster <- eval(cluster[[2]], object$model_data, environment(cluster))
     else if (!is.null(object$rows) && length(cluster) != nrow(S) && length(cluster) >= max(object$rows))
@@ -77,8 +89,23 @@ vcov.regcomp_fit <- function(object, type = c("model", "sandwich", "quasi"), clu
     M <- crossprod(S) * G / (G - 1)
   } else M <- crossprod(S)
   out <- V %*% M %*% V
+  if (type == "HC1") out <- out * object$nobs / (object$nobs - length(bn))
   dimnames(out) <- list(bn, bn)
   out
+}
+
+# Leverages tr(V H_i), with H_i the observation's negative Hessian
+# contribution: the GLM hat values w_i x_i' V x_i for one parameter.
+obs_leverage <- function(object, V) {
+  spec <- object$spec
+  if (length(spec$aux)) stop_unsupported("HC2 and HC3 for models with thresholds")
+  d <- eta_derivs(spec, compute_eta(spec, unname(object$coefficients)), second = TRUE)
+  h <- numeric(spec$n)
+  for (a in seq_along(spec$rpars)) for (b in seq_along(spec$rpars)) {
+    ia <- spec$beta_idx[[spec$rpars[a]]]; ib <- spec$beta_idx[[spec$rpars[b]]]
+    h <- h - spec$weights * d$W[, a, b] * rowSums((spec$preds[[spec$rpars[a]]]$X %*% V[ia, ib, drop = FALSE]) * spec$preds[[spec$rpars[b]]]$X)
+  }
+  pmin(h, 1 - 1e-8)
 }
 
 #' Generalized estimating equations

@@ -220,3 +220,23 @@ fe <- panel_within(y ~ x, data = pd, id = "id")
 re <- regcomp(y ~ x + (1 | id), family = "normal", data = pd)
 hausman_test(fe, re)
 ```
+
+## Robust covariances, bootstrap, power and non nested tests
+
+`vcov(type = "HC0")` to `"HC3"` give the heteroscedasticity consistent
+covariances of `sandwich::vcovHC()`. `boot_regcomp()` bootstraps any
+statistic (parametric or case resampling, by clusters if needed);
+`power_sim()` estimates the power to detect an effect by simulating from
+the fit with chosen coefficients; `vuong_test()` compares non nested
+models; `best_subset()` and `step_regcomp()` select terms by AIC, AICc,
+BIC or Hannan-Quinn.
+
+```{r}
+pw <- data.frame(x1 = rnorm(80), x2 = rnorm(80)); pw$y <- rpois(80, exp(0.5 + 0.3 * pw$x1))
+fp <- regcomp(y ~ x1 + x2, family = "poisson", data = pw)
+sqrt(diag(vcov(fp, type = "HC3")))
+boot_regcomp(fp, R = 50)
+power_sim(fp, "lambda:x1", nsim = 50, coefficients = c("lambda:x1" = 0.2))
+vuong_test(fp, regcomp(y ~ x1 + x2, family = "negative_binomial_nb2", data = pw))
+best_subset(fp, criterion = "AICc")
+```

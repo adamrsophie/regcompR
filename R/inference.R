@@ -213,7 +213,7 @@ johnson_neyman <- function(object, x, moderator, par = NULL, level = 0.05, n = 1
 #' @param scope A one sided formula with the largest set of terms considered
 #'   for `par`; by default the terms of the starting model (backward only).
 #' @param direction `"both"`, `"backward"` or `"forward"`.
-#' @param criterion `"AIC"` or `"BIC"`.
+#' @param criterion `"AIC"`, `"BIC"`, `"AICc"` (small sample AIC) or `"HQ"` (Hannan-Quinn).
 #' @param par Distribution parameter whose formula is searched; the main
 #'   one by default. Random effect terms are kept.
 #' @param trace Print each step.
@@ -227,24 +227,15 @@ johnson_neyman <- function(object, x, moderator, par = NULL, level = 0.05, n = 1
 #' formula(fs)
 #' attr(fs, "steps")
 step_regcomp <- function(object, scope = NULL, direction = c("both", "backward", "forward"),
-                         criterion = c("AIC", "BIC"), par = NULL, trace = FALSE) {
+                         criterion = c("AIC", "BIC", "AICc", "HQ"), par = NULL, trace = FALSE) {
   no_nl(object, "Stepwise selection")
   direction <- match.arg(direction); criterion <- match.arg(criterion)
   if (object$inference != "frequentist") stop_unsupported("Stepwise selection of a Bayesian fit")
   par <- par %||% object$spec$rpars[1]
-  ic <- function(f) -2 * f$logLik + (if (criterion == "AIC") 2 else log(f$nobs)) * f$df
-  fixed_terms <- function(f) { tl <- attr(stats::terms(f$spec$formulas[[par]]), "term.labels"); tl[!grepl("\\|", tl)] }
+  ic <- function(f) info_criterion(f, criterion)
+  fixed_terms <- function(f) fixed_terms_of(f, par)
   universe <- if (is.null(scope)) fixed_terms(object) else attr(stats::terms(scope), "term.labels")
-  refit <- function(f, terms) {
-    fo <- f$spec$formulas[[par]]; tl <- attr(stats::terms(fo), "term.labels"); re <- tl[grepl("\\|", tl)]
-    rhs <- c(if (attr(stats::terms(fo), "intercept") == 0) "0", terms, if (length(re)) paste0("(", re, ")"))
-    nf <- stats::reformulate(if (length(rhs)) rhs else "1", response = if (length(fo) == 3) fo[[2]] else NULL, env = environment(fo))
-    cl <- f$call; i <- which(vapply(as.list(cl), function(e) tryCatch(identical(eval(e, environment(fo)), fo) ||
-      (inherits(e, "formula") && identical(deparse(e), deparse(fo))), error = function(e) FALSE), TRUE))
-    if (!length(i)) stop_unsupported(sprintf("Stepwise selection when the formula of '%s' is not written in the call", par))
-    cl[[i[1]]] <- nf
-    tryCatch(eval(cl, environment(fo)), error = function(e) NULL)
-  }
+  refit <- function(f, terms) refit_terms(f, terms, par)
   cur <- object; cur_ic <- ic(cur); steps <- data.frame(step = "start", criterion = cur_ic)
   repeat {
     have <- fixed_terms(cur); cand <- list()
@@ -261,4 +252,19 @@ step_regcomp <- function(object, scope = NULL, direction = c("both", "backward",
   names(steps)[2] <- criterion
   attr(cur, "steps") <- steps
   cur
+}
+
+fixed_terms_of <- function(f, par) { tl <- attr(stats::terms(f$spec$formulas[[par]]), "term.labels"); tl[!grepl("\\|", tl)] }
+
+# Refit with the fixed effect terms of one parameter replaced (random
+# effect terms kept).
+refit_terms <- function(f, terms, par) {
+  fo <- f$spec$formulas[[par]]; tl <- attr(stats::terms(fo), "term.labels"); re <- tl[grepl("\\|", tl)]
+  rhs <- c(if (attr(stats::terms(fo), "intercept") == 0) "0", terms, if (length(re)) paste0("(", re, ")"))
+  nf <- stats::reformulate(if (length(rhs)) rhs else "1", response = if (length(fo) == 3) fo[[2]] else NULL, env = environment(fo))
+  cl <- f$call; i <- which(vapply(as.list(cl), function(e) tryCatch(identical(eval(e, environment(fo)), fo) ||
+    (inherits(e, "formula") && identical(deparse(e), deparse(fo))), error = function(e) FALSE), TRUE))
+  if (!length(i)) stop_unsupported(sprintf("Model selection when the formula of '%s' is not written in the call", par))
+  cl[[i[1]]] <- nf
+  tryCatch(eval(cl, environment(fo)), error = function(e) NULL)
 }
