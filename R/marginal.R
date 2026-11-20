@@ -150,7 +150,7 @@ gee <- function(formula, data, id, family = stats::gaussian(),
       unstructured = { R <- alpha[t, t, drop = FALSE]; diag(R) <- 1; R })
   }
   alpha <- switch(corstr, independence = 0, exchangeable = 0, ar1 = 0, unstructured = diag(Tmax))
-  conv <- FALSE
+  conv <- FALSE; npd_warned <- FALSE
   for (it in seq_len(maxit)) {
     eta <- drop(X %*% beta) + off
     mu <- family$linkinv(eta); dmu <- family$mu.eta(eta)
@@ -179,6 +179,12 @@ gee <- function(formula, data, id, family = stats::gaussian(),
       S <- matrix(0, Tmax, Tmax); N <- matrix(0, Tmax, Tmax)
       for (i in cl) { t <- wv[i]; S[t, t] <- S[t, t] + tcrossprod(r[i]); N[t, t] <- N[t, t] + 1 }
       alpha <- S / (phi * pmax(N - p / Tmax, 1)); diag(alpha) <- 1
+      # Keep the working correlation positive definite (eigenvalue floor).
+      e <- eigen(alpha, symmetric = TRUE)
+      if (min(e$values) < 1e-6) {
+        alpha <- stats::cov2cor(e$vectors %*% diag(pmax(e$values, 1e-6)) %*% t(e$vectors))
+        if (!isTRUE(npd_warned)) { warning("The unstructured working correlation was not positive definite; it was projected.", call. = FALSE); npd_warned <- TRUE }
+      }
     }
     A <- matrix(0, p, p); U <- numeric(p)
     for (i in cl) {

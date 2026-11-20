@@ -114,9 +114,8 @@ convolve_dist <- function(a, b) {
       return(log_sum_exp(eval_lpdf(a, y - x, lapply(pa(p), rep, length(x))) + eval_lpdf(b, x, lapply(pb(p), rep, length(x)))))
     }
     sb <- b$support(pb(p))
-    v <- stats::integrate(function(x) exp(eval_lpdf(a, y - x, lapply(pa(p), rep, length(x))) + eval_lpdf(b, x, lapply(pb(p), rep, length(x)))),
-                          sb$lower, sb$upper, rel.tol = 1e-10, subdivisions = 2000L, stop.on.error = FALSE)$value
-    log(v)
+    log(integrate_safe(function(x) exp(eval_lpdf(a, y - x, lapply(pa(p), rep, length(x))) + eval_lpdf(b, x, lapply(pb(p), rep, length(x)))),
+                       sb$lower, sb$upper))
   }
   lpdf <- function(y, p) pervec(y, p, function(x, pp) one(x, pp))
   support <- function(p) { s1 <- a$support(pa(p)); s2 <- b$support(pb(p)); list(lower = s1$lower + s2$lower, upper = s1$upper + s2$upper) }
@@ -160,7 +159,8 @@ copula_dist <- function(m1, m2, copula = c("gaussian", "clayton", "gumbel", "fra
   p1 <- function(p) suffix_pars(p, m1, ".1"); p2 <- function(p) suffix_pars(p, m2, ".2")
   Cfun <- function(u, v, th) { u <- pmin(pmax(u, 1e-15), 1 - 1e-15); v <- pmin(pmax(v, 1e-15), 1 - 1e-15)
     switch(copula,
-      gaussian = vapply(seq_along(u), function(i) mvtnorm::pmvnorm(upper = stats::qnorm(c(u[i], v[i])), corr = matrix(c(1, th[i], th[i], 1), 2))[1], 0),
+      gaussian = vapply(seq_along(u), function(i) { if (i == 1 && !requireNamespace("mvtnorm", quietly = TRUE))
+        stop_unsupported("A Gaussian copula with discrete margins without the 'mvtnorm' package; it"); mvtnorm::pmvnorm(upper = stats::qnorm(c(u[i], v[i])), corr = matrix(c(1, th[i], th[i], 1), 2))[1] }, 0),
       clayton = pmax(u^-th + v^-th - 1, 0)^(-1 / th),
       gumbel = exp(-((-log(u))^th + (-log(v))^th)^(1 / th)),
       frank = ifelse(th == 0, u * v, -log1p(expm1(-th * u) * expm1(-th * v) / expm1(-th)) / th)) }
