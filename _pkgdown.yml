@@ -15,10 +15,12 @@ articles:
   navbar: ~
   contents:
   - distributions
+  - operators
   - count-models
   - hierarchical-longitudinal
   - ordinal-categorical
   - survival
+  - regularization
   - model-checking
   - bayesian
 

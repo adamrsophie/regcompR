@@ -1,8 +1,8 @@
 ---
-title: "Distributions and operators"
+title: "Distributions and the registry"
 output: rmarkdown::html_vignette
 vignette: >
-  %\VignetteIndexEntry{Distributions and operators}
+  %\VignetteIndexEntry{Distributions and the registry}
   %\VignetteEngine{knitr::rmarkdown}
   %\VignetteEncoding{UTF-8}
 ---
@@ -18,71 +18,168 @@ library(regcompR)
 
 ## The registry
 
-`registry_table()` lists every family with its category, parameters,
-status and the backends that support it.
+Every family is an entry of a registry that records its support,
+parameters (domain, role, default link, interpretation), formulas,
+moments, references and which methods and engines support it.
+`families()` lists identifiers, optionally by category or status;
+`registry_table()` gives one row per family; `get_family()` returns the
+family object.
 
 ```{r}
 reg <- registry_table()
 table(reg$category)
-head(reg[, c("id", "category", "parameters", "status")])
-capabilities("conway_maxwell_poisson")
+head(reg[, c("id", "category", "parameters", "status", "cdf", "stan")])
+families("circular")
+get_family("nb2")
 ```
 
-Families are validated against reference implementations: densities
-integrate or sum to one, distribution functions agree with numerical
-integration, and random draws agree with the stated moments.
+The categories are `"real"`, `"positive"`, `"bounded"` (unit interval and
+other bounded supports), `"count"`, `"finite_discrete"`, `"ordinal"`,
+`"categorical"`, `"circular"`, `"directional"` (spheres), `"multivariate"`
+(vectors and matrices), `"mixed"` (continuous laws with point masses, such
+as the Tweedie law) and `"quantile_parameterized"` (metalog and J-QPD laws).
 
-## Operators
-
-Operators build new families from registered ones. The result is a family
-like any other: it can be used in `distribution()` and `regcomp()`.
+Several parameterizations of a law are separate entries. The
+`parameterization` argument of `get_family()` and `regcomp()` selects one
+by suffix:
 
 ```{r}
-zinb <- inflate("nb2")          # zero inflation
-names(zinb$pars)
-hnb <- hurdle("poisson")                        # hurdle at zero
-tn <- truncate_dist("normal", lower = 0)        # truncation
-mx <- mixture("normal", "normal")               # finite mixture
-d <- distribution(mx, mu.1 = -2, sigma.1 = 1, mu.2 = 2, sigma.2 = 0.7, w2 = 0.4)
-plot(d)
+names(get_family("gamma")$pars)                  # mean and coefficient of variation
+names(get_family("gamma", "rate")$pars)          # shape and rate
+names(get_family("weibull", "mean")$pars)
 ```
 
-Further operators:
+## Capabilities
 
-* `censor()`, `discretize()`, `round_dist()`, `transform_dist()`, `wrap()`, `weighted()`;
-* `compound()` for mixtures over a parameter, such as the Poisson lognormal law;
-* `cure()` for mixture cure survival models;
-* `splice()` for body and tail composite laws;
-* `convolve_dist()` for sums of independent variables;
-* `copula_dist()` for bivariate copula models with any margins.
+`family_capabilities()` reports how each operation is provided: `"analytic"`
+(written for the family: a closed form, or a series, recursion or
+quadrature specific to it), `"numeric"` (the generic numerical fallback)
+or `"unavailable"`, together with regression and engine support.
+`supports()` answers one question.
 
 ```{r}
-emg <- convolve_dist("normal", "exponential")
-prob(distribution(emg, mu.1 = 0, sigma.1 = 1, lambda.2 = 2), c(0, 1, 2))
-sp <- splice("lognormal", "lomax")
-plot(distribution(sp, mu.b = 0, sigma.b = 0.6, scale.t = 2, alpha.t = 2.5,
-                  threshold = 2, w = 0.7), xlim = c(0, 8))
+str(family_capabilities("conway_maxwell_poisson"))
+supports("cauchy", "mean")                       # FALSE: the mean does not exist
+supports("poisson", backend = "stan")
+supports("cumulative_logit", "rng")
 ```
 
-## Generators
+## Distribution objects
 
-Generators such as `kumaraswamy_g()`, `beta_g()`, `marshall_olkin()`,
-`transmuted()` and `exponentiated()` produce the generalized families of
-the distribution literature from any baseline.
+`distribution()` combines a family with parameter values (scalars or
+vectors, recycled to a common length). Parameters are checked against
+their domains and joint constraints when the object is created.
 
 ```{r}
-kw <- kumaraswamy_g("weibull")
-names(kw$pars)
+d <- distribution("gamma", mu = 2, sigma = 0.5)
+d
+prob(d, c(1, 2, 3))              # density or mass
+log_prob(d, c(1, 2, 3))          # log density, computed on the log scale
+cdf(d, 2); survival(d, 2)
+quantile(d, c(0.1, 0.5, 0.9))
+rng(d, 5)
+c(mean = mean(d), variance = variance(d), skewness = skewness(d), kurtosis = kurtosis(d))
+support(d)
+try(distribution("gamma", mu = -1, sigma = 0.5))
 ```
 
-## Custom families
-
-`custom_family()` registers a law from its log density; regcompR checks
-that it is normalized.
+Moments that do not exist are `NA` with a reason; a numerical failure is
+`NaN` with a warning of class `regcomp_numerical_warning`.
 
 ```{r}
-myexp <- custom_family("my_exponential", list(par_spec("rate", "positive", role = "rate")),
-  lpdf = function(y, p) dexp(y, p$rate, log = TRUE),
-  support = function(p) list(lower = 0, upper = Inf), check = list(rate = 2))
-coef(regcomp(y ~ 1, family = myexp, data = data.frame(y = rexp(200, 2))))
+mean(distribution("cauchy", mu = 0, sigma = 1))
+variance(distribution("student_t", mu = 0, sigma = 1, nu = 1.5))
 ```
+
+A vector of parameters gives a vector of laws; `length()` counts them and
+`[` selects some. Parameters that describe one event (a covariance matrix,
+the category probabilities of a categorical law) are kept whole.
+
+```{r}
+dv <- distribution("normal", mu = c(-1, 0, 2), sigma = 1)
+length(dv)
+mean(dv[2:3])
+plot(dv)
+```
+
+### Scores and Hessians
+
+`score()` and `hessian()` give the derivatives of the log density with
+respect to each parameter, analytically where the family supplies them
+and by finite differences that stay inside the parameter domain otherwise.
+
+```{r}
+dn <- distribution("normal", mu = 0, sigma = 1)
+score(dn, c(-1, 0, 2))
+hessian(dn, 1)[1, , ]
+```
+
+### Validation
+
+```{r}
+validate_parameters("poisson", list(lambda = 2))
+try(validate_parameters("poisson", list(lambda = -2)))
+validate_response(distribution("poisson", lambda = 2), c(-1, 0, 1.5, 3))
+```
+
+### Point masses and lattices
+
+Each family states its measure. Discrete laws live on a lattice (the
+integers, or multiples of a step); continuous laws may carry atoms, which
+`prob()` reports as masses at those points and the CDF as jumps.
+
+```{r}
+tw <- distribution("tweedie", mu = 1, phi = 1, power = 0.5)   # Tweedie power p = 1.5
+prob(tw, 0)                          # the atom at zero
+tob <- distribution(censor("normal", lower = 0), mu = 0.5, sigma = 1)
+c(prob(tob, 0), cdf(tob, -1e-9), cdf(tob, 0))   # an atom and the jump of the CDF
+prob(distribution("poisson", lambda = 2), 1.5)  # off the lattice: no mass
+```
+
+## Families beyond the real line
+
+```{r}
+vm <- distribution("von_mises", mu = 0, kappa = 2)
+prob(vm, c(-pi, 0, pi))
+dir <- distribution("dirichlet", alpha = c(2, 3, 5))
+rng(dir, 2)
+mvn <- distribution("multivariate_normal", mu = c(0, 1), Sigma = matrix(c(1, 0.5, 0.5, 2), 2))
+log_prob(mvn, rbind(c(0, 1), c(1, 2)))
+plot(mvn)
+try(distribution("multivariate_normal", mu = c(0, 1), Sigma = matrix(c(1, 2, 2, 1), 2)))
+mn <- distribution("multinomial", probs = c(0.2, 0.3, 0.5), size = 4)
+rng(mn, 2)
+ml <- distribution("metalog", a = c(0, 1, 0.2))
+quantile(ml, c(0.1, 0.5, 0.9))
+```
+
+Multivariate families check their structured parameters (symmetric
+positive definite covariance and scale matrices, Wishart degrees of
+freedom, orthonormal frames) and the shape of each response. Multinomial
+and Ewens laws take the sample size as a parameter.
+
+## Links
+
+`links()` lists the link functions and `link()` returns one; each
+parameter has a default link and a set of allowed links that `regcomp()`
+accepts through `links =`.
+
+```{r}
+links()
+l <- link("logit")
+l$linkinv(0)
+```
+
+## Numerical building blocks
+
+The log scale helpers used throughout the package are exported:
+
+```{r}
+log1mexp(1e-20)                      # log(1 - exp(-x)) without cancellation
+log1pexp(800)                        # log(1 + exp(x)) without overflow
+log_sum_exp(c(1000, 1000))
+log_diff_exp(log(3), log(2))
+```
+
+`vignette("operators")` shows how to build new families from these, and
+how to register your own.

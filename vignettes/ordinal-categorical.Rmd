@@ -70,8 +70,37 @@ fm <- regcomp(k ~ x, family = "multinomial_logit", data = d)
 coef(fm)
 ```
 
-## Bivariate binary responses and selection
+Scoring rules for categorical responses use the class probabilities:
 
-`bivariate_binary_odds_ratio` models two binary outcomes with an odds ratio
-regression (as in VGAM's `binom2.or`), and `heckman_selection` fits the
-sample selection model with response `cbind(selected, outcome)`.
+```{r}
+c(brier = mean(scoring_rule(fit, rule = "brier")), rps = mean(scoring_rule(fit, rule = "rps")))
+```
+
+## Bivariate binary responses
+
+`bivariate_binary_odds_ratio` models two binary outcomes with a regression
+for each margin (`p1`, `p2`) and for their log odds ratio (`psi`), as in
+VGAM's `binom2.or`. The response is `cbind(y1, y2)`.
+
+```{r}
+d$y1 <- rbinom(n, 1, plogis(d$x)); d$y2 <- rbinom(n, 1, plogis(0.5 * d$x + 0.4 * d$y1))
+fb <- regcomp(cbind(y1, y2) ~ x, p2 ~ x, psi ~ 1, family = "bivariate_binary_odds_ratio", data = d)
+coef(fb)
+```
+
+## Sample selection
+
+`heckman_selection` fits the sample selection model by maximum likelihood.
+The response is `cbind(selected, outcome)` (the outcome value of unselected
+rows is ignored); the main formula is the outcome equation and `gamma ~`
+gives the probit selection equation; `rho` is the error correlation on the
+Fisher z scale.
+
+```{r}
+z <- rnorm(n); e <- MASS::mvrnorm(n, c(0, 0), matrix(c(1, 0.5, 0.5, 1), 2))
+sel <- as.numeric(0.3 + z + e[, 1] > 0)
+hs <- data.frame(sel, out = ifelse(sel == 1, 1 + d$x + e[, 2], 0), x = d$x, z)
+fh <- regcomp(cbind(sel, out) ~ x, gamma ~ z, family = "heckman_selection", data = hs)
+coef(fh)
+tanh(coef(fh)["rho:(Intercept)"])     # the error correlation
+```

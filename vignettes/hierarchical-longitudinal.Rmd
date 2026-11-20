@@ -41,6 +41,24 @@ plot(fit, which = "ranef")
 The estimates, standard errors and log likelihood agree with lme4 and
 glmmTMB for the families they share.
 
+### Predictions with random effects
+
+`predict(re = "conditional")` uses the estimated effects of known groups,
+`re = "zero"` sets them to zero, and `re = "marginal"` averages over the
+random effect distribution (population averaged predictions, `nmarginal`
+Monte Carlo draws). Rows with unseen levels, or new data without the
+grouping column, are new groups: their effect is zero when conditioning
+and drawn from its distribution for marginal predictions and for
+`simulate(re = "new")`.
+
+```{r}
+nd <- data.frame(x = c(0, 1), g = factor(c(1, 99)))
+predict(fit, nd, type = "mean", re = "conditional")
+predict(fit, nd, type = "mean", re = "zero")
+predict(fit, data.frame(x = c(0, 1)), type = "mean", re = "marginal", nmarginal = 2000, seed = 1)
+dim(simulate(fit, nsim = 2, newdata = data.frame(x = c(0, 1)), re = "new"))
+```
+
 ## Random effects in other parameters
 
 A random effect in the dispersion gives a model in which the clusters
@@ -75,8 +93,38 @@ c(ar1 = AIC(f_ar1), ou = AIC(f_ou))
 With equally spaced times the two models coincide (`rho = exp(-1 / range)`),
 so their AIC values agree; the OU form also handles irregular times.
 
+The other structures use the same syntax:
+
+```{r}
+structs <- c("us(0 + time | id)", "diag(0 + time | id)", "homdiag(0 + time | id)",
+             "cs(0 + time | id)", "homcs(0 + time | id)", "exp(t | id)", "gau(t | id)", "matern32(t | id)")
+# Some structures put a variance or correlation on its boundary for these
+# data; the fits then warn that standard errors are unavailable.
+suppressWarnings(sapply(structs, function(s) AIC(regcomp(stats::as.formula(paste("y ~ x +", s)),
+  family = "normal", data = long, engine = "tmb"))))
+```
+
 The TMB engine uses automatic differentiation and is much faster for large
 multilevel models; it gives the same estimates as the default engine.
+
+## Smooth terms
+
+Smooth terms from mgcv enter any parameter through their mixed model
+representation: `s()` for one dimensional and thin plate smooths, `t2()`
+for tensor products, and `by =` a factor for one smooth per level. The
+smoothing parameters are variance components estimated with the other
+parameters; the fits agree with `mgcv::gamm()`. (`te()` and `ti()` have
+no mixed model form; use `t2()`.)
+
+```{r, eval = requireNamespace("mgcv", quietly = TRUE)}
+sm <- data.frame(x = runif(300), w = runif(300), f = factor(sample(c("a", "b"), 300, TRUE)))
+sm$y <- ifelse(sm$f == "a", sin(2 * pi * sm$x), cos(2 * pi * sm$x)) + rnorm(300, 0, 0.3)
+fs <- regcomp(y ~ f + s(x, by = f, k = 8), sigma ~ s(w, k = 5), family = "normal", data = sm)
+fs$theta
+plot(fs, which = "effects", variable = "x")
+ft <- regcomp(y ~ t2(x, w, k = 4), family = "normal", data = sm)
+logLik(ft)
+```
 
 ## Multiple membership
 

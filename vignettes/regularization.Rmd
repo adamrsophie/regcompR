@@ -1,0 +1,136 @@
+---
+title: "Penalized and bias reduced estimation"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Penalized and bias reduced estimation}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(collapse = TRUE, comment = "#>", fig.width = 6, fig.height = 4)
+set.seed(1)
+```
+
+```{r}
+library(regcompR)
+```
+
+`penalty()` builds a penalty on the regression coefficients for the
+`"ml"` engine; the estimate maximizes `loglik(beta) - P(beta)`. Intercepts
+are never penalized except by `"firth"`. `pars =` restricts the penalty to
+some distribution parameters, and `standardize = TRUE` (the default for the
+shrinkage penalties) scales each column by its standard deviation.
+
+## Bias reduction and separation
+
+Firth's penalty (`"firth"`, also `"jeffreys"`) removes the first order bias
+of the maximum likelihood estimator for canonical links and gives finite
+estimates under separation. `"flic"` re-estimates the intercept so that the
+mean predicted probability equals the observed proportion, and `"flac"`
+fits maximum likelihood on data augmented with Firth's pseudo observations
+(Puhr et al. 2017). `"log_f"` (log F(m, m) priors) and `"cauchy"`
+(independent Cauchy priors with scale `scale`) are weakly informative
+alternatives.
+
+```{r}
+sep <- data.frame(x = c(-2, -1, -0.5, 0.5, 1, 2), y = c(0, 0, 0, 1, 1, 1))
+coef(suppressWarnings(regcomp(y ~ x, family = "bernoulli", data = sep)))   # diverges
+fits <- lapply(c("firth", "flic", "flac", "log_f", "cauchy"), function(t)
+  coef(regcomp(y ~ x, family = "bernoulli", data = sep, penalty = penalty(t))))
+do.call(rbind, setNames(fits, c("firth", "flic", "flac", "log_f", "cauchy")))
+```
+
+Grouped binomial data give the same Firth, FLIC and FLAC estimates as the
+equivalent Bernoulli rows:
+
+```{r}
+g <- data.frame(x = c(-2, -1, 0, 1, 2), y = c(0, 1, 2, 6, 3), n = c(3, 7, 5, 10, 4))
+coef(regcomp(y ~ x, family = "binomial", size = n, data = g, penalty = penalty("flac")))
+```
+
+For `"firth"`, `"log_f"` and `"cauchy"` the inverse penalized Hessian is the
+usual large sample covariance.
+
+## Shrinkage
+
+* `"ridge"`: `lambda / 2 * sum(beta^2)`;
+* `"lasso"`: `lambda * sum(|beta|)`;
+* `"elastic_net"`: `lambda * (alpha * sum(|beta|) + (1 - alpha) / 2 * sum(beta^2))`;
+* `"adaptive_lasso"`: weights `1 / |b|^gamma` from an initial fit, or `weights =`;
+* `"group_lasso"`: `lambda * sum_g sqrt(p_g) ||beta_g||` over `groups =`
+  (by default the columns of one model term form a group);
+* `"scad"` and `"mcp"`: folded concave penalties fitted by local linear
+  approximation.
+
+`lambda` is on the scale of the summed log likelihood: `lambda = n *
+lambda_glmnet` reproduces glmnet and ncvreg.
+
+```{r}
+n <- 100
+X <- matrix(rnorm(n * 8), n, 8, dimnames = list(NULL, paste0("x", 1:8)))
+d <- data.frame(X); d$y <- 1 + 2 * d$x1 - d$x2 + rnorm(n)
+types <- c("ridge", "lasso", "elastic_net", "adaptive_lasso", "scad", "mcp")
+est <- sapply(types, function(t) coef(regcomp(y ~ ., family = "normal", data = d,
+  fixed = list(sigma = 1), penalty = penalty(t, lambda = 20, alpha = if (t == "elastic_net") 0.5))))
+round(est, 3)
+fg <- regcomp(y ~ ., family = "normal", data = d, fixed = list(sigma = 1),
+              penalty = penalty("group_lasso", lambda = 30, groups = rep(c("a", "b"), each = 4)))
+round(coef(fg), 3)
+```
+
+Penalties apply to any distribution parameter; here only the dispersion
+model of a negative binomial regression is shrunk:
+
+```{r}
+dn <- data.frame(X); dn$y <- rnbinom(n, mu = exp(1 + 0.5 * dn$x1), size = 2)
+fpar <- regcomp(y ~ x1, phi ~ ., family = "nb2", data = dn,
+                penalty = penalty("lasso", lambda = 10, pars = "phi"))
+round(coef(fpar), 3)
+```
+
+### Diagnostics and controls
+
+Lasso type penalties are fitted by accelerated proximal gradient descent.
+Their optimum is not a zero of the gradient, so the fit reports the
+proximal stationarity residual, which is zero at the minimizer. The
+iteration limit and tolerance of this solver are `prox_maxit` and `prox_tol`
+in `regcomp_control()`.
+
+```{r}
+fl <- regcomp(y ~ ., family = "normal", data = d, fixed = list(sigma = 1),
+              penalty = penalty("lasso", lambda = 20),
+              control = regcomp_control(prox_maxit = 10000, prox_tol = 1e-10))
+fl$diagnostics$kkt_residual
+fl$optimizer$objective + as.numeric(logLik(fl))    # the stored penalty value
+fl$penalty$value(unname(coef(fl)))
+```
+
+### More coefficients than observations
+
+A shrinkage penalty identifies designs with more columns than rows or
+with aliased columns; unpenalized fits refuse them.
+
+```{r}
+wide <- data.frame(y = rnorm(10), matrix(rnorm(10 * 20), 10, 20))
+fw <- regcomp(y ~ ., family = "normal", data = wide, fixed = list(sigma = 1),
+              penalty = penalty("ridge", lambda = 2))
+length(coef(fw))
+try(regcomp(y ~ ., family = "normal", data = wide, fixed = list(sigma = 1)))
+```
+
+### Choosing lambda
+
+Choose `lambda` by cross validation:
+
+```{r}
+lams <- c(5, 20, 60)
+cvs <- sapply(lams, function(l) cv_regcomp(regcomp(y ~ ., family = "normal", data = d,
+  fixed = list(sigma = 1), penalty = penalty("lasso", lambda = l)), K = 5)$estimate)
+setNames(cvs, lams)
+```
+
+Penalized estimates are not maximum likelihood estimates; for the
+shrinkage penalties p values are suppressed. Smooth penalties (ridge,
+Firth, log F, Cauchy) also work with random effects and smooth terms; the
+lasso type penalties need models without them.

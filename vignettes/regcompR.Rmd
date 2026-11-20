@@ -14,8 +14,9 @@ set.seed(1)
 
 regcompR fits distributional regression models: every parameter of a
 response distribution can depend on covariates through its own formula. The
-same model specification can be fitted by maximum likelihood, through TMB,
-or by Bayesian inference in Stan, JAGS or OpenBUGS.
+same model specification can be fitted by maximum likelihood (`engine =
+"ml"`), through TMB (`"tmb"`), or by Bayesian inference in Stan, JAGS or
+OpenBUGS (`"bayes"`).
 
 ```{r}
 library(regcompR)
@@ -29,18 +30,9 @@ links, moments and references.
 ```{r}
 length(families())
 head(families("count"), 10)
-get_family("nb2")
-```
-
-A distribution object evaluates densities, distribution functions,
-quantiles, moments and random draws.
-
-```{r}
 d <- distribution("gamma", mu = 2, sigma = 0.5)
 prob(d, c(1, 2, 3))
-cdf(d, 2)
 quantile(d, c(0.1, 0.5, 0.9))
-mean(d); variance(d)
 plot(d)
 ```
 
@@ -52,26 +44,110 @@ name the parameter on their left side.
 
 ```{r}
 n <- 400
-dat <- data.frame(x = runif(n))
+dat <- data.frame(x = runif(n), z = rnorm(n))
 dat$y <- rgamma(n, shape = 1 / (0.3 + 0.4 * dat$x)^2,
                 scale = exp(1 + dat$x) * (0.3 + 0.4 * dat$x)^2)
 fit <- regcomp(y ~ x, sigma ~ x, family = "gamma", data = dat)
 summary(fit)
 ```
 
+## Specifying the model
+
+* `links =` changes the link of a parameter (`links()` lists them);
+* `fixed =` holds a parameter at a known value;
+* `weights =` multiplies each log likelihood contribution;
+* `subset =` selects rows (a logical or index vector);
+* data parameters (trial counts, known minima) are given by name, as
+  `size = n` for the binomial;
+* `offset()` enters a term with coefficient one;
+* `parameterization =` chooses among parameterizations of a law
+  (`get_family("gamma", "rate")`);
+* `y ~ .` uses every other column.
+
+```{r}
+f_link <- regcomp(y ~ x, sigma ~ 1, family = "gamma", data = dat, links = list(mu = "identity"))
+f_fix <- regcomp(y ~ x, family = "gamma", data = dat, fixed = list(sigma = 0.5))
+f_sub <- regcomp(y ~ x, family = "gamma", data = dat, subset = dat$x > 0.2, weights = rep(2, n))
+f_rate <- regcomp(y ~ x, family = "gamma", parameterization = "rate", data = dat)
+names(coef(f_rate))
+bd <- data.frame(n = rpois(50, 10) + 1, x = rnorm(50))
+bd$k <- rbinom(50, bd$n, plogis(0.3 * bd$x))
+coef(regcomp(k ~ x, family = "binomial", size = n, data = bd))
+```
+
+Rows with a missing or non finite value in anything the model evaluates
+(the response, a transformed covariate such as `log(x)`, a weight or a data
+parameter) are left out, as with `glm()`. The fit stores its analysis rows,
+and cross validation and clustered covariances use exactly those rows.
+
+```{r}
+dm <- dat; dm$x[3] <- NA; dm$z[5] <- -1
+fm <- regcomp(y ~ x + log(z + 1), family = "gamma", data = dm)
+nobs(fm)
+head(fm$rows)
+```
+
+`regcomp_control()` sets the optimizer (`maxit`, `rel_tol`, `restarts`,
+`start` values), the Laplace inner problem, the proximal solver of lasso
+type penalties and the MCMC settings.
+
+```{r}
+f_ctl <- regcomp(y ~ x, family = "gamma", data = dat,
+                 control = regcomp_control(restarts = 2, start = list(mu = c(1, 1))))
+f_ctl$diagnostics[c("converged", "max_abs_gradient")]
+```
+
+## Methods for fitted models
+
+```{r}
+coef(fit)
+sqrt(diag(vcov(fit)))
+confint(fit)
+logLik(fit); AIC(fit); BIC(fit); nobs(fit)
+formula(fit)
+head(fitted(fit))
+```
+
+`residuals()` gives randomized quantile (`"quantile"`, the default),
+`"pit"`, `"response"` and `"pearson"` residuals.
+
+```{r}
+sapply(c("quantile", "pit", "response", "pearson"), function(t) round(head(residuals(fit, type = t), 3), 3))
+```
+
 ## Predictions
+
+`predict()` returns the distribution parameters (`"parameter"`), the linear
+predictors (`"link"`), `"mean"`, `"variance"`, `"sd"`, `"median"`,
+`"quantile"`, `"probability"` (mass or density at `at`), `"density"`,
+`"cdf"` and `"survival"`, with optional confidence intervals.
 
 ```{r}
 nd <- data.frame(x = c(0.1, 0.5, 0.9))
-predict(fit, nd, type = "mean")
-predict(fit, nd, type = "quantile", probs = c(0.05, 0.95))
-predict(fit, nd, type = "probability", at = 5)
+predict(fit, nd, type = "parameter")
+predict(fit, nd, type = "link")
 predict(fit, nd, type = "mean", interval = "confidence")
+predict(fit, nd, type = "variance")
+predict(fit, nd, type = "sd")
+predict(fit, nd, type = "median")
+predict(fit, nd, type = "quantile", probs = c(0.05, 0.95))
+predict(fit, nd, type = "density", at = 5)
+predict(fit, nd, type = "cdf", at = 5)
+predict(fit, nd, type = "survival", at = 5)
+```
+
+`fitted_distribution()` returns the fitted law of each row as a
+distribution object; `simulate()` draws new responses; `log_lik()` gives
+pointwise log likelihoods.
+
+```{r}
+fd <- fitted_distribution(fit, nd)
+quantile(fd, 0.9)
+dim(simulate(fit, nsim = 3))
+head(log_lik(fit))
 ```
 
 ## Checking the fit
-
-Randomized quantile residuals are standard normal under a correct model.
 
 ```{r}
 plot(fit, which = "qq")
@@ -80,10 +156,12 @@ plot(fit, which = "effects", variable = "x", par = "sigma")
 
 ## Where to go next
 
-* `vignette("distributions")`: the registry and the operators that build new laws.
+* `vignette("distributions")`: the registry and distribution objects.
+* `vignette("operators")`: inflation, hurdles, mixtures, truncation, generated families and custom families.
 * `vignette("count-models")`: overdispersion, zeros and the count families.
-* `vignette("hierarchical-longitudinal")`: random effects, covariance structures and GEE.
-* `vignette("ordinal-categorical")`: ordinal, nominal and bivariate binary responses.
-* `vignette("survival")`: censoring, cure models and discrete time hazards.
-* `vignette("model-checking")`: residuals, scoring rules and cross validation.
-* `vignette("bayesian")`: priors and Bayesian fitting.
+* `vignette("hierarchical-longitudinal")`: random effects, covariance structures, smooth terms and GEE.
+* `vignette("ordinal-categorical")`: ordinal, nominal, bivariate binary and selection models.
+* `vignette("survival")`: censoring, truncation, cure models and discrete time hazards.
+* `vignette("regularization")`: penalized and bias reduced estimation.
+* `vignette("model-checking")`: residuals, scoring rules, cross validation and comparison.
+* `vignette("bayesian")`: priors, generated Stan and BUGS programs and Bayesian fitting.
