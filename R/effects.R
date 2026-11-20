@@ -26,7 +26,8 @@ effect_inference <- function(object, q, level, vcov = "model", ...) {
   }
   b <- object$coefficients; u <- object$u
   est <- q(b, u)
-  J <- vapply(seq_along(b), function(j) { h <- 1e-5 * max(1, abs(b[j])); bp <- b; bm <- b
+  bs <- coef_scale(object$spec, b)
+  J <- vapply(seq_along(b), function(j) { h <- 1e-5 * max(bs[j], abs(b[j])); bp <- b; bm <- b
     bp[j] <- b[j] + h; bm[j] <- b[j] - h; (q(bp, u) - q(bm, u)) / (2 * h) }, est)
   J <- matrix(J, nrow = length(est))
   se <- sqrt(pmax(rowSums((J %*% stats::vcov(object, type = vcov, ...)) * J), 0))

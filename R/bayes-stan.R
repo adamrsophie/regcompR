@@ -83,13 +83,15 @@ stan_spec <- function(spec) {
 # parameters and covariates are indexed by i, a few R functions renamed.
 stan_nl <- function(spec) {
   nl <- spec$nl
-  bad <- nl$pars[!grepl("^[A-Za-z][A-Za-z0-9_]*$", nl$pars) | nl$pars %in% stan_reserved]
+  bad <- nl$pars[!grepl("^[A-Za-z][A-Za-z0-9_]*$", nl$pars) | nl$pars %in% c(stan_reserved, "i")]
   if (length(bad)) stop_input(sprintf("Rename the nonlinear parameter%s %s for Stan.", if (length(bad) > 1) "s" else "", paste(bad, collapse = ", ")))
   idx <- function(nm) call("[", as.name(nm), quote(i))
   sub <- c(lapply(stats::setNames(nm = nl$pars), idx),
            lapply(stats::setNames(nm = names(nl$data)), function(v) idx(stan_nl_name(v))),
            list(pi = quote(pi()), plogis = quote(inv_logit), qlogis = quote(logit), pnorm = quote(Phi)))
   ex <- paste(deparse(do.call(substitute, list(nl$expr, sub)), width.cutoff = 500L), collapse = "")
+  # Whole number literals as reals: 1/2 is integer division in Stan.
+  ex <- gsub("(?<![A-Za-z0-9_.])(?<![eE][-+])([0-9]+)(?![0-9.eE])", "\\1.0", ex, perl = TRUE)
   c(sprintf("  vector[N] %s;", nl$par),
     sprintf("  for (i in 1:N) %s[i] = %s;", nl$par, spec$links[[nl$par]]$stan_inv(ex)))
 }

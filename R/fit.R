@@ -122,6 +122,7 @@ regcomp <- function(formula, ..., family, data, engine = c("ml", "tmb", "bayes")
     penalty$type %in% c("ridge", "lasso", "elastic_net", "adaptive_lasso", "group_lasso", "scad", "mcp")
   spec <- build_spec(formula, mr$dots, fam, mr$data, weights = mr$weights,
                      links = links, fixed = fixed, env = parent.frame(), allow_aliased = shrink)
+  if (!is.null(spec$nl) && !is.null(penalty)) stop_unsupported("A penalty with a nonlinear formula")
   if (!is.null(spec$nl) && engine == "tmb") stop_unsupported("A nonlinear formula with engine \"tmb\" (use engine = \"ml\" or \"bayes\")")
   spec$data_args <- dots[setdiff(names(spec$data_args), "")]
   spec$call <- cl
@@ -307,6 +308,9 @@ build_spec <- function(formula, dots, fam, data, weights = NULL, links = NULL,
     if (length(dv)) stop_input(sprintf("Nonlinear parameter names must differ from data columns: rename %s.", paste(dv, collapse = ", ")))
     vs <- setdiff(all.vars(nl$expr), nl$pars)
     nl$data <- stats::setNames(lapply(vs, function(v) eval(as.name(v), data, nl$env)), vs)
+    bad <- vs[!lengths(nl$data) %in% c(1L, nrow(data))]
+    if (length(bad)) stop_input(sprintf("The covariate%s %s of the nonlinear formula must have one value or %d values (one per row of data).",
+                                        if (length(bad) > 1) "s" else "", paste(bad, collapse = ", "), nrow(data)))
   }
   for (k in setdiff(fam$extra$fixed_unless_formula, attr(fl, "given")))
     if (is.null(fixed[[k]])) fixed[[k]] <- fam$pars[[k]]$default
@@ -698,13 +702,14 @@ fit_ml <- function(spec, control, penalty = NULL) {
   }
   pen_val <- function(beta) if (is.null(pen)) 0 else pen$value(beta)
   pen_grad <- function(beta) if (is.null(pen)) 0 else pen$grad(beta)
+  bs <- coef_scale(spec, beta0)
   if (!has_re) {
     obj <- function(b) {
       v <- ml_objective(spec, b) - pen_val(b)
       if (!is.finite(v)) 1e300 else -v
     }
     gr <- function(b) -(ml_gradient(spec, b) - pen_grad(b))
-    opt <- robust_nlminb(beta0, obj, gr, control)
+    opt <- robust_nlminb(beta0, obj, gr, control, bs)
     beta <- opt$par
     if (!is.null(pen) && pen$type == "flic") beta <- flic_adjust(spec, beta, control)
     theta <- numeric(0); u <- numeric(0)
@@ -712,9 +717,9 @@ fit_ml <- function(spec, control, penalty = NULL) {
     if (control$hessian && !is.null(pen) && pen$type %in% c("firth", "flic")) {
       cov <- safe_inverse(info_matrix(spec, beta))
     } else if (control$hessian) {
-      H <- num_jacobian(function(b) -gr(b), beta)
+      H <- num_jacobian(function(b) -gr(b), beta, bs)
       H <- (H + t(H)) / 2
-      cov <- safe_inverse(-H)
+      cov <- safe_inverse(-H, bs)
     }
     ll <- ml_objective(spec, beta)
     approx <- "none"
@@ -723,7 +728,7 @@ fit_ml <- function(spec, control, penalty = NULL) {
     # Stage 1: fixed effects only for good starting values.
     obj0 <- function(b) { v <- ml_objective(spec, b) - pen_val(b); if (!is.finite(v)) 1e300 else -v }
     gr0 <- function(b) -(ml_gradient(spec, b) - pen_grad(b))
-    b1 <- tryCatch(robust_nlminb(beta0, obj0, gr0, control)$par, error = function(e) beta0)
+    b1 <- tryCatch(robust_nlminb(beta0, obj0, gr0, control, bs)$par, error = function(e) beta0)
     theta0 <- unlist(lapply(spec$blocks, block_theta_start))
     state <- new.env(); state$u <- rep(0, spec$Q)
     obj_re <- function(par) {
@@ -733,7 +738,8 @@ fit_ml <- function(spec, control, penalty = NULL) {
                     error = function(e) -Inf) - pen_val(par[seq_len(np)])
       if (!is.finite(v)) 1e300 else -v
     }
-    opt <- robust_nlminb(c(b1, theta0), obj_re, NULL, control)
+    ps <- c(bs, rep(1, length(theta0)))
+    opt <- robust_nlminb(c(b1, theta0), obj_re, NULL, control, ps)
     beta <- opt$par[seq_len(np)]; theta <- opt$par[-seq_len(np)]
     inner <- laplace_inner(spec, beta, theta, state$u, control)
     if (!isTRUE(inner$converged))
@@ -742,8 +748,8 @@ fit_ml <- function(spec, control, penalty = NULL) {
     u <- inner$u
     cov <- NULL
     if (control$hessian) {
-      H <- num_hessian(function(p) -obj_re(p), opt$par)
-      cov <- safe_inverse(-H)
+      H <- num_hessian(function(p) -obj_re(p), opt$par, s = ps)
+      cov <- safe_inverse(-H, ps)
     }
     ll <- -opt$objective + pen_val(beta)
     approx <- "laplace"
@@ -751,14 +757,24 @@ fit_ml <- function(spec, control, penalty = NULL) {
   new_fit(spec, beta, theta, u, cov, ll, opt, approx, pen)
 }
 
-robust_nlminb <- function(start, obj, gr, control) {
+# Typical size of each coefficient: one, or the size of a nonlinear
+# parameter's coefficients (a rate of 0.001 needs finite difference steps
+# and optimizer scaling of that size).
+coef_scale <- function(spec, beta) {
+  bs <- rep(1, length(beta))
+  for (k in spec$nl$pars) { i <- spec$beta_idx[[k]]; bs[i] <- max(abs(beta[i])) }
+  bs[bs == 0] <- 1
+  bs
+}
+
+robust_nlminb <- function(start, obj, gr, control, scale = 1) {
   best <- NULL
   starts <- list(start)
   if (control$restarts > 0) {
     seed <- if (exists(".Random.seed", globalenv())) get(".Random.seed", globalenv())
     on.exit(if (is.null(seed)) rm(".Random.seed", envir = globalenv()) else assign(".Random.seed", seed, globalenv()))
     set.seed(control$seed)
-    for (r in seq_len(control$restarts)) starts[[r + 1]] <- start + stats::rnorm(length(start), 0, 0.1 * r)
+    for (r in seq_len(control$restarts)) starts[[r + 1]] <- start + stats::rnorm(length(start), 0, 0.1 * r) * scale
   }
   # Keep the best point evaluated, so that an error late in a run (a
   # singular matrix near a boundary, say) returns that point flagged as not
@@ -766,7 +782,7 @@ robust_nlminb <- function(start, obj, gr, control) {
   seen <- new.env(); seen$val <- Inf
   obj2 <- function(p) { v <- obj(p); if (is.finite(v) && v < seen$val) { seen$val <- v; seen$par <- p }; v }
   for (s in starts) {
-    o <- tryCatch(stats::nlminb(s, obj2, gr, control = list(
+    o <- tryCatch(stats::nlminb(s, obj2, gr, scale = 1 / scale, control = list(
       iter.max = control$maxit, eval.max = 2 * control$maxit, rel.tol = control$rel_tol,
       trace = as.integer(control$trace))), error = function(e) if (is.finite(seen$val))
         list(par = seen$par, objective = seen$val, convergence = 1L, iterations = NA_integer_,
@@ -780,7 +796,7 @@ robust_nlminb <- function(start, obj, gr, control) {
   # "False convergence" with numerical gradients often stops at the optimum:
   # restart once; no further decrease confirms the solution.
   if (best$convergence != 0 && grepl("false convergence", best$message)) {
-    o <- tryCatch(stats::nlminb(best$par, obj, gr, control = list(iter.max = control$maxit,
+    o <- tryCatch(stats::nlminb(best$par, obj, gr, scale = 1 / scale, control = list(iter.max = control$maxit,
       eval.max = 2 * control$maxit, rel.tol = control$rel_tol)), error = function(e) NULL)
     if (!is.null(o)) {
       if (abs(best$objective - o$objective) <= 1e-6 * (1 + abs(best$objective))) {
@@ -793,11 +809,11 @@ robust_nlminb <- function(start, obj, gr, control) {
 }
 
 # Forward difference Jacobian of a vector function.
-num_jacobian <- function(f, x) {
+num_jacobian <- function(f, x, s = 1) {
   f0 <- f(x)
   J <- matrix(0, length(f0), length(x))
   for (j in seq_along(x)) {
-    h <- 1e-5 * max(1, abs(x[j]))
+    h <- 1e-5 * max(rep_len(s, length(x))[j], abs(x[j]))
     xp <- x; xp[j] <- xp[j] + h
     xm <- x; xm[j] <- xm[j] - h
     J[, j] <- (f(xp) - f(xm)) / (2 * h)
@@ -808,7 +824,7 @@ num_jacobian <- function(f, x) {
 # Central difference Hessian of a scalar function with one Richardson
 # extrapolation step, which tolerates the small noise left by the inner
 # Laplace solver (steps much below 1e-3 amplify that noise).
-num_hessian <- function(f, x, rel = 1e-2) {
+num_hessian <- function(f, x, rel = 1e-2, s = 1) {
   d <- length(x)
   f0 <- f(x)
   hess_h <- function(h) {
@@ -824,13 +840,16 @@ num_hessian <- function(f, x, rel = 1e-2) {
     }
     H
   }
-  h <- rel * pmax(1, abs(x))
+  h <- rel * pmax(s, abs(x))
   (4 * hess_h(h / 2) - hess_h(h)) / 3
 }
 
 # Inverse of an information matrix, which must be positive definite (to a
 # relative tolerance); otherwise an NA matrix flagged as singular.
-safe_inverse <- function(A) {
+safe_inverse <- function(A, s = 1) {
+  # Inverted on the scale of the coefficients' typical sizes s, so that
+  # parameters of very different sizes are not mistaken for singularity.
+  if (length(s) > 1) { S <- outer(s, s); out <- safe_inverse(A * S); return(if (isTRUE(attr(out, "singular"))) out else out * S) }
   A <- (A + t(A)) / 2
   ev <- tryCatch(eigen(A, symmetric = TRUE), error = function(e) NULL)
   if (is.null(ev) || any(!is.finite(ev$values)) || min(ev$values) <= 1e-10 * max(abs(ev$values), 1e-300))

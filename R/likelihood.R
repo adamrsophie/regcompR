@@ -78,6 +78,7 @@ link_d12 <- function(lk, e) {
 }
 
 eta_derivs <- function(spec, eta, second = TRUE, which = spec$rpars) {
+  if (!is.null(spec$nl)) return(nl_eta_derivs(spec, eta, second, which))
   rp <- which
   if (length(rp) == 1 && is.null(spec$cmat) && !is.null(f1 <- analytic_dpar[[spec$fam$id]][[rp]])) {
     ll0 <- loglik_eta(spec, eta)
@@ -126,6 +127,61 @@ eta_derivs <- function(spec, eta, second = TRUE, which = spec$rpars) {
     W[, a, b] <- v; W[, b, a] <- v
   }
   list(ll = ll0, g = g, W = W)
+}
+
+# Derivatives for a nonlinear formula by the chain rule: finite differences
+# in the nonlinear parameter's own predictor (on its natural scale), times
+# the exact derivatives of the expression in the nonlinear parameters
+# (stats::deriv; central differences relative to each parameter's size for
+# functions deriv does not know).
+nl_eta_derivs <- function(spec, eta, second = TRUE, which = spec$rpars) {
+  nl <- spec$nl; m <- nl$par
+  wn <- intersect(which, nl$pars); wo <- setdiff(which, nl$pars)
+  env <- c(eta[nl$pars], nl$data)
+  F <- nl_expr_derivs(nl, env, spec$n)
+  s2 <- spec; s2$nl <- NULL; s2$rpars <- c(m, setdiff(spec$rpars, nl$pars))
+  e2 <- eta[setdiff(spec$rpars, nl$pars)]; e2[[m]] <- F$value
+  attributes(e2) <- c(attributes(e2), attributes(eta)["aux"])
+  inner <- c(if (length(wn)) m, wo)
+  d <- eta_derivs(s2, e2, second, inner)
+  K <- length(which); n <- spec$n
+  pos <- match(which, inner); pos[which %in% nl$pars] <- 1L
+  g <- matrix(0, n, K); W <- if (second) array(0, c(n, K, K))
+  for (a in seq_len(K)) {
+    ka <- which[a]; fa <- if (ka %in% nl$pars) F$grad[, ka] else 1
+    g[, a] <- d$g[, pos[a]] * fa
+    if (second) for (b in seq_len(K)) {
+      kb <- which[b]; fb <- if (kb %in% nl$pars) F$grad[, kb] else 1
+      w <- d$W[, pos[a], pos[b]] * fa * fb
+      if (ka %in% nl$pars && kb %in% nl$pars) w <- w + d$g[, 1] * F$hess[, ka, kb]
+      W[, a, b] <- w
+    }
+  }
+  list(ll = d$ll, g = g, W = W)
+}
+
+nl_expr_derivs <- function(nl, env, n) {
+  np <- nl$pars
+  de <- tryCatch(stats::deriv(nl$expr, np, hessian = TRUE), error = function(e) NULL)
+  if (!is.null(de)) {
+    v <- eval(de, env, nl$env)
+    gr <- attr(v, "gradient"); he <- attr(v, "hessian")
+    return(list(value = rep_len(as.vector(v), n),
+                grad = matrix(gr, n, length(np), dimnames = list(NULL, np)),
+                hess = array(he, c(n, length(np), length(np)), dimnames = list(NULL, np, np))))
+  }
+  f <- function(e) rep_len(eval(nl$expr, e, nl$env), n)
+  f0 <- f(env)
+  h <- lapply(env[np], function(e) 1e-4 * pmax(abs(e), 1e-8))
+  sh <- function(...) { e <- env; a <- list(...)
+    for (i in seq(1, length(a), 2)) e[[a[[i]]]] <- e[[a[[i]]]] + a[[i + 1]] * h[[a[[i]]]]; f(e) }
+  gr <- matrix(0, n, length(np), dimnames = list(NULL, np)); he <- array(0, c(n, length(np), length(np)), dimnames = list(NULL, np, np))
+  for (a in np) {
+    gr[, a] <- (sh(a, 1) - sh(a, -1)) / (2 * h[[a]])
+    he[, a, a] <- (sh(a, 1) - 2 * f0 + sh(a, -1)) / h[[a]]^2
+    for (b in setdiff(np, a)) he[, a, b] <- (sh(a, 1, b, 1) - sh(a, 1, b, -1) - sh(a, -1, b, 1) + sh(a, -1, b, -1)) / (4 * h[[a]] * h[[b]])
+  }
+  list(value = f0, grad = gr, hess = he)
 }
 
 # Linear predictors from coefficient vector and random effects.

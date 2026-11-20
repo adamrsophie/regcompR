@@ -61,3 +61,33 @@ test_that("Stan code for a nonlinear formula computes the parameter row by row",
   expect_error(stan_code(y ~ nl(log(a) - b * x), a ~ 1, b ~ 1, family = "poisson", data = d), "prior for the nonlinear parameter")
   expect_error(bugs_code(y ~ nl(log(a) - b * x), a ~ 1, b ~ 1, family = "poisson", data = d), class = "regcomp_unsupported")
 })
+
+test_that("nonlinear parameters far from unit size are fitted on their own scale", {
+  set.seed(1)
+  d <- data.frame(x = runif(80, 0, 5))
+  d$y <- 10 * exp(-0.6 * d$x) + rnorm(80, 0, 0.4)
+  f <- regcomp(y ~ nl(a * exp(-b * x)), a ~ 1, b ~ 1, family = "normal", data = d,
+               control = regcomp_control(start = list(a = 5, b = 1)))
+  d$x <- d$x * 1000
+  fs <- regcomp(y ~ nl(a * exp(-b * x)), a ~ 1, b ~ 1, family = "normal", data = d,
+                control = regcomp_control(start = list(a = 5, b = 1e-3)))
+  expect_equal(as.numeric(logLik(fs)), as.numeric(logLik(f)), tolerance = 1e-8)
+  expect_equal(unname(coef(fs)), unname(coef(f) * c(1, 1e-3, 1)), tolerance = 1e-5)
+  expect_equal(unname(sqrt(diag(vcov(fs)))), unname(sqrt(diag(vcov(f))) * c(1, 1e-3, 1)), tolerance = 1e-4)
+  skip_if_not_installed("lme4")
+  O <- as.data.frame(Orange); O$Tree <- factor(as.character(O$Tree))
+  fo <- regcomp(circumference ~ nl(Asym / (1 + exp((xmid - age) * r))), Asym ~ 1 + (1 | Tree), xmid ~ 1, r ~ 1,
+                family = "normal", data = O, control = regcomp_control(start = list(Asym = 200, xmid = 725, r = 0.003)))
+  m <- lme4::nlmer(circumference ~ SSlogis(age, Asym, xmid, scal) ~ Asym | Tree, data = Orange,
+                   start = c(Asym = 200, xmid = 725, scal = 350))
+  expect_equal(as.numeric(logLik(fo)), as.numeric(logLik(m)), tolerance = 1e-5)
+  expect_equal(unname(coef(fo)[3]), 1 / unname(lme4::fixef(m)[3]), tolerance = 1e-4)
+  expect_true(fo$diagnostics$hessian_positive_definite)
+})
+
+test_that("Stan code writes whole numbers of a nonlinear formula as reals", {
+  d <- data.frame(x = runif(30, 0, 5), y = rpois(30, 3))
+  pr <- prior("normal(1, 2)", par = "a", class = "Intercept")
+  sc <- stan_code(y ~ nl(log(a * x^(1/2) + 1e-04)), a ~ 1, family = "poisson", data = d, priors = pr)
+  expect_match(sc$code, "lambda[i] = exp(log(a[i] * nlx_x[i]^(1.0/2.0) + 1e-04));", fixed = TRUE)
+})
