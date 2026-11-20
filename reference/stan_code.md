@@ -54,7 +54,7 @@ cat(stan_code(y ~ x, family = "poisson", data = d)$code)
 #>   int<lower=1> N;
 #>   array[N] int y;
 #>   vector[N] w;
-#>   int<lower=1> P_lambda;
+#>   int<lower=0> P_lambda;
 #>   matrix[N, P_lambda] X_lambda;
 #>   vector[N] off_lambda;
 #> }

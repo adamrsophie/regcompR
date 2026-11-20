@@ -102,7 +102,7 @@ dat$z <- rnorm(G * m, 1 + dat$x + u[dat$g], exp(-0.5 + v[dat$g]))
 fit2 <- regcomp(z ~ x + (1 | g), sigma ~ 1 + (1 | g), family = "normal", data = dat)
 fit2$theta
 #>    mu:1 | g:log_sd((Intercept)) sigma:1 | g:log_sd((Intercept)) 
-#>                      -0.6444914                      -1.2631843
+#>                      -0.6445014                      -1.2631436
 ```
 
 ## Covariance structures for longitudinal data
@@ -201,5 +201,5 @@ pp <- person_period(sd0, "t", "d")
 fh <- regcomp(event ~ factor(period) + x + (1 | cl), family = "bernoulli", data = pp)
 coef(fh)["prob:x"]
 #>    prob:x 
-#> 0.5543537
+#> 0.5543546
 ```
