@@ -106,11 +106,13 @@ mean(scoring_rule(regcomp(y ~ x, family = "bernoulli", data = db), rule = "brier
 #> [1] 0.1854706
 ```
 
-`re = "conditional"` scores with the estimated group effects and
-`re = "zero"` as for new groups. For Bayesian fits every rule scores the
-posterior predictive distribution (the mixture over posterior draws),
-not the law at the posterior mean. The CRPS is infinite for a predictive
-law without a finite mean:
+`re = "conditional"` scores with the estimated group effects,
+`re = "zero"` with the effects set to zero, and `re = "marginal"` with
+the predictive law of a new group (the mixture over draws of its random
+effects, the proper score for an unseen group). For Bayesian fits every
+rule scores the posterior predictive distribution (the mixture over
+posterior draws), not the law at the posterior mean. The CRPS is
+infinite for a predictive law without a finite mean:
 
 ``` r
 
@@ -125,8 +127,9 @@ scoring_rule(fpar, data.frame(y = 1), rule = "crps")
 refits on training folds and scores held out rows. Folds split the
 analysis rows of the fit (rows dropped for missing values stay out, and
 external weights and trial counts follow their rows). `group =` holds
-out whole groups, predicted with their random effects at zero; `folds =`
-gives an explicit assignment.
+out whole groups, scored by default as new groups with the marginal
+predictive law (`re =` changes this), and its standard error is
+clustered by group; `folds =` gives an explicit assignment.
 
 ``` r
 
@@ -167,7 +170,7 @@ try(compare_models(fp, regcomp(log1p(y) ~ x, family = "normal", data = d)))
 
 identifiability_check(fnb)
 #> $condition_number
-#> [1] 8.593194
+#> [1] 8.593197
 #> 
 #> $weak_directions
 #> list()

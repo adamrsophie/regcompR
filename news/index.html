@@ -53,6 +53,12 @@
     <div class="section level2">
 <h2 class="pkg-version" data-toc-text="0.1.0" id="regcompr-010">regcompR 0.1.0<a class="anchor" aria-label="anchor" href="#regcompr-010"></a></h2>
 <ul><li>First release.</li>
+<li>
+<code><a href="../reference/family_capabilities.html">family_capabilities()</a></code> (formerly <code><a href="https://rdrr.io/r/base/capabilities.html" class="external-link">capabilities()</a></code>, renamed so that attaching the package masks no base R function) labels family specific numerical methods <code>"algorithm"</code>, separately from closed forms (<code>"analytic"</code>) and the generic fallback (<code>"numeric"</code>).</li>
+<li>
+<code>scoring_rule(re = "marginal")</code> scores the predictive law of a new group, mixing over draws of its random effects. <code>cv_regcomp(group = )</code> now scores held out groups this way by default (previously with the effects set to zero; <code>re = "zero"</code> restores that) and clusters the standard error by group.</li>
+<li>The multivariate hypergeometric law takes the number of draws <code>size</code>.</li>
+<li>Finite difference scores and Hessians respect joint parameter constraints.</li>
 <li>Registry of 278 distribution families with densities, distribution functions, quantiles, random generation, moments and references.</li>
 <li>Distributional regression by maximum likelihood with a Laplace approximation for random effects and smooths, through TMB (RTMB), and by Bayesian inference in Stan, JAGS and OpenBUGS.</li>
 <li>Random effects in any parameter with nested, crossed, structured (AR(1), compound symmetry, unstructured, Ornstein Uhlenbeck, spatial kernels) and multiple membership terms.</li>

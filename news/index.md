@@ -3,6 +3,20 @@
 ## regcompR 0.1.0
 
 - First release.
+- [`family_capabilities()`](https://adamrsophie.github.io/regcompR/reference/family_capabilities.md)
+  (formerly
+  [`capabilities()`](https://rdrr.io/r/base/capabilities.html), renamed
+  so that attaching the package masks no base R function) labels family
+  specific numerical methods `"algorithm"`, separately from closed forms
+  (`"analytic"`) and the generic fallback (`"numeric"`).
+- `scoring_rule(re = "marginal")` scores the predictive law of a new
+  group, mixing over draws of its random effects. `cv_regcomp(group = )`
+  now scores held out groups this way by default (previously with the
+  effects set to zero; `re = "zero"` restores that) and clusters the
+  standard error by group.
+- The multivariate hypergeometric law takes the number of draws `size`.
+- Finite difference scores and Hessians respect joint parameter
+  constraints.
 - Registry of 278 distribution families with densities, distribution
   functions, quantiles, random generation, moments and references.
 - Distributional regression by maximum likelihood with a Laplace

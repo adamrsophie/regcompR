@@ -3,12 +3,22 @@
 Refits the model on training folds and scores the held out observations
 with a proper scoring rule. With `group` the folds leave out whole
 groups (leave group out cross validation), and held out groups are
-predicted with their random effects at zero.
+scored as new groups: by default with the marginal predictive law, the
+mixture over draws of their random effects.
 
 ## Usage
 
 ``` r
-cv_regcomp(object, K = 10, rule = "log", group = NULL, folds = NULL, seed = 1)
+cv_regcomp(
+  object,
+  K = 10,
+  rule = "log",
+  group = NULL,
+  folds = NULL,
+  seed = 1,
+  re = NULL,
+  nmarginal = 200
+)
 ```
 
 ## Arguments
@@ -42,10 +52,23 @@ cv_regcomp(object, K = 10, rule = "log", group = NULL, folds = NULL, seed = 1)
 
   Seed for the fold assignment.
 
+- re:
+
+  Random effects for scoring held out rows, as in
+  [`scoring_rule()`](https://adamrsophie.github.io/regcompR/reference/scoring_rule.md).
+  By default `"marginal"` with `group` (held out groups are new groups)
+  and `"conditional"` otherwise.
+
+- nmarginal:
+
+  Number of random effect draws for `re = "marginal"`.
+
 ## Value
 
 A list with `scores` (per observation), `estimate` (mean score), `se`
-and `folds`.
+and `folds`. With `group` the standard error is clustered by group
+(scores of one group are dependent); otherwise rows are treated as
+independent.
 
 ## Examples
 

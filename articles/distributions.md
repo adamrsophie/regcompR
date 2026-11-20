@@ -86,10 +86,10 @@ names(get_family("weibull", "mean")$pars)
 ## Capabilities
 
 [`family_capabilities()`](https://adamrsophie.github.io/regcompR/reference/family_capabilities.md)
-reports how each operation is provided: `"analytic"` (written for the
-family: a closed form, or a series, recursion or quadrature specific to
-it), `"numeric"` (the generic numerical fallback) or `"unavailable"`,
-together with regression and engine support.
+reports how each operation is provided: `"analytic"` (a closed form),
+`"algorithm"` (a series, recursion, root finding or quadrature written
+for that law), `"numeric"` (the generic numerical fallback) or
+`"unavailable"`, together with regression and engine support.
 [`supports()`](https://adamrsophie.github.io/regcompR/reference/family_capabilities.md)
 answers one question.
 
@@ -97,12 +97,12 @@ answers one question.
 
 str(family_capabilities("conway_maxwell_poisson"))
 #> List of 16
-#>  $ log_prob  : chr "analytic"
-#>  $ cdf       : chr "analytic"
+#>  $ log_prob  : chr "algorithm"
+#>  $ cdf       : chr "algorithm"
 #>  $ quantile  : chr "numeric"
 #>  $ rng       : chr "numeric"
-#>  $ mean      : chr "analytic"
-#>  $ variance  : chr "analytic"
+#>  $ mean      : chr "algorithm"
+#>  $ variance  : chr "algorithm"
 #>  $ skewness  : chr "numeric"
 #>  $ kurtosis  : chr "numeric"
 #>  $ score     : chr "numeric"

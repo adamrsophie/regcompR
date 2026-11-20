@@ -23,7 +23,9 @@ scoring_rule(
   object,
   newdata = NULL,
   rule = c("log", "crps", "dss", "brier", "rps"),
-  re = c("conditional", "zero")
+  re = c("conditional", "zero", "marginal"),
+  nmarginal = 200,
+  seed = NULL
 )
 ```
 
@@ -45,8 +47,19 @@ scoring_rule(
 
   Random effects used for prediction, as in
   [`predict()`](https://rdrr.io/r/stats/predict.html): `"conditional"`
-  uses the estimated effects of known groups, `"zero"` sets them to zero
-  (new groups).
+  uses the estimated effects of known groups, `"zero"` sets them to
+  zero, and `"marginal"` scores the predictive law of a new group: the
+  mixture over `nmarginal` draws of the random effects from their
+  estimated distribution (for each observation; the dependence between
+  observations of one group is not used).
+
+- nmarginal:
+
+  Number of random effect draws for `re = "marginal"`.
+
+- seed:
+
+  Optional seed for the random effect draws.
 
 ## Value
 

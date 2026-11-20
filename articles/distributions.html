@@ -159,20 +159,21 @@ status; <code><a href="../reference/registry_table.html">registry_table()</a></c
 <h2 id="capabilities">Capabilities<a class="anchor" aria-label="anchor" href="#capabilities"></a>
 </h2>
 <p><code><a href="../reference/family_capabilities.html">family_capabilities()</a></code> reports how each operation is
-provided: <code>"analytic"</code> (written for the family: a closed
-form, or a series, recursion or quadrature specific to it),
-<code>"numeric"</code> (the generic numerical fallback) or
-<code>"unavailable"</code>, together with regression and engine support.
-<code><a href="../reference/family_capabilities.html">supports()</a></code> answers one question.</p>
+provided: <code>"analytic"</code> (a closed form),
+<code>"algorithm"</code> (a series, recursion, root finding or
+quadrature written for that law), <code>"numeric"</code> (the generic
+numerical fallback) or <code>"unavailable"</code>, together with
+regression and engine support. <code><a href="../reference/family_capabilities.html">supports()</a></code> answers one
+question.</p>
 <div class="sourceCode" id="cb4"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/utils/str.html" class="external-link">str</a></span><span class="op">(</span><span class="fu"><a href="../reference/family_capabilities.html">family_capabilities</a></span><span class="op">(</span><span class="st">"conway_maxwell_poisson"</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="co">#&gt; List of 16</span></span>
-<span><span class="co">#&gt;  $ log_prob  : chr "analytic"</span></span>
-<span><span class="co">#&gt;  $ cdf       : chr "analytic"</span></span>
+<span><span class="co">#&gt;  $ log_prob  : chr "algorithm"</span></span>
+<span><span class="co">#&gt;  $ cdf       : chr "algorithm"</span></span>
 <span><span class="co">#&gt;  $ quantile  : chr "numeric"</span></span>
 <span><span class="co">#&gt;  $ rng       : chr "numeric"</span></span>
-<span><span class="co">#&gt;  $ mean      : chr "analytic"</span></span>
-<span><span class="co">#&gt;  $ variance  : chr "analytic"</span></span>
+<span><span class="co">#&gt;  $ mean      : chr "algorithm"</span></span>
+<span><span class="co">#&gt;  $ variance  : chr "algorithm"</span></span>
 <span><span class="co">#&gt;  $ skewness  : chr "numeric"</span></span>
 <span><span class="co">#&gt;  $ kurtosis  : chr "numeric"</span></span>
 <span><span class="co">#&gt;  $ score     : chr "numeric"</span></span>

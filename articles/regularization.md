@@ -28,7 +28,7 @@ informative alternatives.
 sep <- data.frame(x = c(-2, -1, -0.5, 0.5, 1, 2), y = c(0, 0, 0, 1, 1, 1))
 coef(suppressWarnings(regcomp(y ~ x, family = "bernoulli", data = sep)))   # diverges
 #> prob:(Intercept)           prob:x 
-#>    -1.096246e-04     1.176299e+02
+#>    -1.084897e-04     1.168769e+02
 fits <- lapply(c("firth", "flic", "flac", "log_f", "cauchy"), function(t)
   coef(regcomp(y ~ x, family = "bernoulli", data = sep, penalty = penalty(t))))
 do.call(rbind, setNames(fits, c("firth", "flic", "flac", "log_f", "cauchy")))

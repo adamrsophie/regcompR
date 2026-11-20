@@ -1,15 +1,15 @@
 # Capability queries
 
 `family_capabilities()` reports, for a family or distribution, how each
-operation is provided: `"analytic"` (a method specific to the family: a
-closed form, or a dedicated algorithm such as a series, recursion or
-quadrature written for that law), `"numeric"` (the generic numerical
-fallback: inversion, summation or integration of the density, with
-tolerance checks) or `"unavailable"`. Ordinal and nominal families draw
-random values from their class probabilities. It also reports whether
-the family can be used as a regression response and which fitting
-engines support it. `supports()` answers a single question with `TRUE`
-or `FALSE`.
+operation is provided: `"analytic"` (a closed form, possibly through
+special functions of base R), `"algorithm"` (a numerical method written
+for that law: a series, recursion, root finding or quadrature specific
+to it), `"numeric"` (the generic numerical fallback: inversion,
+summation or integration of the density, with tolerance checks) or
+`"unavailable"`. Ordinal and nominal families draw random values from
+their class probabilities. It also reports whether the family can be
+used as a regression response and which fitting engines support it.
+`supports()` answers a single question with `TRUE` or `FALSE`.
 
 ## Usage
 
@@ -45,10 +45,10 @@ supports(x, what = NULL, backend = NULL)
 ``` r
 family_capabilities("conway_maxwell_poisson")
 #> $log_prob
-#> [1] "analytic"
+#> [1] "algorithm"
 #> 
 #> $cdf
-#> [1] "analytic"
+#> [1] "algorithm"
 #> 
 #> $quantile
 #> [1] "numeric"
@@ -57,10 +57,10 @@ family_capabilities("conway_maxwell_poisson")
 #> [1] "numeric"
 #> 
 #> $mean
-#> [1] "analytic"
+#> [1] "algorithm"
 #> 
 #> $variance
-#> [1] "analytic"
+#> [1] "algorithm"
 #> 
 #> $skewness
 #> [1] "numeric"
