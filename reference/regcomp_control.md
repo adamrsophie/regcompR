@@ -123,4 +123,10 @@ regcomp_control(maxit = 500)
 #> $start
 #> NULL
 #> 
+#> $prox_maxit
+#> [1] 5000
+#> 
+#> $prox_tol
+#> [1] 1e-08
+#> 
 ```
