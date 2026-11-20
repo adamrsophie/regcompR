@@ -48,8 +48,8 @@
   : Look up a registered family
 - [`registry_table()`](https://adamrsophie.github.io/regcompR/reference/registry_table.md)
   : Registry table
-- [`capabilities()`](https://adamrsophie.github.io/regcompR/reference/capabilities.md)
-  [`supports()`](https://adamrsophie.github.io/regcompR/reference/capabilities.md)
+- [`family_capabilities()`](https://adamrsophie.github.io/regcompR/reference/family_capabilities.md)
+  [`supports()`](https://adamrsophie.github.io/regcompR/reference/family_capabilities.md)
   : Capability queries
 - [`validate_parameters()`](https://adamrsophie.github.io/regcompR/reference/validate_parameters.md)
   [`validate_response()`](https://adamrsophie.github.io/regcompR/reference/validate_parameters.md)

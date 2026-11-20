@@ -17,7 +17,6 @@
 <url><loc>https://adamrsophie.github.io/regcompR/index.html</loc></url>
 <url><loc>https://adamrsophie.github.io/regcompR/news/index.html</loc></url>
 <url><loc>https://adamrsophie.github.io/regcompR/reference/bugs_code.html</loc></url>
-<url><loc>https://adamrsophie.github.io/regcompR/reference/capabilities.html</loc></url>
 <url><loc>https://adamrsophie.github.io/regcompR/reference/cens.html</loc></url>
 <url><loc>https://adamrsophie.github.io/regcompR/reference/censor.html</loc></url>
 <url><loc>https://adamrsophie.github.io/regcompR/reference/compare_models.html</loc></url>
@@ -31,6 +30,7 @@
 <url><loc>https://adamrsophie.github.io/regcompR/reference/distribution.html</loc></url>
 <url><loc>https://adamrsophie.github.io/regcompR/reference/exact_poisson.html</loc></url>
 <url><loc>https://adamrsophie.github.io/regcompR/reference/exponentiated.html</loc></url>
+<url><loc>https://adamrsophie.github.io/regcompR/reference/family_capabilities.html</loc></url>
 <url><loc>https://adamrsophie.github.io/regcompR/reference/fitted_distribution.html</loc></url>
 <url><loc>https://adamrsophie.github.io/regcompR/reference/gee.html</loc></url>
 <url><loc>https://adamrsophie.github.io/regcompR/reference/get_family.html</loc></url>

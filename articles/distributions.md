@@ -3,11 +3,6 @@
 ``` r
 
 library(regcompR)
-#> 
-#> Attaching package: 'regcompR'
-#> The following object is masked from 'package:base':
-#> 
-#>     capabilities
 ```
 
 ## The registry
@@ -38,53 +33,7 @@ head(reg[, c("id", "category", "parameters", "status")])
 #> 5         balding_nichols  bounded            F, p validated
 #> 6                   bates  bounded               n validated
 capabilities("conway_maxwell_poisson")
-#> $log_prob
-#> [1] "analytic"
-#> 
-#> $cdf
-#> [1] "analytic"
-#> 
-#> $quantile
-#> [1] "numeric"
-#> 
-#> $rng
-#> [1] "numeric"
-#> 
-#> $mean
-#> [1] "analytic"
-#> 
-#> $variance
-#> [1] "analytic"
-#> 
-#> $skewness
-#> [1] "numeric"
-#> 
-#> $kurtosis
-#> [1] "numeric"
-#> 
-#> $score
-#> [1] "numeric"
-#> 
-#> $hessian
-#> [1] "numeric"
-#> 
-#> $regression
-#> [1] TRUE
-#> 
-#> $ml
-#> [1] TRUE
-#> 
-#> $stan
-#> [1] "generated"
-#> 
-#> $tmb
-#> [1] "unavailable"
-#> 
-#> $bugs
-#> [1] "unavailable"
-#> 
-#> $status
-#> [1] "validated"
+#> named logical(0)
 ```
 
 Families are validated against reference implementations: densities

@@ -3,11 +3,6 @@
 ``` r
 
 library(regcompR)
-#> 
-#> Attaching package: 'regcompR'
-#> The following object is masked from 'package:base':
-#> 
-#>     capabilities
 ```
 
 ## Right censoring and parametric survival

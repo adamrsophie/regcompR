@@ -37,7 +37,7 @@ An object of class `regcomp_dist`.
 [`cdf()`](https://adamrsophie.github.io/regcompR/reference/probability-interface.md),
 [`quantile.regcomp_dist()`](https://adamrsophie.github.io/regcompR/reference/quantile.regcomp_dist.md),
 [`rng()`](https://adamrsophie.github.io/regcompR/reference/probability-interface.md),
-[`capabilities()`](https://adamrsophie.github.io/regcompR/reference/capabilities.md),
+[`family_capabilities()`](https://adamrsophie.github.io/regcompR/reference/family_capabilities.md),
 [`plot.regcomp_dist()`](https://adamrsophie.github.io/regcompR/reference/plot.regcomp_dist.md).
 
 ## Examples

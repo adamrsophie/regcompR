@@ -3,11 +3,6 @@
 ``` r
 
 library(regcompR)
-#> 
-#> Attaching package: 'regcompR'
-#> The following object is masked from 'package:base':
-#> 
-#>     capabilities
 families("ordinal")
 #>  [1] "adjacent_category_logit"    "continuation_ratio_cloglog"
 #>  [3] "continuation_ratio_logit"   "continuation_ratio_probit" 

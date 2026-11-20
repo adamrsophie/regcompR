@@ -3,11 +3,6 @@
 ``` r
 
 library(regcompR)
-#> 
-#> Attaching package: 'regcompR'
-#> The following object is masked from 'package:base':
-#> 
-#>     capabilities
 n <- 300
 d <- data.frame(x = rnorm(n))
 d$y <- rnbinom(n, mu = exp(1 + 0.5 * d$x), size = 2)

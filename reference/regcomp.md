@@ -156,7 +156,7 @@ structures.
   'TMB' (via 'RTMB'), for the normal, Poisson, binomial, Bernoulli, NB1,
   NB2, Student t, gamma, lognormal, Weibull, beta and exponential
   families (see
-  [`capabilities()`](https://adamrsophie.github.io/regcompR/reference/capabilities.md)).
+  [`family_capabilities()`](https://adamrsophie.github.io/regcompR/reference/family_capabilities.md)).
   It gives the same estimates as `"ml"` and is much faster for large
   multilevel models; the taped density is checked against the registry
   density before fitting.

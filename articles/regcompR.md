@@ -8,11 +8,6 @@ through TMB, or by Bayesian inference in Stan, JAGS or OpenBUGS.
 ``` r
 
 library(regcompR)
-#> 
-#> Attaching package: 'regcompR'
-#> The following object is masked from 'package:base':
-#> 
-#>     capabilities
 ```
 
 ## Distributions

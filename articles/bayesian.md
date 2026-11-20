@@ -3,11 +3,6 @@
 ``` r
 
 library(regcompR)
-#> 
-#> Attaching package: 'regcompR'
-#> The following object is masked from 'package:base':
-#> 
-#>     capabilities
 ```
 
 `engine = "bayes"` fits the same model by MCMC. regcompR writes the Stan
@@ -92,57 +87,11 @@ families, ordinal and nominal models, all random effect covariance
 structures and multiple membership terms are supported by the Stan
 backends. The BUGS backends support the families with BUGS densities and
 unstructured random effects;
-[`capabilities()`](https://adamrsophie.github.io/regcompR/reference/capabilities.md)
-reports what is available for a family.
+[`capabilities()`](https://rdrr.io/r/base/capabilities.html) reports
+what is available for a family.
 
 ``` r
 
 capabilities("generalized_poisson")
-#> $log_prob
-#> [1] "analytic"
-#> 
-#> $cdf
-#> [1] "numeric"
-#> 
-#> $quantile
-#> [1] "numeric"
-#> 
-#> $rng
-#> [1] "numeric"
-#> 
-#> $mean
-#> [1] "analytic"
-#> 
-#> $variance
-#> [1] "analytic"
-#> 
-#> $skewness
-#> [1] "numeric"
-#> 
-#> $kurtosis
-#> [1] "numeric"
-#> 
-#> $score
-#> [1] "numeric"
-#> 
-#> $hessian
-#> [1] "numeric"
-#> 
-#> $regression
-#> [1] TRUE
-#> 
-#> $ml
-#> [1] TRUE
-#> 
-#> $stan
-#> [1] "generated"
-#> 
-#> $tmb
-#> [1] "unavailable"
-#> 
-#> $bugs
-#> [1] "unavailable"
-#> 
-#> $status
-#> [1] "validated"
+#> named logical(0)
 ```

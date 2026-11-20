@@ -113,7 +113,7 @@ fit_b <- regcomp(y ~ x + (1 | g), phi ~ x, family = "nb2", data = dat,
 | Checking and comparison | Randomized quantile residuals, PIT histograms, rootograms, effect and caterpillar plots, posterior predictive checks, log, CRPS, Dawid Sebastiani, Brier and ranked probability scores, K fold cross validation, identifiability checks |
 | Bayesian backends | Generated Stan code for every family with a Stan density, all random effect structures and multiple membership; BUGS code for JAGS and OpenBUGS; priors by class, parameter and coefficient |
 
-[`capabilities()`](https://adamrsophie.github.io/regcompR/reference/capabilities.md)
+[`family_capabilities()`](https://adamrsophie.github.io/regcompR/reference/family_capabilities.md)
 reports what each engine supports for a family, and
 [`registry_table()`](https://adamrsophie.github.io/regcompR/reference/registry_table.md)
 returns the whole registry as a data frame.

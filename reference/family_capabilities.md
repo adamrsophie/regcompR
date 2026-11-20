@@ -1,6 +1,6 @@
 # Capability queries
 
-`capabilities()` reports, for a family or distribution, how each
+`family_capabilities()` reports, for a family or distribution, how each
 operation is provided: `"analytic"` (a method specific to the family: a
 closed form, or a dedicated algorithm such as a series, recursion or
 quadrature written for that law), `"numeric"` (the generic numerical
@@ -14,7 +14,7 @@ or `FALSE`.
 ## Usage
 
 ``` r
-capabilities(x)
+family_capabilities(x)
 
 supports(x, what = NULL, backend = NULL)
 ```
@@ -38,12 +38,12 @@ supports(x, what = NULL, backend = NULL)
 
 ## Value
 
-`capabilities()`: a named list. `supports()`: a logical scalar.
+`family_capabilities()`: a named list. `supports()`: a logical scalar.
 
 ## Examples
 
 ``` r
-capabilities("conway_maxwell_poisson")
+family_capabilities("conway_maxwell_poisson")
 #> $log_prob
 #> [1] "analytic"
 #> 
