@@ -7,7 +7,9 @@ int (F(z) - 1(y &amp;lt;= z))^2 dz, by quadrature for continuous laws and
 by summation for counts.
 &quot;dss&quot;: Dawid-Sebastiani score (y - m)^2 / v + log v.
 &quot;brier&quot; and &quot;rps&quot;: Brier and ranked probability scores for
-ordinal and nominal families.
+ordinal and nominal families (summed over the classes). For bernoulli
+and binomial families &quot;brier&quot; is the usual (y / size - p)^2 with
+p the predicted success probability.
 
 "><meta property="og:description" content="Scores each observation under the fitted predictive distribution
 (Gneiting and Raftery 2007). Smaller is better for every rule.
@@ -17,7 +19,9 @@ int (F(z) - 1(y &amp;lt;= z))^2 dz, by quadrature for continuous laws and
 by summation for counts.
 &quot;dss&quot;: Dawid-Sebastiani score (y - m)^2 / v + log v.
 &quot;brier&quot; and &quot;rps&quot;: Brier and ranked probability scores for
-ordinal and nominal families.
+ordinal and nominal families (summed over the classes). For bernoulli
+and binomial families &quot;brier&quot; is the usual (y / size - p)^2 with
+p the predicted success probability.
 
 "><meta property="og:image" content="https://adamrsophie.github.io/regcompR/logo.svg"></head><body>
     <a href="#main" class="visually-hidden-focusable">Skip to contents</a>
@@ -77,7 +81,9 @@ ordinal and nominal families.
 by summation for counts.</p></li>
 <li><p><code>"dss"</code>: Dawid-Sebastiani score <code>(y - m)^2 / v + log v</code>.</p></li>
 <li><p><code>"brier"</code> and <code>"rps"</code>: Brier and ranked probability scores for
-ordinal and nominal families.</p></li>
+ordinal and nominal families (summed over the classes). For bernoulli
+and binomial families <code>"brier"</code> is the usual <code>(y / size - p)^2</code> with
+<code>p</code> the predicted success probability.</p></li>
 </ul></div>
 
     <div class="section level2">
@@ -116,6 +122,17 @@ fitting data.</p></dd>
     <div class="section level2">
     <h2 id="value">Value<a class="anchor" aria-label="anchor" href="#value"></a></h2>
     <p>Numeric vector of scores, one per observation.</p>
+    </div>
+    <div class="section level2">
+    <h2 id="details">Details<a class="anchor" aria-label="anchor" href="#details"></a></h2>
+    <p>For Bayesian fits every rule scores the posterior predictive
+distribution, the mixture of the laws of the posterior draws (at most
+1000, evenly thinned): the log score uses the mean density, the CRPS the
+mean CDF, the Dawid-Sebastiani score the total predictive mean and
+variance, and the Brier and ranked probability scores the mean class
+probabilities. The CRPS is infinite when the predictive law has no finite
+mean; a quadrature that does not converge raises
+<code>regcomp_numerical_failure</code>.</p>
     </div>
 
     <div class="section level2">

@@ -56,7 +56,15 @@ predict(
   `"none"`, or `"confidence"` for uncertainty of the predicted quantity.
   Frequentist fits use parametric simulation from the asymptotic normal
   distribution of the estimates (`ndraws` draws); Bayesian fits use
-  posterior draws and return credible intervals.
+  posterior draws and return credible intervals. With
+  `re = "conditional"` frequentist intervals hold the estimated random
+  effects fixed: they reflect the uncertainty of the fixed effects and
+  variance parameters, not of the predicted group effects. For Bayesian
+  fits the estimate is the posterior mean of the conditional quantity
+  (for `"variance"`, the mean of the conditional variances, not the
+  total posterior predictive variance;
+  [`scoring_rule()`](https://adamrsophie.github.io/regcompR/reference/scoring_rule.md)
+  uses the posterior predictive law).
 
 - level:
 
@@ -67,7 +75,9 @@ predict(
   `"conditional"`, `"zero"` or `"marginal"`. `"marginal"` averages the
   quantity over the random effect distribution by Monte Carlo
   integration (`nmarginal` draws), giving population averaged
-  predictions.
+  predictions. Rows of `newdata` without the grouping columns, or with
+  unseen levels, are new groups: one per row when the columns are
+  absent.
 
 - ndraws:
 

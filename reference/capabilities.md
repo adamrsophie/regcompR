@@ -1,11 +1,15 @@
 # Capability queries
 
 `capabilities()` reports, for a family or distribution, how each
-operation is provided: `"analytic"` (closed form or exact algorithm),
-`"numeric"` (declared numerical fallback with tolerance checks) or
-`"unavailable"`. It also reports whether the family can be used as a
-regression response and which fitting engines support it. `supports()`
-answers a single question with `TRUE` or `FALSE`.
+operation is provided: `"analytic"` (a method specific to the family: a
+closed form, or a dedicated algorithm such as a series, recursion or
+quadrature written for that law), `"numeric"` (the generic numerical
+fallback: inversion, summation or integration of the density, with
+tolerance checks) or `"unavailable"`. Ordinal and nominal families draw
+random values from their class probabilities. It also reports whether
+the family can be used as a regression response and which fitting
+engines support it. `supports()` answers a single question with `TRUE`
+or `FALSE`.
 
 ## Usage
 

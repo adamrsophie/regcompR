@@ -20,8 +20,7 @@ effects and smooth terms, optionally through 'TMB' (Kristensen et al.
 ), or by Bayesian inference through generated 'Stan' programs run by
 'bayescompR', 'cmdstanr' or 'rstan'. Predictions, quantiles, event
 probabilities, randomized quantile residuals, proper scoring rules,
-cross validation, average predictions and contrasts, and plots for every
-distribution and fit are included.
+cross validation, and plots for every distribution and fit are included.
 
 ## See also
 

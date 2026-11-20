@@ -70,7 +70,9 @@
 <span>  runner <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"bayescompR"</span>, <span class="st">"cmdstanr"</span>, <span class="st">"rstan"</span>, <span class="st">"jags"</span>, <span class="st">"openbugs"</span><span class="op">)</span>,</span>
 <span>  cores <span class="op">=</span> <span class="fl">1</span>,</span>
 <span>  adapt_delta <span class="op">=</span> <span class="fl">0.8</span>,</span>
-<span>  start <span class="op">=</span> <span class="cn">NULL</span></span>
+<span>  start <span class="op">=</span> <span class="cn">NULL</span>,</span>
+<span>  prox_maxit <span class="op">=</span> <span class="fl">5000</span>,</span>
+<span>  prox_tol <span class="op">=</span> <span class="fl">1e-08</span></span>
 <span><span class="op">)</span></span></code></pre></div>
     </div>
 
@@ -121,6 +123,12 @@ settings: chains, iterations, seed, the runner (<code>"bayescompR"</code>,
 <dt id="arg-start">start<a class="anchor" aria-label="anchor" href="#arg-start"></a></dt>
 <dd><p>Optional named list of starting values for the coefficients
 of each parameter (vectors on the link scale).</p></dd>
+
+
+<dt id="arg-prox-maxit-prox-tol">prox_maxit, prox_tol<a class="anchor" aria-label="anchor" href="#arg-prox-maxit-prox-tol"></a></dt>
+<dd><p>Iteration limit and relative step tolerance of
+the proximal gradient (FISTA) solver used for lasso type penalties
+(<code>maxit</code> and <code>rel_tol</code> apply to <code><a href="https://rdrr.io/r/stats/nlminb.html" class="external-link">nlminb()</a></code> only).</p></dd>
 
 </dl></div>
     <div class="section level2">

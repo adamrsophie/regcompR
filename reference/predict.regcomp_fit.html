@@ -107,7 +107,14 @@ the matrix of category probabilities (all categories by default).</p></dd>
 <dd><p><code>"none"</code>, or <code>"confidence"</code> for uncertainty of the
 predicted quantity. Frequentist fits use parametric simulation from the
 asymptotic normal distribution of the estimates (<code>ndraws</code> draws);
-Bayesian fits use posterior draws and return credible intervals.</p></dd>
+Bayesian fits use posterior draws and return credible intervals. With
+<code>re = "conditional"</code> frequentist intervals hold the estimated random
+effects fixed: they reflect the uncertainty of the fixed effects and
+variance parameters, not of the predicted group effects.
+For Bayesian fits the estimate is the posterior mean of the conditional
+quantity (for <code>"variance"</code>, the mean of the conditional variances, not
+the total posterior predictive variance; <code><a href="scoring_rule.html">scoring_rule()</a></code> uses the
+posterior predictive law).</p></dd>
 
 
 <dt id="arg-level">level<a class="anchor" aria-label="anchor" href="#arg-level"></a></dt>
@@ -118,7 +125,8 @@ Bayesian fits use posterior draws and return credible intervals.</p></dd>
 <dd><p><code>"conditional"</code>, <code>"zero"</code> or <code>"marginal"</code>. <code>"marginal"</code>
 averages the quantity over the random effect distribution by Monte
 Carlo integration (<code>nmarginal</code> draws), giving population averaged
-predictions.</p></dd>
+predictions. Rows of <code>newdata</code> without the grouping columns, or with
+unseen levels, are new groups: one per row when the columns are absent.</p></dd>
 
 
 <dt id="arg-ndraws">ndraws<a class="anchor" aria-label="anchor" href="#arg-ndraws"></a></dt>
