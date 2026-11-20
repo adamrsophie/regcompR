@@ -45,7 +45,7 @@ reference:
   - families
   - get_family
   - registry_table
-  - capabilities
+  - family_capabilities
   - supports
   - validate_parameters
   - validate_response

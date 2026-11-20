@@ -308,6 +308,7 @@ plot_trace <- function(fit, pars = NULL, ...) {
 }
 
 model_data <- function(fit) {
+  if (!is.null(fit$model_data)) return(fit$model_data)
   d <- tryCatch(eval(fit$call$data, environment(fit$spec$formulas[[1]])), error = function(e) NULL)
   if (is.null(d)) stop_input("The data used for fitting are not available; give newdata explicitly.")
   as.data.frame(d)

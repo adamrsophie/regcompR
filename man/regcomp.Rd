@@ -115,7 +115,7 @@ Penalties (see \code{\link[=penalty]{penalty()}}) give penalized likelihood esti
 through automatic differentiation and the Laplace approximation of
 'TMB' (via 'RTMB'), for the normal, Poisson, binomial, Bernoulli,
 NB1, NB2, Student t, gamma, lognormal, Weibull, beta and exponential
-families (see \code{\link[=capabilities]{capabilities()}}). It gives the same estimates as
+families (see \code{\link[=family_capabilities]{family_capabilities()}}). It gives the same estimates as
 \code{"ml"} and is much faster for large multilevel models; the taped
 density is checked against the registry density before fitting.
 \item \code{"bayes"}: Bayesian inference. A 'Stan' program is generated from the

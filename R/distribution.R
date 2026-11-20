@@ -14,7 +14,7 @@
 #'   [get_family()].
 #' @return An object of class `regcomp_dist`.
 #' @seealso [log_prob()], [cdf()], [quantile.regcomp_dist()], [rng()],
-#'   [capabilities()], [plot.regcomp_dist()].
+#'   [family_capabilities()], [plot.regcomp_dist()].
 #' @export
 #' @examples
 #' d <- distribution("negative_binomial", parameterization = "nb2",

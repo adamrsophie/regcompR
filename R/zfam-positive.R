@@ -503,6 +503,9 @@ posfam("generalized_birnbaum_saunders", "Generalized Birnbaum-Saunders (power, G
 posfam("log_cauchy", "Log-Cauchy", list(loc_par("mu"), scale_par("sigma")),
   lpdf = function(y, p) stats::dcauchy(log(y), p$mu, p$sigma, log = TRUE) - log(y),
   cdf = function(q, p) stats::pcauchy(log(q), p$mu, p$sigma), quantile = function(pr, p) exp(stats::qcauchy(pr, p$mu, p$sigma)),
+  mean_formula = "does not exist", variance_formula = "does not exist",
+  moment_conditions = "No moments of order 1 or higher exist (exp of a Cauchy variable).",
+  mean = function(p) rep(NA_real_, length(p$mu)), variance = function(p) rep(NA_real_, length(p$mu)),
   numeric_moments = FALSE, references = JKB,
   reference = ref_impl("transform", function(y, p) log(stats::dcauchy(log(y), p$mu, p$sigma) / y)), status = "validated")
 

@@ -89,7 +89,9 @@ scoring_rule <- function(object, newdata = NULL, rule = c("log", "crps", "dss", 
   PP <- lapply(PS, recycle_pars)
   vapply(seq_along(y), function(i) {
     pis <- lapply(PP, function(pp) lapply(pp, `[`, i))
-    Fz <- function(z) Reduce(`+`, lapply(pis, function(pi) family_cdf(fam, z, lapply(pi, rep, length(z))))) / length(pis)
+    # Mean CDF over the parameter sets, in one vectorized call.
+    pst <- lapply(stats::setNames(names(pis[[1]]), names(pis[[1]])), function(k) vapply(pis, function(pi) pi[[k]], 0))
+    Fz <- function(z) rowMeans(matrix(family_cdf(fam, rep(z, length(pis)), lapply(pst, rep, each = length(z))), length(z)))
     # The CRPS is finite exactly when the predictive mean is.
     mu <- vapply(pis, function(pi) tryCatch(family_moment(fam, "mean", pi, quiet = TRUE), error = function(e) NaN), 0)
     if (any(is.na(mu) & !is.nan(mu)) || any(is.infinite(mu))) return(Inf)
@@ -107,12 +109,17 @@ scoring_rule <- function(object, newdata = NULL, rule = c("log", "crps", "dss", 
     # make the quadrature miss the mass of heavy tails.
     sp <- lapply(pis, fam$support)
     a <- min(unlist(lapply(sp, `[[`, "lower")), y[i]); b <- max(unlist(lapply(sp, `[[`, "upper")), y[i])
-    i1 <- stats::integrate(function(z) Fz(z)^2, a, y[i], rel.tol = 1e-8, subdivisions = 1000L, stop.on.error = FALSE)
-    i2 <- stats::integrate(function(z) (1 - Fz(z))^2, y[i], b, rel.tol = 1e-8, subdivisions = 1000L, stop.on.error = FALSE)
-    if (i1$message != "OK" || i2$message != "OK" || !is.finite(i1$value + i2$value) || i1$value + i2$value < 0)
+    quad <- function(f, lo, up) tryCatch(stats::integrate(f, lo, up, rel.tol = 1e-8, subdivisions = 1000L, stop.on.error = FALSE),
+      error = function(e) stop_numerical(sprintf("The CRPS integral of observation %d failed (%s).", i, conditionMessage(e))))
+    i1 <- quad(function(z) Fz(z)^2, a, y[i])
+    i2 <- quad(function(z) (1 - Fz(z))^2, y[i], b)
+    # Roundoff messages on an accurate integral are harmless; a negative or
+    # non finite value, or a large error estimate, is a failure.
+    v <- i1$value + i2$value; err <- i1$abs.error + i2$abs.error
+    if (!is.finite(v) || v < 0 || ((i1$message != "OK" || i2$message != "OK") && !(err <= 1e-4 * max(1, v))))
       stop_numerical(sprintf("The CRPS integral of observation %d did not converge (%s).", i,
                              if (i1$message != "OK") i1$message else i2$message))
-    i1$value + i2$value
+    v
   }, 0)
 }
 

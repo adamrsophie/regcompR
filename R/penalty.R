@@ -280,7 +280,8 @@ fit_proximal <- function(spec, beta0, pen, control) {
         else ifelse(b <= a * lam, lam * b - b^2 / (2 * a), a * lam^2 / 2)) }
   } else o <- fista(spec, beta0, pen, control$prox_maxit, control$prox_tol)
   opt <- list(convergence = o$convergence, message = if (o$convergence == 0) "converged" else "iteration limit",
-              iterations = o$iterations, objective = o$objective, kkt = o$kkt)
+              iterations = o$iterations, objective = o$objective, kkt = o$kkt,
+              controls = list(prox_maxit = control$prox_maxit, prox_tol = control$prox_tol))
   new_fit(spec, o$par, numeric(0), numeric(0), NULL, ml_objective(spec, o$par), opt, "none", pen)
 }
 

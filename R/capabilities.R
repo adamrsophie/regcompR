@@ -1,6 +1,6 @@
 #' Capability queries
 #'
-#' `capabilities()` reports, for a family or distribution, how each operation
+#' `family_capabilities()` reports, for a family or distribution, how each operation
 #' is provided: `"analytic"` (a method specific to the family: a closed
 #' form, or a dedicated algorithm such as a series, recursion or quadrature
 #' written for that law), `"numeric"` (the generic numerical fallback:
@@ -17,13 +17,13 @@
 #'   `"hessian"` or `"regression"`.
 #' @param backend Engine name: `"ml"`, `"tmb"`, `"stan"` (also `"bayes"`)
 #'   or `"bugs"` (also `"jags"`, `"openbugs"`).
-#' @return `capabilities()`: a named list. `supports()`: a logical scalar.
+#' @return `family_capabilities()`: a named list. `supports()`: a logical scalar.
 #' @export
 #' @examples
-#' capabilities("conway_maxwell_poisson")
+#' family_capabilities("conway_maxwell_poisson")
 #' supports("cauchy", "mean")
 #' supports("poisson", backend = "stan")
-capabilities <- function(x) {
+family_capabilities <- function(x) {
   fam <- capability_family(x)
   scalar <- fam$variate_type == "scalar" || scalar_vecpar(fam)
   op <- function(slot, fallback) {
@@ -61,10 +61,10 @@ capability_family <- function(x) {
   get_family(x)
 }
 
-#' @rdname capabilities
+#' @rdname family_capabilities
 #' @export
 supports <- function(x, what = NULL, backend = NULL) {
-  cap <- capabilities(x)
+  cap <- family_capabilities(x)
   if (!is.null(backend)) {
     backend <- match.arg(backend, c("ml", "tmb", "stan", "bayes", "bugs", "jags", "openbugs"))
     if (backend %in% c("jags", "openbugs")) backend <- "bugs"

@@ -51,7 +51,7 @@
 #'   through automatic differentiation and the Laplace approximation of
 #'   'TMB' (via 'RTMB'), for the normal, Poisson, binomial, Bernoulli,
 #'   NB1, NB2, Student t, gamma, lognormal, Weibull, beta and exponential
-#'   families (see [capabilities()]). It gives the same estimates as
+#'   families (see [family_capabilities()]). It gives the same estimates as
 #'   `"ml"` and is much faster for large multilevel models; the taped
 #'   density is checked against the registry density before fitting.
 #' * `"bayes"`: Bayesian inference. A 'Stan' program is generated from the
@@ -463,7 +463,7 @@ block_cov <- function(b, th) {
     },
     cs = , homcs = {
       sd <- if (b$struct == "cs") exp(th[seq_len(q)]) else rep(exp(th[1]), q)
-      a <- 1 / (q - 1); rho <- stats::plogis(th[length(th)]) * (1 + a) - a
+      a <- 1 / (q - 1); rho <- (1 + a) / (1 + exp(-th[length(th)])) - a   # plogis, written so RTMB can tape it
       R <- ad_like(matrix(0, q, q), th) + rho; diag(R) <- 1
       D <- ad_like(diag(q), th); diag(D) <- sd
       return(D %*% R %*% D)
@@ -696,8 +696,10 @@ fit_ml <- function(spec, control, penalty = NULL) {
     theta0 <- unlist(lapply(spec$blocks, block_theta_start))
     state <- new.env(); state$u <- rep(0, spec$Q)
     obj_re <- function(par) {
-      v <- laplace_objective(spec, par[seq_len(np)], par[-seq_len(np)], state, control) -
-        pen_val(par[seq_len(np)])
+      # A singular random effect covariance (a correlation at its boundary)
+      # is outside the parameter space.
+      v <- tryCatch(laplace_objective(spec, par[seq_len(np)], par[-seq_len(np)], state, control),
+                    error = function(e) -Inf) - pen_val(par[seq_len(np)])
       if (!is.finite(v)) 1e300 else -v
     }
     opt <- robust_nlminb(c(b1, theta0), obj_re, NULL, control)
@@ -727,10 +729,17 @@ robust_nlminb <- function(start, obj, gr, control) {
     set.seed(control$seed)
     for (r in seq_len(control$restarts)) starts[[r + 1]] <- start + stats::rnorm(length(start), 0, 0.1 * r)
   }
+  # Keep the best point evaluated, so that an error late in a run (a
+  # singular matrix near a boundary, say) returns that point flagged as not
+  # converged instead of discarding the run.
+  seen <- new.env(); seen$val <- Inf
+  obj2 <- function(p) { v <- obj(p); if (is.finite(v) && v < seen$val) { seen$val <- v; seen$par <- p }; v }
   for (s in starts) {
-    o <- tryCatch(stats::nlminb(s, obj, gr, control = list(
+    o <- tryCatch(stats::nlminb(s, obj2, gr, control = list(
       iter.max = control$maxit, eval.max = 2 * control$maxit, rel.tol = control$rel_tol,
-      trace = as.integer(control$trace))), error = function(e) NULL)
+      trace = as.integer(control$trace))), error = function(e) if (is.finite(seen$val))
+        list(par = seen$par, objective = seen$val, convergence = 1L, iterations = NA_integer_,
+             message = paste("stopped after an error:", conditionMessage(e))))
     if (is.null(o)) next
     if (is.null(best) || o$objective < best$objective) best <- o
     if (o$convergence == 0 && o$objective < 1e299) break
@@ -812,7 +821,8 @@ new_fit <- function(spec, beta, theta, u, cov, ll, opt, approx, pen = NULL,
     spec = spec, family = spec$fam, coefficients = beta, theta = theta, u = u,
     vcov = cov, logLik = ll, df = edf, nobs = obs_count(spec),
     optimizer = list(convergence = opt$convergence, message = opt$message,
-                     iterations = opt$iterations, objective = opt$objective, kkt = opt$kkt),
+                     iterations = opt$iterations, objective = opt$objective, kkt = opt$kkt,
+                     controls = opt$controls),
     approximation = approx, penalty = pen, engine = engine,
     inference = "frequentist"
   ), class = "regcomp_fit")

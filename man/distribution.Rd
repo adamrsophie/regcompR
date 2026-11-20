@@ -35,5 +35,5 @@ distribution("conway_maxwell_poisson_mean", mu = 3, nu = 1.5)
 }
 \seealso{
 \code{\link[=log_prob]{log_prob()}}, \code{\link[=cdf]{cdf()}}, \code{\link[=quantile.regcomp_dist]{quantile.regcomp_dist()}}, \code{\link[=rng]{rng()}},
-\code{\link[=capabilities]{capabilities()}}, \code{\link[=plot.regcomp_dist]{plot.regcomp_dist()}}.
+\code{\link[=family_capabilities]{family_capabilities()}}, \code{\link[=plot.regcomp_dist]{plot.regcomp_dist()}}.
 }

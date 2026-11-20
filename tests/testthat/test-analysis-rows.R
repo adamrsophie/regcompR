@@ -97,3 +97,9 @@ test_that("binary Brier, comparison guards, new groups and RNG-safe plots", {
   pdf(NULL); plot(distribution("multivariate_normal", mu = c(0, 0), Sigma = diag(2))); dev.off()
   expect_identical(.Random.seed, before)
 })
+
+test_that("no export masks a function of the base R packages", {
+  ex <- getNamespaceExports("regcompR")
+  for (p in c("base", "stats", "utils", "graphics", "grDevices", "methods"))
+    expect_identical(intersect(ex, getNamespaceExports(p)), character(0), info = p)
+})

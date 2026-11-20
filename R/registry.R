@@ -80,7 +80,7 @@ registry_table <- function(category = NULL) {
   ids <- families(category)
   rows <- lapply(ids, function(i) {
     f <- get_family(i)
-    cap <- capabilities(f)
+    cap <- family_capabilities(f)
     data.frame(
       id = f$id, display_name = f$display_name, category = f$category,
       variate_type = f$variate_type, discrete = f$discrete,
