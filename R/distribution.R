@@ -519,7 +519,15 @@ family_moment <- function(fam, what, pars, quiet = FALSE) {
       stop_unsupported(sprintf("The %s", what), fam$id)
     out <- numeric_family_moment(fam, what, pars)
   } else out <- f(pars)
-  bad <- is.na(out) & !Reduce(`|`, lapply(pars, function(v) is.na(v)), FALSE)
+  # NaN marks a numerical failure, NA a moment that does not exist.
+  nf <- is.nan(out)
+  if (any(nf)) {
+    out[nf] <- NA
+    if (!quiet) warning(structure(class = c("regcomp_numerical_warning", "warning", "condition"),
+      list(message = sprintf("The %s could not be computed numerically for %d parameter value%s; NA returned (it may still exist).",
+                             what, sum(nf), if (sum(nf) == 1) "" else "s"), call = NULL)))
+  }
+  bad <- is.na(out) & !nf & !Reduce(`|`, lapply(pars, function(v) is.na(v)), FALSE)
   if (!quiet && any(bad)) warn_undefined_moment(what, sum(bad))
   out
 }
@@ -589,6 +597,14 @@ support.regcomp_dist <- function(x, ...) {
 score <- function(x, y, ...) UseMethod("score")
 
 #' @export
+# Finite difference step that stays inside the parameter's domain: at most a
+# thousandth of the distance to a finite bound (curvature grows near it).
+domain_step <- function(spec, v, rel, small) {
+  h <- rel * ifelse(v == 0, small, abs(v))
+  d <- pmin(v - (spec$lower %||% -Inf), (spec$upper %||% Inf) - v)
+  ifelse(is.finite(d) & d > 0, pmin(h, d * 1e-3), h)
+}
+
 score.regcomp_dist <- function(x, y, ...) {
   fam <- x$family
   free <- regression_pars(fam)
@@ -596,7 +612,7 @@ score.regcomp_dist <- function(x, y, ...) {
   y <- r$.y; p <- r[-1]
   out <- matrix(NA_real_, length(y), length(free), dimnames = list(NULL, free))
   for (k in free) {
-    h <- 1e-5 * ifelse(p[[k]] == 0, 1e-3, abs(p[[k]]))
+    h <- domain_step(fam$pars[[k]], p[[k]], 1e-5, 1e-3)
     up <- p; dn <- p
     up[[k]] <- p[[k]] + h; dn[[k]] <- p[[k]] - h
     out[, k] <- (eval_lpdf(fam, y, up) - eval_lpdf(fam, y, dn)) / (2 * h)
@@ -617,7 +633,7 @@ hessian.regcomp_dist <- function(x, y, ...) {
   K <- length(free)
   out <- array(NA_real_, c(length(y), K, K), list(NULL, free, free))
   f <- function(pp) eval_lpdf(fam, y, pp)
-  h <- lapply(p[free], function(v) 1e-4 * ifelse(v == 0, 1e-2, abs(v)))
+  h <- lapply(free, function(k) domain_step(fam$pars[[k]], p[[k]], 1e-4, 1e-2)); names(h) <- free
   for (a in seq_len(K)) for (b in a:K) {
     ka <- free[a]; kb <- free[b]
     shift <- function(sa, sb) {

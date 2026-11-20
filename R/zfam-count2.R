@@ -71,7 +71,7 @@ register_family(family_def(
 # Generalized Poisson (Consul) --------------------------------------------
 gp_lt <- function(k, p) {
   a <- p$theta + p$lambda * k
-  ifelse(a > 0, log(p$theta) + (k - 1) * log(a) - a - lgamma(k + 1), -Inf)
+  ifelse(a > 0, log(p$theta) + (k - 1) * log(pmax(a, 0)) - a - lgamma(k + 1), -Inf)
 }
 gp_nc <- normalized_count(gp_lt)
 gp_check <- function(p) if (any(p$lambda <= -1 | p$lambda >= 1 | p$lambda < -p$theta / 4, na.rm = TRUE))
@@ -97,7 +97,11 @@ register_family(family_def(
 
 register_family(family_def(
   "generalized_poisson_mean", "Generalized Poisson (mean and dispersion, GP-1)", cnt, discrete = TRUE, aliases = "GP1",
-  pars = list(log_mean_par("mu"), P("lambda", "real", role = "dispersion", link = "identity")),
+  # mu is the mean only for lambda >= 0; the truncated, renormalized law for
+  # lambda < 0 has a different mean (given exactly by mean()).
+  pars = list(local({ q <- log_mean_par("mu"); q$is_mean <- FALSE
+    q$interpretation <- "Mean for lambda >= 0; a location parameter (theta / (1 - lambda)) for lambda < 0"; q }),
+    P("lambda", "real", role = "dispersion", link = "identity")),
   check = function(p) if (any(p$lambda <= -1 | p$lambda >= 1, na.rm = TRUE)) "lambda must lie in (-1, 1).",
   formula = "Consul generalized Poisson with theta = mu (1 - lambda)",
   mean_formula = "mu (for lambda >= 0)", variance_formula = "mu / (1 - lambda)^2",

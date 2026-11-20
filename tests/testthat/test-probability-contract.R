@@ -139,3 +139,32 @@ test_that("multinomial and Ewens laws take an explicit sample size", {
   z <- rng(distribution("ewens", theta = 1, size = 3), 4)
   expect_true(all(drop(z %*% seq_len(ncol(z))) == 3))
 })
+
+test_that("numerical regimes: far tails, moments, periodicity and boundaries", {
+  for (ab in list(c(40, 41), c(-41, -40))) {
+    d <- distribution("truncated_normal", mu = 0, sigma = 1, a = ab[1], b = ab[2])
+    q <- quantile(d, c(.01, .5, .99))
+    expect_true(all(is.finite(q) & q >= ab[1] & q <= ab[2]))
+    expect_equal(cdf(d, q), c(.01, .5, .99), tolerance = 1e-6)
+  }
+  lsa <- pnorm(40, lower.tail = FALSE, log.p = TRUE); lsb <- pnorm(41, lower.tail = FALSE, log.p = TRUE)
+  expect_equal(quantile(distribution("truncated_normal", mu = 0, sigma = 1, a = 40, b = 41), .5),
+               qnorm(lsa + log(.5 * (1 + exp(lsb - lsa))), lower.tail = FALSE, log.p = TRUE), tolerance = 1e-8)
+  expect_equal(variance(distribution("lomax", scale = 1, alpha = 2.2)), 2.2 / (1.2^2 * .2))
+  # The numerical moment path no longer calls a slow but convergent tail divergent.
+  f <- get_family("lomax"); f$variance <- NULL
+  expect_equal(regcompR:::family_moment(f, "variance", list(scale = 1, alpha = 2.2), quiet = TRUE), 2.2 / (1.2^2 * .2), tolerance = 1e-5)
+  expect_warning(variance(distribution("cauchy", mu = 0, sigma = 1)), class = "regcomp_undefined_moment")
+  for (turns in c(-7, 10)) expect_equal(log_prob(distribution("wrapped_normal", mu = .1 + 2 * pi * turns, sigma = 1), .1),
+                                        log_prob(distribution("wrapped_normal", mu = .1, sigma = 1), .1), tolerance = 1e-10)
+  expect_equal(log_prob(distribution("projected_normal", m1 = 40, m2 = 0), 0), log(40 / sqrt(2 * pi)), tolerance = 1e-10)
+  expect_equal(log_prob(distribution("projected_normal", m1 = 2, m2 = 1), 1),
+               log(integrate(function(r) r * dnorm(r * cos(1), 2) * dnorm(r * sin(1), 1), 0, Inf)$value), tolerance = 1e-7)
+  mu <- 1 - 1e-8
+  expect_equal(unname(score(distribution("beta", mu = mu, phi = 2), .5)[, "mu"]),
+               2 * (digamma((1 - mu) * 2) - digamma(mu * 2) + log(.5) - log1p(-.5)), tolerance = 1e-4)
+  gp <- get_family("generalized_poisson_mean")
+  expect_false(gp$pars$mu$is_mean)
+  expect_equal(mean(distribution(gp, mu = .2, lambda = -.8)), 0)
+  expect_equal(mean(distribution(gp, mu = 2, lambda = .3)), 2)
+})

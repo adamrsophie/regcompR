@@ -193,6 +193,8 @@ posfam("lomax", "Lomax (Pareto type II)", list(P("scale", "positive", role = "sc
   cdf = function(q, p) 1 - (1 + q / p$scale)^(-p$alpha),
   quantile = function(pr, p) p$scale * ((1 - pr)^(-1 / p$alpha) - 1),
   mean = function(p) ifelse(p$alpha > 1, p$scale / (p$alpha - 1), Inf),
+  variance = function(p) ifelse(p$alpha > 2, p$scale^2 * p$alpha / ((p$alpha - 1)^2 * (p$alpha - 2)), ifelse(p$alpha > 1, Inf, NA)),
+  moment_conditions = "Mean finite for alpha > 1, variance for alpha > 2.",
   references = KLUG, reference = ref_impl("extraDistr", function(y, p) extraDistr::dlomax(y, 1 / p$scale, p$alpha, log = TRUE)),
   stan = stan_native("pareto_type_2_lpdf({y} | 0, {scale}, {alpha})", "pareto_type_2_lcdf({y} | 0, {scale}, {alpha})",
                      "pareto_type_2_lccdf({y} | 0, {scale}, {alpha})"),

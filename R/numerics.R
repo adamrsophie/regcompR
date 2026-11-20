@@ -292,12 +292,16 @@ numeric_moment_cont <- function(lpdf, pars, fun, lower, upper) {
     # cancel into a principal value.
     c0 <- if (is.finite(lower[i]) && is.finite(upper[i])) (lower[i] + upper[i]) / 2 else
       if (is.finite(lower[i])) lower[i] + 1 else if (is.finite(upper[i])) upper[i] - 1 else 0
+    # A failed quadrature is a numerical failure (NaN), not a proof that
+    # the moment does not exist (NA).
     part <- function(a, b) tryCatch(integrate_safe(f, a, b, rel_tol = 1e-8),
-      regcomp_numerical_failure = function(e) NA_real_, error = function(e) NA_real_)
-    # stats::integrate can report success on a divergent tail: require
-    # t |f(t)| to decay along each infinite end.
+      regcomp_numerical_failure = function(e) NaN, error = function(e) NaN)
+    # stats::integrate can report success on a divergent tail. With a
+    # polynomial tail |f(t)| ~ t^-s the integral converges exactly when
+    # t |f(t)| ~ t^(1 - s) decays; its log-log slope between two far points
+    # estimates 1 - s, and a slope that is not negative means divergence.
     diverges <- function(sgn) { t <- c0 + sgn * c(1e6, 1e12) * (1 + abs(c0))
-      g <- abs(t * f(t)); is.finite(g[1]) && g[1] > 0 && !(g[2] < 1e-3 * g[1]) }
+      g <- abs(t * f(t)); is.finite(g[1]) && g[1] > 0 && (!is.finite(g[2]) || log(g[2] / g[1]) / log(1e6) > -1e-3) }
     if ((!is.finite(upper[i]) && diverges(1)) || (!is.finite(lower[i]) && diverges(-1))) return(NA_real_)
     part(lower[i], c0) + part(c0, upper[i])
   }, 0)

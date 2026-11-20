@@ -99,16 +99,20 @@ register_family(family_def("truncated_normal", "Truncated normal", "real",
   cdf = function(q, p) { N <- get_family("normal"); pn <- p[c("mu", "sigma")]
     out <- exp(family_log_interval(N, p$a, pmin(pmax(q, p$a), p$b), pn) - family_log_interval(N, p$a, p$b, pn))
     out[q <= p$a] <- 0; out[q >= p$b] <- 1; out },
+  # Inversion in log probabilities from the tail that holds the interval,
+  # so intervals far in a tail keep finite quantiles inside [a, b].
   quantile = function(pr, p) { la <- stats::pnorm(p$a, p$mu, p$sigma, log.p = TRUE)
     upper <- la > log(0.5)
-    sa <- stats::pnorm(p$a, p$mu, p$sigma, lower.tail = FALSE); sb <- stats::pnorm(p$b, p$mu, p$sigma, lower.tail = FALSE)
-    fa <- stats::pnorm(p$a, p$mu, p$sigma); fb <- stats::pnorm(p$b, p$mu, p$sigma)
-    ifelse(upper, stats::qnorm(sa - pr * (sa - sb), p$mu, p$sigma, lower.tail = FALSE),
-           stats::qnorm(fa + pr * (fb - fa), p$mu, p$sigma)) },
+    lsa <- stats::pnorm(p$a, p$mu, p$sigma, lower.tail = FALSE, log.p = TRUE); lsb <- stats::pnorm(p$b, p$mu, p$sigma, lower.tail = FALSE, log.p = TRUE)
+    lfb <- stats::pnorm(p$b, p$mu, p$sigma, log.p = TRUE)
+    q <- rep(NA_real_, length(pr)); u <- which(upper); l <- which(!upper)
+    if (length(u)) q[u] <- stats::qnorm((lsa + log1p(pr * expm1(lsb - lsa)))[u], p$mu[u], p$sigma[u], lower.tail = FALSE, log.p = TRUE)
+    if (length(l)) q[l] <- stats::qnorm((la + log1p(pr * expm1(lfb - la)))[l], p$mu[l], p$sigma[l], log.p = TRUE)
+    pmin(pmax(q, p$a), p$b) },
   references = "Johnson, Kotz and Balakrishnan (1994), Continuous Univariate Distributions, vol. 1, sec. 13.10.",
   reference = ref_impl("truncnorm", function(y, p) log(truncnorm::dtruncnorm(y, p$a, p$b, p$mu, p$sigma))),
   stan = sfun("truncated_normal", c("mu", "sigma", "a", "b"),
-    "    if (y < a || y > b) return negative_infinity();\n    return normal_lpdf(y | mu, sigma) - log_diff_exp(normal_lcdf(b | mu, sigma), normal_lcdf(a | mu, sigma));"),
+    "    if (y < a || y > b) return negative_infinity();\n    if (a > mu) return normal_lpdf(y | mu, sigma) - log_diff_exp(normal_lccdf(a | mu, sigma), normal_lccdf(b | mu, sigma));\n    return normal_lpdf(y | mu, sigma) - log_diff_exp(normal_lcdf(b | mu, sigma), normal_lcdf(a | mu, sigma));"),
   status = "validated"))
 
 register_family(modify_family(censor("normal", lower = 0), id = "rectified_gaussian", display_name = "Rectified Gaussian",

@@ -47,8 +47,10 @@ cfam("wrapped_cauchy", "Wrapped Cauchy", list(circ_mu(), P("rho", "unit", role =
 
 cfam("wrapped_normal", "Wrapped normal", list(circ_mu(), scale_par("sigma")),
   formula = "f(y) = sum_k phi((y - mu + 2 pi k)/sigma) / sigma",
+  # The sum is centered at the wrapped difference, so locations that differ
+  # by whole turns give the same law.
   lpdf = function(y, p) log(pervec(y, p, function(x, pp) { K <- ceiling(6 * pp$sigma / (2 * pi)) + 2; k <- -K:K
-    sum(stats::dnorm(x - pp$mu + 2 * pi * k, 0, pp$sigma)) })),
+    sum(stats::dnorm(wrap_angle(x - pp$mu) + 2 * pi * k, 0, pp$sigma)) })),
   rng = function(n, p) wrap_angle(stats::rnorm(n, p$mu, p$sigma)),
   references = "Mardia and Jupp (2000).",
   reference = ref_impl("circular", function(y, p) log(mapply(function(x, m, s) circular::dwrappednormal(circular::circular(x), circular::circular(m), sd = s), y, p$mu, p$sigma))),
@@ -131,7 +133,12 @@ cfam("henyey_greenstein", "Henyey-Greenstein (phase function on the circle of sc
   status = "validated")
 
 pn_lpdf <- function(y, p) { u <- cbind(cos(y), sin(y)); m <- cbind(p$m1, p$m2)
-  a <- rowSums(u * m); -0.5 * (p$m1^2 + p$m2^2) - log(2 * pi) + log1p(a * stats::pnorm(a) / stats::dnorm(a)) }
+  a <- rowSums(u * m)
+  # log(1 + a Phi(a) / phi(a)) with the ratio in log space (phi underflows
+  # for large a).
+  lr <- stats::pnorm(a, log.p = TRUE) - stats::dnorm(a, log = TRUE)
+  x <- log(pmax(a, 1e-300)) + lr
+  -0.5 * (p$m1^2 + p$m2^2) - log(2 * pi) + ifelse(a > 0, x + log1p(exp(-x)), log1p(a * exp(lr))) }
 cfam("projected_normal", "Projected normal (isotropic)", list(P("m1", "real", link = "identity"), P("m2", "real", link = "identity")),
   formula = "Direction of a bivariate N((m1, m2), I) vector",
   lpdf = pn_lpdf, rng = function(n, p) atan2(stats::rnorm(n, p$m2), stats::rnorm(n, p$m1)),
