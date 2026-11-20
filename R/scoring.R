@@ -100,7 +100,10 @@ new_spec_dots <- function(spec) {
 #' @param rule Scoring rule passed to [scoring_rule()].
 #' @param group Optional grouping variable name; folds then hold out whole
 #'   groups.
-#' @param folds Optional integer vector assigning each row to a fold.
+#' @param folds Optional integer vector assigning each analysis row (the
+#'   `nobs()` rows used in the fit) to a fold; a vector with one entry per
+#'   row of the original data is also accepted and is restricted to the
+#'   analysis rows.
 #' @param seed Seed for the fold assignment.
 #' @return A list with `scores` (per observation), `estimate` (mean score),
 #'   `se` and `folds`.
@@ -112,12 +115,16 @@ new_spec_dots <- function(spec) {
 #' cv_regcomp(fit, K = 5)$estimate
 cv_regcomp <- function(object, K = 10, rule = "log", group = NULL, folds = NULL, seed = 1) {
   env <- environment(object$spec$formula %||% object$spec$formulas[[1]])
-  data <- as.data.frame(eval(object$call$data, env))
-  # Apply the fitted subset once; folds split the analysis rows.
-  if (!is.null(object$call$subset)) data <- data[eval(object$call$subset, data, env), , drop = FALSE]
+  # Folds split the stored analysis rows; external weights and data
+  # arguments are columns of that data, so they are split with the rows.
+  data <- object$model_data
+  if (is.null(data)) stop_unsupported("Cross validation of a fit without stored analysis rows (refit with this version)")
   ctrl <- if (is.null(object$call$control)) regcomp_control() else eval(object$call$control, env)
   n <- nrow(data)
-  if (!is.null(folds) && length(folds) != n) stop_input(sprintf("folds must have %d entries, one per analysis row.", n))
+  if (!is.null(folds) && length(folds) != n) {
+    if (length(folds) >= max(object$rows)) folds <- folds[object$rows]
+    else stop_input(sprintf("folds must have %d entries (one per analysis row) or one per row of the data.", n))
+  }
   if (is.null(folds)) {
     local_seed(seed)
     if (is.null(group)) folds <- sample(rep_len(seq_len(K), n))
@@ -127,6 +134,8 @@ cv_regcomp <- function(object, K = 10, rule = "log", group = NULL, folds = NULL,
   for (k in sort(unique(folds))) {
     test <- folds == k
     cl <- object$call; cl$data <- data[!test, , drop = FALSE]; cl$subset <- NULL
+    cl$weights <- object$model_args$weights
+    for (a in setdiff(names(object$model_args$dots), "")) if (!is.null(cl[[a]])) cl[[a]] <- object$model_args$dots[[a]]
     cl$control <- utils::modifyList(ctrl, list(hessian = FALSE))
     f <- eval(cl, env)
     sc[test] <- scoring_rule(f, data[test, , drop = FALSE], rule = rule, re = if (is.null(group)) "conditional" else "zero")

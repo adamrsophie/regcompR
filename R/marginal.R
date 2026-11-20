@@ -61,8 +61,10 @@ vcov.regcomp_fit <- function(object, type = c("model", "sandwich"), cluster = NU
   S <- obs_scores(object)
   if (!is.null(cluster)) {
     if (inherits(cluster, "formula"))
-      cluster <- eval(cluster[[2]], eval(object$call$data, environment(object$spec$formulas[[1]])), environment(cluster))
-    if (length(cluster) != nrow(S) || anyNA(cluster)) stop_input("cluster must have one nonmissing value per observation.")
+      cluster <- eval(cluster[[2]], object$model_data, environment(cluster))
+    else if (!is.null(object$rows) && length(cluster) != nrow(S) && length(cluster) >= max(object$rows))
+      cluster <- cluster[object$rows]
+    if (length(cluster) != nrow(S) || anyNA(cluster)) stop_input("cluster must have one nonmissing value per analysis row (or per row of the data).")
     S <- rowsum(S, as.character(cluster), reorder = FALSE)
     G <- nrow(S)
     if (G < 2) stop_input("A clustered sandwich covariance needs at least two clusters.")

@@ -106,8 +106,7 @@ regcomp <- function(formula, ..., family, data, engine = c("ml", "tmb", "bayes")
   if (isTRUE(fam$extra$no_regression))
     stop_unsupported("Regression", fam$id)
   data <- as.data.frame(data)
-  if (!is.null(subset)) data <- data[subset, , drop = FALSE]
-  mr <- model_rows(formula, dots, data, substitute(weights), parent.frame())
+  mr <- model_rows(formula, dots, data, substitute(weights), parent.frame(), subset = subset)
   spec <- build_spec(formula, mr$dots, fam, mr$data, weights = mr$weights,
                      links = links, fixed = fixed, env = parent.frame())
   spec$data_args <- dots[setdiff(names(spec$data_args), "")]
@@ -118,6 +117,12 @@ regcomp <- function(formula, ..., family, data, engine = c("ml", "tmb", "bayes")
     bayes = fit_bayes(spec, priors, control))
   fit$call <- cl
   fit$engine <- engine
+  # The analysis rows: their indices in the data, and the data with every
+  # external vector stored as a column, so cross validation and clustered
+  # covariances use exactly the fitted observations.
+  fit$rows <- mr$rows
+  fit$model_data <- mr$data
+  fit$model_args <- list(dots = mr$dots, weights = mr$weights)
   fit
 }
 
@@ -164,34 +169,89 @@ regcomp_control <- function(maxit = 1000, rel_tol = 1e-10, inner_maxit = 50,
        cores = cores, adapt_delta = adapt_delta, start = start)
 }
 
-# Rows used in a fit: weights must be finite and nonnegative; rows with a
-# missing value in any variable the model uses, or with zero weight, are
-# omitted (as na.omit does for glm).
-model_rows <- function(formula, dots, data, weights, env) {
+# Rows used in a fit. External vectors (weights and data arguments given
+# outside `data`) must have one value or one per row of `data`; they are
+# stored as reserved columns before any row is dropped, so they stay
+# aligned with the observations. Then `subset` is applied and rows with a
+# missing or non finite value in anything the model evaluates (response,
+# covariates after transformation and dot expansion, data arguments,
+# weights) or with zero weight are omitted, as na.omit does for glm.
+model_rows <- function(formula, dots, data, weights, env, subset = NULL) {
   n <- nrow(data)
-  # Weights and data arguments given as vectors outside `data` are stored
-  # as reserved columns so they stay aligned when rows are dropped.
   w <- if (is.null(weights)) NULL else eval(weights, data, env)
   if (!is.null(w)) {
     if (!is.numeric(w) || !length(w) %in% c(1L, n) || any(!is.finite(w) | w < 0))
-      stop_input("weights must be finite, nonnegative and have one value per row.")
+      stop_input(sprintf("weights must be finite, nonnegative and have one value or %d values (one per row of data).", n))
     data[["(weights)"]] <- rep_len(w, n)
-    # Weights named by columns of data keep their expression.
-    if (!length(setdiff(all.vars(weights), names(data)))) wname <- weights else wname <- as.name("(weights)")
+    # Weights given as a column expression of data keep it (so a dot in the
+    # formula leaves that column out); anything else uses the stored column.
+    wname <- if (length(all.vars(weights)) && !length(setdiff(all.vars(weights), names(data))) && length(w) == n) weights
+             else as.name("(weights)")
   }
   is_formula <- vapply(dots, function(d) inherits(tryCatch(eval(d, env), error = function(e) NULL), "formula"), TRUE)
   for (k in names(dots)[!is_formula & nzchar(names(dots))]) {
-    if (!length(setdiff(all.vars(dots[[k]]), names(data)))) next
     v <- tryCatch(eval(dots[[k]], data, env), error = function(e) NULL)
+    if (is.null(v)) next
+    if (!length(v) %in% c(1L, n))
+      stop_input(sprintf("The data argument '%s' must have one value or %d values (one per row of data); got %d.", k, n, length(v)))
+    if (!length(setdiff(all.vars(dots[[k]]), names(data)))) next
     if (length(v) == n && n > 1) { data[[paste0("(", k, ")")]] <- v; dots[[k]] <- as.name(paste0("(", k, ")")) }
   }
-  vars <- unique(c(all.vars(formula), unlist(lapply(seq_along(dots), function(i) {
-    if (is_formula[i]) all.vars(eval(dots[[i]], env)) else all.vars(dots[[i]]) }))))
-  vars <- intersect(vars, names(data))
-  keep <- if (length(vars)) stats::complete.cases(data[vars]) else rep(TRUE, n)
+  rows <- seq_len(n)
+  if (!is.null(subset)) {
+    rows <- rows[subset]
+    if (anyNA(rows)) stop_input("subset selects rows that are not in data.")
+    data <- data[rows, , drop = FALSE]; n <- nrow(data)
+  }
+  forms <- c(list(formula), lapply(dots[is_formula], eval, env))
+  bad <- rep(FALSE, n)
+  for (f in forms) bad <- bad | nonfinite_rows(f, data, env)
+  for (k in names(dots)[!is_formula & nzchar(names(dots))]) {
+    v <- tryCatch(eval(dots[[k]], data, env), error = function(e) NULL)
+    if (length(v) == n) bad <- bad | is.na(v)
+  }
+  keep <- !bad
   if (!is.null(w)) keep <- keep & data[["(weights)"]] > 0
   if (!any(keep)) stop_input("No rows remain after removing missing values and zero weights.")
-  list(data = data[keep, , drop = FALSE], dots = dots, weights = if (!is.null(w)) wname)
+  list(data = data[keep, , drop = FALSE], dots = dots, weights = if (!is.null(w)) wname, rows = rows[keep])
+}
+
+# Rows where a variable or term of a formula is missing or not finite after
+# evaluation: the response, each fixed effect term (a dot expands to the
+# other columns), the variables of random effect and smooth terms.
+nonfinite_rows <- function(f, data, env) {
+  n <- nrow(data); bad <- rep(FALSE, n)
+  mark <- function(v) {
+    if (is.null(v) || NROW(v) != n) return()
+    b <- if (is.numeric(v)) !is.finite(v) else is.na(v)
+    if (is.matrix(b)) b <- if (inherits(v, "regcomp_cens")) rowSums(is.na(unclass(v)[, c("lower", "upper"), drop = FALSE])) > 0 else rowSums(b) > 0
+    bad <<- bad | b
+  }
+  ev <- function(e) tryCatch(suppressWarnings(eval(e, data, env)), error = function(e) NULL)
+  if (length(f) == 3) {
+    y <- ev(f[[2]])
+    if (is.numeric(y) && is.matrix(y) && !inherits(y, "regcomp_cens")) mark(rowSums(is.na(y)) > 0) else mark(y)
+  }
+  rhs <- f[[length(f)]]
+  walk <- function(e) {
+    if (is.name(e)) {
+      nm <- as.character(e)
+      if (nm == ".") { for (cn in setdiff(names(data), all.vars(f[[2]]))) if (!startsWith(cn, "(")) mark(data[[cn]]) }
+      else mark(ev(e))
+      return()
+    }
+    if (!is.call(e)) return()
+    fn <- as.character(e[[1]])[1]
+    if (fn %in% c("+", "-", "*", ":", "/", "(", "^", "%in%")) { for (a in as.list(e)[-1]) walk(a); return() }
+    if (fn %in% c("|", "||") || is_smooth_call(e) || is_struct_call(e)) {
+      # Random effect and smooth terms: their variables must be present.
+      for (v in all.vars(e)) if (v %in% names(data)) mark(data[[v]])
+      return()
+    }
+    mark(ev(e))
+  }
+  walk(rhs)
+  bad
 }
 
 # Data frame for a model fitted without `data`: the formula variables from
