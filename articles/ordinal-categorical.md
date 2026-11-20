@@ -40,9 +40,9 @@ summary(fit)
 #>               estimate std_error   lower   upper       z p_value
 #> mu:x            0.6056    0.0998  0.4099  0.8013  6.0653       0
 #> mu:z           -0.3720    0.0863 -0.5412 -0.2028 -4.3091       0
-#> cuts:low|mid   -0.7929    0.1116 -1.0116 -0.5743 -7.1064       0
-#> cuts:mid|high   0.4777    0.1074  0.2671  0.6883  4.4460       0
-#> cuts:high|top   1.8334    0.1444  1.5505  2.1164 12.7003       0
+#> cuts:low|mid   -0.7929    0.1116 -1.0116 -0.5743 -7.1065       0
+#> cuts:mid|high   0.4777    0.1074  0.2671  0.6883  4.4462       0
+#> cuts:high|top   1.8334    0.1444  1.5505  2.1164 12.7002       0
 #> max |gradient| 1.63e-04; Hessian positive definite
 ```
 
@@ -83,7 +83,7 @@ also available, and random effects work as for any other family:
 fit_m <- regcomp(y ~ x + z + (1 | g), family = "cumulative_logit", data = d)
 exp(fit_m$theta)   # random intercept standard deviation (true value 0.7)
 #> mu:1 | g:log_sd((Intercept)) 
-#>                    0.5912711
+#>                     0.591244
 ```
 
 ## Nominal responses

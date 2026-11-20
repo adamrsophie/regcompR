@@ -117,51 +117,51 @@ for nested and <code>(1 | a) + (1 | b)</code> for crossed factors.</p>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; Wald estimates with 95% confidence intervals:</span></span>
 <span><span class="co">#&gt;                                      estimate std_error   lower   upper       z</span></span>
-<span><span class="co">#&gt; lambda:(Intercept)                     0.5495    0.0885  0.3760  0.7230  6.2082</span></span>
-<span><span class="co">#&gt; lambda:x                               0.5157    0.0799  0.3591  0.6723  6.4524</span></span>
-<span><span class="co">#&gt; lambda:1 + x | g:log_sd((Intercept))  -0.9795    0.2038 -1.3789 -0.5801 -4.8065</span></span>
+<span><span class="co">#&gt; lambda:(Intercept)                     0.5495    0.0885  0.3760  0.7230  6.2086</span></span>
+<span><span class="co">#&gt; lambda:x                               0.5157    0.0799  0.3591  0.6724  6.4524</span></span>
+<span><span class="co">#&gt; lambda:1 + x | g:log_sd((Intercept))  -0.9795    0.2038 -1.3789 -0.5801 -4.8069</span></span>
 <span><span class="co">#&gt; lambda:1 + x | g:log_sd(x)            -1.2338    0.2799 -1.7824 -0.6853 -4.4086</span></span>
-<span><span class="co">#&gt; lambda:1 + x | g:chol(x,(Intercept))  -0.0504    0.3680 -0.7717  0.6708 -0.1370</span></span>
+<span><span class="co">#&gt; lambda:1 + x | g:chol(x,(Intercept))  -0.0504    0.3680 -0.7717  0.6709 -0.1370</span></span>
 <span><span class="co">#&gt;                                      p_value</span></span>
-<span><span class="co">#&gt; lambda:(Intercept)                     0.000</span></span>
-<span><span class="co">#&gt; lambda:x                               0.000</span></span>
-<span><span class="co">#&gt; lambda:1 + x | g:log_sd((Intercept))   0.000</span></span>
-<span><span class="co">#&gt; lambda:1 + x | g:log_sd(x)             0.000</span></span>
-<span><span class="co">#&gt; lambda:1 + x | g:chol(x,(Intercept))   0.891</span></span>
+<span><span class="co">#&gt; lambda:(Intercept)                    0.0000</span></span>
+<span><span class="co">#&gt; lambda:x                              0.0000</span></span>
+<span><span class="co">#&gt; lambda:1 + x | g:log_sd((Intercept))  0.0000</span></span>
+<span><span class="co">#&gt; lambda:1 + x | g:log_sd(x)            0.0000</span></span>
+<span><span class="co">#&gt; lambda:1 + x | g:chol(x,(Intercept))  0.8911</span></span>
 <span><span class="co">#&gt; Hessian positive definite</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/utils/head.html" class="external-link">head</a></span><span class="op">(</span><span class="fu"><a href="../reference/ranef_regcomp.html">ranef_regcomp</a></span><span class="op">(</span><span class="va">fit</span><span class="op">)</span><span class="op">[[</span><span class="fl">1</span><span class="op">]</span><span class="op">]</span><span class="op">)</span></span>
 <span><span class="co">#&gt; $`1 + x | g`</span></span>
 <span><span class="co">#&gt;     (Intercept)            x</span></span>
-<span><span class="co">#&gt; 1   0.583953976 -0.180976405</span></span>
-<span><span class="co">#&gt; 2   0.478774418  0.280039187</span></span>
-<span><span class="co">#&gt; 3  -0.285989477  0.001552737</span></span>
-<span><span class="co">#&gt; 4  -0.210818050  0.376993659</span></span>
-<span><span class="co">#&gt; 5   0.335895388  0.149174549</span></span>
-<span><span class="co">#&gt; 6  -0.473180263  0.010998947</span></span>
-<span><span class="co">#&gt; 7  -0.113398016 -0.406484209</span></span>
-<span><span class="co">#&gt; 8  -0.062552842 -0.051806010</span></span>
-<span><span class="co">#&gt; 9  -0.096982088 -0.410287669</span></span>
-<span><span class="co">#&gt; 10  0.302163886  0.137121741</span></span>
-<span><span class="co">#&gt; 11  0.013591208 -0.181106309</span></span>
-<span><span class="co">#&gt; 12 -0.041372550  0.035688315</span></span>
-<span><span class="co">#&gt; 13  0.124967758 -0.049013675</span></span>
-<span><span class="co">#&gt; 14 -0.017122395 -0.309309737</span></span>
-<span><span class="co">#&gt; 15  0.004757044 -0.252649088</span></span>
-<span><span class="co">#&gt; 16  0.414068748 -0.040985010</span></span>
-<span><span class="co">#&gt; 17 -0.526187795  0.176747768</span></span>
-<span><span class="co">#&gt; 18 -0.033390871  0.150887666</span></span>
-<span><span class="co">#&gt; 19  0.081504511  0.070936374</span></span>
-<span><span class="co">#&gt; 20 -0.273611486  0.069174825</span></span>
-<span><span class="co">#&gt; 21  0.321336643 -0.208833897</span></span>
-<span><span class="co">#&gt; 22  0.026062551 -0.137347280</span></span>
-<span><span class="co">#&gt; 23  0.021894404  0.045967167</span></span>
-<span><span class="co">#&gt; 24 -0.041580489  0.002327874</span></span>
-<span><span class="co">#&gt; 25  0.834488983  0.370676919</span></span>
-<span><span class="co">#&gt; 26  0.028325640  0.108110993</span></span>
-<span><span class="co">#&gt; 27 -0.019605533  0.256644911</span></span>
-<span><span class="co">#&gt; 28 -0.327088361  0.049023344</span></span>
-<span><span class="co">#&gt; 29 -0.024225317 -0.174958803</span></span>
-<span><span class="co">#&gt; 30 -0.328385550  0.162459676</span></span>
+<span><span class="co">#&gt; 1   0.583929099 -0.180972803</span></span>
+<span><span class="co">#&gt; 2   0.478751753  0.280042955</span></span>
+<span><span class="co">#&gt; 3  -0.285983708  0.001543361</span></span>
+<span><span class="co">#&gt; 4  -0.210814667  0.376985749</span></span>
+<span><span class="co">#&gt; 5   0.335876984  0.149176474</span></span>
+<span><span class="co">#&gt; 6  -0.473163656  0.010990201</span></span>
+<span><span class="co">#&gt; 7  -0.113403071 -0.406488130</span></span>
+<span><span class="co">#&gt; 8  -0.062558484 -0.051810670</span></span>
+<span><span class="co">#&gt; 9  -0.096987898 -0.410290910</span></span>
+<span><span class="co">#&gt; 10  0.302147000  0.137122424</span></span>
+<span><span class="co">#&gt; 11  0.013581798 -0.181108213</span></span>
+<span><span class="co">#&gt; 12 -0.041378676  0.035682969</span></span>
+<span><span class="co">#&gt; 13  0.124956522 -0.049013906</span></span>
+<span><span class="co">#&gt; 14 -0.017131363 -0.309312740</span></span>
+<span><span class="co">#&gt; 15  0.004747919 -0.252650319</span></span>
+<span><span class="co">#&gt; 16  0.414047746 -0.040981870</span></span>
+<span><span class="co">#&gt; 17 -0.526162353  0.176744631</span></span>
+<span><span class="co">#&gt; 18 -0.033395476  0.150885710</span></span>
+<span><span class="co">#&gt; 19  0.081493809  0.070933571</span></span>
+<span><span class="co">#&gt; 20 -0.273605249  0.069168185</span></span>
+<span><span class="co">#&gt; 21  0.321316680 -0.208833315</span></span>
+<span><span class="co">#&gt; 22  0.026052690 -0.137350104</span></span>
+<span><span class="co">#&gt; 23  0.021885560  0.045963124</span></span>
+<span><span class="co">#&gt; 24 -0.041586699  0.002324960</span></span>
+<span><span class="co">#&gt; 25  0.834461443  0.370682108</span></span>
+<span><span class="co">#&gt; 26  0.028317080  0.108106409</span></span>
+<span><span class="co">#&gt; 27 -0.019611769  0.256640288</span></span>
+<span><span class="co">#&gt; 28 -0.327077449  0.049022255</span></span>
+<span><span class="co">#&gt; 29 -0.024232429 -0.174961272</span></span>
+<span><span class="co">#&gt; 30 -0.328376876  0.162451922</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">fit</span>, which <span class="op">=</span> <span class="st">"ranef"</span><span class="op">)</span></span></code></pre></div>
 <p><img src="hierarchical-longitudinal_files/figure-html/unnamed-chunk-3-1.png" class="r-plt" alt="" width="576"><img src="hierarchical-longitudinal_files/figure-html/unnamed-chunk-3-2.png" class="r-plt" alt="" width="576"></p>
 <p>The estimates, standard errors and log likelihood agree with lme4 and
@@ -177,7 +177,7 @@ differ in variability as well as in level.</p>
 <span><span class="va">fit2</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/regcomp.html">regcomp</a></span><span class="op">(</span><span class="va">z</span> <span class="op">~</span> <span class="va">x</span> <span class="op">+</span> <span class="op">(</span><span class="fl">1</span> <span class="op">|</span> <span class="va">g</span><span class="op">)</span>, <span class="va">sigma</span> <span class="op">~</span> <span class="fl">1</span> <span class="op">+</span> <span class="op">(</span><span class="fl">1</span> <span class="op">|</span> <span class="va">g</span><span class="op">)</span>, family <span class="op">=</span> <span class="st">"normal"</span>, data <span class="op">=</span> <span class="va">dat</span><span class="op">)</span></span>
 <span><span class="va">fit2</span><span class="op">$</span><span class="va">theta</span></span>
 <span><span class="co">#&gt;    mu:1 | g:log_sd((Intercept)) sigma:1 | g:log_sd((Intercept)) </span></span>
-<span><span class="co">#&gt;                       -0.644537                       -1.263162</span></span></code></pre></div>
+<span><span class="co">#&gt;                      -0.6445014                      -1.2631436</span></span></code></pre></div>
 </div>
 <div class="section level2">
 <h2 id="covariance-structures-for-longitudinal-data">Covariance structures for longitudinal data<a class="anchor" aria-label="anchor" href="#covariance-structures-for-longitudinal-data"></a>
@@ -232,7 +232,7 @@ models.</p>
 <span><span class="va">fmm</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/regcomp.html">regcomp</a></span><span class="op">(</span><span class="va">y</span> <span class="op">~</span> <span class="va">x</span> <span class="op">+</span> <span class="op">(</span><span class="fl">1</span> <span class="op">|</span> <span class="fu">mm</span><span class="op">(</span><span class="va">s1</span>, <span class="va">s2</span>, weights <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/cbind.html" class="external-link">cbind</a></span><span class="op">(</span><span class="va">w1</span>, <span class="va">w2</span><span class="op">)</span><span class="op">)</span><span class="op">)</span>, family <span class="op">=</span> <span class="st">"normal"</span>, data <span class="op">=</span> <span class="va">mmd</span><span class="op">)</span></span>
 <span><span class="va">fmm</span><span class="op">$</span><span class="va">theta</span></span>
 <span><span class="co">#&gt; mu:1 | mm(s1, s2, weights = cbind(w1, w2)):log_sd((Intercept)) </span></span>
-<span><span class="co">#&gt;                                                     -0.6498188</span></span></code></pre></div>
+<span><span class="co">#&gt;                                                     -0.6498441</span></span></code></pre></div>
 </div>
 <div class="section level2">
 <h2 id="marginal-models">Marginal models<a class="anchor" aria-label="anchor" href="#marginal-models"></a>
@@ -271,7 +271,7 @@ hazards.</p>
 <span><span class="va">fh</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/regcomp.html">regcomp</a></span><span class="op">(</span><span class="va">event</span> <span class="op">~</span> <span class="fu"><a href="https://rdrr.io/r/base/factor.html" class="external-link">factor</a></span><span class="op">(</span><span class="va">period</span><span class="op">)</span> <span class="op">+</span> <span class="va">x</span> <span class="op">+</span> <span class="op">(</span><span class="fl">1</span> <span class="op">|</span> <span class="va">cl</span><span class="op">)</span>, family <span class="op">=</span> <span class="st">"bernoulli"</span>, data <span class="op">=</span> <span class="va">pp</span><span class="op">)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/stats/coef.html" class="external-link">coef</a></span><span class="op">(</span><span class="va">fh</span><span class="op">)</span><span class="op">[</span><span class="st">"prob:x"</span><span class="op">]</span></span>
 <span><span class="co">#&gt;    prob:x </span></span>
-<span><span class="co">#&gt; 0.5543754</span></span></code></pre></div>
+<span><span class="co">#&gt; 0.5543546</span></span></code></pre></div>
 </div>
   </main><aside class="col-md-3"><nav id="toc" aria-label="Table of contents"><h2>On this page</h2>
     </nav></aside>

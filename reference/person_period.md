@@ -55,4 +55,5 @@ fit <- regcomp(event ~ factor(period) + x, family = "bernoulli",
                links = list(prob = "cloglog"), data = person_period(
                  data.frame(t = rpois(200, 3) + 1, d = rbinom(200, 1, 0.7),
                             x = rnorm(200)), "t", "d"))
+#> Warning: The Hessian is not positive definite; standard errors are unavailable or unreliable.
 ```
