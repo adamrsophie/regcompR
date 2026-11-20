@@ -172,7 +172,8 @@ posfam("log_logistic", "Log-logistic (Fisk)", list(P("scale", "positive", role =
   quantile = function(pr, p) p$scale * (pr / (1 - pr))^(1 / p$shape),
   mean = function(p) ifelse(p$shape > 1, p$scale * (pi / p$shape) / sin(pi / p$shape), NA),
   references = KLUG, reference = ref_impl("actuar", function(y, p) actuar::dllogis(y, p$shape, scale = p$scale, log = TRUE)),
-  stan = stan_native("loglogistic_lpdf({y} | {scale}, {shape})", "loglogistic_cdf({y} | {scale}, {shape})"),
+  stan = stan_native("loglogistic_lpdf({y} | {scale}, {shape})", "log(loglogistic_cdf({y} | {scale}, {shape}))",
+                     "log1m(loglogistic_cdf({y} | {scale}, {shape}))"),
   status = "validated")
 
 posfam("pareto", "Pareto (type I)", list(P("xm", "positive", role = "minimum", data = TRUE), shp("alpha")),

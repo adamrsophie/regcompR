@@ -68,8 +68,9 @@ stan_spec <- function(spec) {
   for (k in names(fam$pars)) fam$pars[[k]]$name <- k
   sub_t <- function(t) { if (is.null(t)) return(t)
     for (k in old[bad]) t <- gsub(paste0("{", k, "}"), paste0("{", rn(k), "}"), t, fixed = TRUE); t }
-  for (f in c("lpdf", "lcdf", "lccdf", "rng")) if (!is.null(fam$stan[[f]])) fam$stan[[f]] <- sub_t(fam$stan[[f]])
+  for (f in c("lpdf", "lcdf", "lccdf", "rng", "constraint")) if (!is.null(fam$stan[[f]])) fam$stan[[f]] <- sub_t(fam$stan[[f]])
   spec$fam <- fam
+  spec$stan_names <- stats::setNames(rn(old), old)
   spec$rpars <- rn(spec$rpars)
   for (f in c("preds", "links", "beta_idx", "fixed", "data_pars", "aux", "formulas", "Z"))
     if (length(spec[[f]])) names(spec[[f]]) <- rn(names(spec[[f]]))
@@ -79,6 +80,11 @@ stan_spec <- function(spec) {
 
 stan_program <- function(spec, priors = NULL) {
   spec <- stan_spec(spec)
+  # Priors name the user facing parameters (mu.1); map them to the Stan
+  # identifiers before matching.
+  if (!is.null(spec$stan_names)) priors[] <- lapply(priors, function(p) {
+    if (!is.null(p$par) && p$par %in% names(spec$stan_names)) p$par <- spec$stan_names[[p$par]]; p })
+  priors <- track_priors(priors)
   fam <- spec$fam
   if (is.null(fam$stan)) stop_unsupported("A Stan implementation", fam$id)
   if (!fam$variate_type %in% c("scalar", "categorical") && is.null(fam$stan$vector))
@@ -166,6 +172,9 @@ stan_program <- function(spec, priors = NULL) {
   for (k in intersect(names(spec$fixed), names(Filter(function(p) !is.null(p$estimate), fam$pars))))
     stop_unsupported("Fixed ordinal thresholds in Stan")
   lp <- stan_fill(fam$stan$lpdf, "y[i]", pm)
+  # Joint parameter constraints: reject draws outside the valid region.
+  guard <- if (!is.null(fam$stan$constraint))
+    sprintf("  for (i in 1:N) if (!(%s)) target += negative_infinity();", stan_fill(fam$stan$constraint, "y[i]", pm))
   lik <- if (!(censored || truncated)) {
     c("  for (i in 1:N) target += w[i] * " %+% lp %+% ";")
   } else {
@@ -191,7 +200,8 @@ stan_program <- function(spec, priors = NULL) {
             "data {", d, "}",
             "parameters {", par, "}",
             if (length(tpar)) c("transformed parameters {", tpar, "}"),
-            "model {", mdl, pri, lik, "}")
+            "model {", mdl, pri, guard, lik, "}")
+  check_priors_used(priors)
   paste(code, collapse = "\n")
 }
 
@@ -285,16 +295,24 @@ stan_struct_block <- function(b, j, priors) {
   par <- c(if (hom) sprintf("  real<lower=0> sdh_%d;", j) else sprintf("  vector<lower=0>[%s] sd_%d;", q, j),
            sprintf("  matrix[%s, %s] z_%d;", q, L, j))
   tpar <- if (hom) sprintf("  vector[%s] sd_%d = rep_vector(sdh_%d, %s);", q, j, j, q)
+  # A user prior on the scalar correlation of cs and ar1 blocks applies to
+  # rho; lkj is for correlation matrices and is refused here.
+  rho_prior <- function() {
+    cp <- find_prior(priors, "cor", b$par, b$label)
+    if (is.null(cp$text)) return(NULL)
+    if (cp$dist == "lkj") stop_unsupported(sprintf("An lkj prior for the scalar correlation of a block with structure %s (use, e.g., uniform(a, b) or normal(m, s))", b$struct))
+    "  " %+% prior_stan(cp, sprintf("rho_%d", j))
+  }
   pri <- c(sprintf("  to_vector(z_%d) ~ std_normal();", j),
            "  " %+% prior_stan(find_prior(priors, "sd", b$par, b$label), if (hom) sprintf("sdh_%d", j) else sprintf("sd_%d", j)))
   fill <- function(expr) c(sprintf("  matrix[%s, %s] Rc_%d;", q, q, j),
     sprintf("  for (a in 1:%s) for (c in 1:%s) Rc_%d[a, c] = a == c ? 1 + 1e-9 : %s;", q, q, j, expr))
   if (b$struct %in% c("cs", "homcs")) {
     par <- c(par, sprintf("  real<lower=-1.0 / (%s - 1), upper=1> rho_%d;", q, j))
-    tpar <- c(tpar, fill(sprintf("rho_%d", j)))
+    tpar <- c(tpar, fill(sprintf("rho_%d", j))); pri <- c(pri, rho_prior())
   } else if (b$struct == "ar1") {
     par <- c(par, sprintf("  real<lower=-1, upper=1> rho_%d;", j))
-    tpar <- c(tpar, fill(sprintf("rho_%d^abs(a - c)", j)))
+    tpar <- c(tpar, fill(sprintf("rho_%d^abs(a - c)", j))); pri <- c(pri, rho_prior())
   } else if (b$struct == "homdiag") {
     tpar <- c(tpar, fill("0"))
   } else {

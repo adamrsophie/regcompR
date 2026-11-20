@@ -5,6 +5,8 @@
 .aliases <- new.env(parent = emptyenv())
 
 register_family <- function(fam) {
+  if (!is.null(fam$stan) && is.null(fam$stan$constraint) && !is.null(stan_joint_constraints[[fam$id]]))
+    fam$stan$constraint <- stan_joint_constraints[[fam$id]]
   assign(fam$id, fam, envir = .registry)
   for (a in fam$aliases) assign(a, fam$id, envir = .aliases)
   invisible(fam)

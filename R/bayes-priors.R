@@ -72,10 +72,13 @@ find_prior <- function(priors, class, par, coef = NULL) {
   # The most specific matching entry wins (coefficient, then parameter,
   # then class); among equally specific entries the last one wins.
   hit <- NULL; best <- -1
-  for (p in priors) {
+  tr <- attr(priors, "track")
+  for (i in seq_along(priors)) {
+    p <- priors[[i]]
     if (p$class != class) next
     if (!is.null(p$par) && !identical(p$par, par)) next
     if (!is.null(p$coef) && !identical(p$coef, coef)) next
+    if (!is.null(tr)) tr$hit <- union(tr$hit, i)
     sp <- 2 * (!is.null(p$coef)) + (!is.null(p$par))
     if (sp >= best) { hit <- p; best <- sp }
   }
@@ -88,6 +91,25 @@ find_prior <- function(priors, class, par, coef = NULL) {
       cuts = list(dist = "normal", args = c(0, 5)))
   }
   hit
+}
+
+# Record which priors match a model quantity, so that a prior matching
+# nothing (a misspelled parameter, coefficient or term, or a class the model
+# does not have) is an error rather than silently ignored.
+track_priors <- function(priors) {
+  if (!length(priors)) return(priors)
+  attr(priors, "track") <- new.env()
+  priors
+}
+check_priors_used <- function(priors) {
+  tr <- attr(priors, "track")
+  if (is.null(tr)) return(invisible())
+  un <- setdiff(seq_along(priors), tr$hit)
+  if (length(un)) stop_input(sprintf("These priors match nothing in the model: %s. Check par, class and coef.",
+    paste(vapply(priors[un], function(p) sprintf("%s (class %s%s%s)", p$text, p$class,
+      if (is.null(p$par)) "" else paste0(", par ", p$par), if (is.null(p$coef)) "" else paste0(", coef ", p$coef)), ""),
+      collapse = "; ")))
+  invisible()
 }
 
 prior_stan <- function(p, target) {

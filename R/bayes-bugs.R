@@ -42,6 +42,7 @@ bugs_code <- function(formula, ..., family, data, weights = NULL, links = NULL,
 }
 
 bugs_program <- function(spec, priors = NULL, dialect = "jags") {
+  priors <- track_priors(priors)
   fam <- spec$fam
   bg <- fam$bugs
   if (is.null(bg)) stop_unsupported("A BUGS language implementation", fam$id)
@@ -102,6 +103,7 @@ bugs_program <- function(spec, priors = NULL, dialect = "jags") {
              "  }")
     }
   }
+  check_priors_used(priors)
   paste(c(L, "}"), collapse = "\n")
 }
 

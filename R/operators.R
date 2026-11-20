@@ -135,9 +135,9 @@ inflate <- function(base, at = 0, names = NULL) {
     P(n, "unit", role = "inflation", interpretation = "Probability of the added point mass")), names))
   stan <- NULL
   if (!is.null(base$stan) && k == 1 && !has_atoms(base)) {
-    fn <- sprintf("rc_inflate_%s_%s", stan_ident(base$id), gsub("[^0-9a-z]", "", tolower(format(at))))
-    args <- stan_args(base$pars, bnames)
-    pm <- stats::setNames(lapply(bnames, identity), bnames)
+    fn <- stan_fn_name(paste0("inflate_", base$id), paste(base$id, format(at)))
+    args <- stan_args(base$pars, bnames, stan_ident(bnames))
+    pm <- stats::setNames(as.list(stan_ident(bnames)), bnames)
     yt <- if (base$discrete) "int" else "real"
     blp <- stan_fill(base$stan$lpdf, "y", pm)
     body <- if (base$discrete) sprintf(
@@ -153,9 +153,9 @@ inflate <- function(base, at = 0, names = NULL) {
   }
   real %1$s_lccdf(%2$s y, %3$s, real pi) {
     return log1m_exp(%1$s_lcdf(y | %6$s, pi));
-  }", fn, yt, args, format(at), bl, paste(bnames, collapse = ", "))
+  }", fn, yt, args, format(at), bl, paste(stan_ident(bnames), collapse = ", "))
     } else ""
-    stan <- list(native = FALSE, needs = base$stan$needs,
+    stan <- list(native = FALSE, needs = base$stan$needs, constraint = base$stan$constraint,
       functions = paste0(base$stan$functions, sprintf("
   real %s_%s(%s y, %s, real pi) {
 %s
@@ -300,13 +300,13 @@ hurdle <- function(base, at = 0, name = "hu") {
     interpretation = "Probability of the hurdle value")), name))
   stan <- NULL
   if (!is.null(base$stan) && !has_atoms(base)) {
-    fn <- sprintf("rc_hurdle_%s", stan_ident(base$id))
-    args <- stan_args(base$pars, bnames)
-    pm <- stats::setNames(lapply(bnames, identity), bnames)
+    fn <- stan_fn_name(paste0("hurdle_", base$id), paste(base$id, format(at)))
+    args <- stan_args(base$pars, bnames, stan_ident(bnames))
+    pm <- stats::setNames(as.list(stan_ident(bnames)), bnames)
     yt <- if (base$discrete) "int" else "real"
     blp <- stan_fill(base$stan$lpdf, "y", pm)
     b0 <- if (base$discrete) sprintf("log1m_exp(%s)", stan_fill(base$stan$lpdf, format(at), pm)) else "0"
-    stan <- list(native = FALSE, needs = base$stan$needs,
+    stan <- list(native = FALSE, needs = base$stan$needs, constraint = base$stan$constraint,
       functions = paste0(base$stan$functions, sprintf("
   real %s_%s(%s y, %s, real pi) {
     if (y == %s) return log(pi);
@@ -400,9 +400,9 @@ truncate_dist <- function(base, lower = -Inf, upper = Inf) {
   }
   stan <- NULL
   if (!is.null(base$stan) && !is.null(base$stan$lcdf)) {
-    fn <- sprintf("rc_trunc_%s", stan_ident(base$id))
-    pm <- stats::setNames(lapply(bn, identity), bn)
-    args <- stan_args(base$pars, bn)
+    fn <- stan_fn_name(paste0("trunc_", base$id), paste(base$id, format(lower), format(upper)))
+    pm <- stats::setNames(as.list(stan_ident(bn)), bn)
+    args <- stan_args(base$pars, bn, stan_ident(bn))
     yt <- if (base$discrete) "int" else "real"
     nrm <- if (is.finite(lower) && is.finite(upper))
       sprintf("log_diff_exp(%s, %s)", stan_fill(base$stan$lcdf, format(upper), pm), stan_fill(base$stan$lcdf, format(lo_q), pm))
@@ -410,7 +410,7 @@ truncate_dist <- function(base, lower = -Inf, upper = Inf) {
       else stan_fill(base$stan$lcdf, format(upper), pm)
     guard <- paste(c(if (is.finite(lower)) sprintf("y < %s", format(lower)),
                      if (is.finite(upper)) sprintf("y > %s", format(upper))), collapse = " || ")
-    stan <- list(native = FALSE, needs = base$stan$needs,
+    stan <- list(native = FALSE, needs = base$stan$needs, constraint = base$stan$constraint,
       functions = paste0(base$stan$functions, sprintf("
   real %s_%s(%s y, %s) {
     if (%s) return negative_infinity();
@@ -524,7 +524,8 @@ mixture <- function(...) {
   }
   stan <- NULL
   if (all(vapply(comps, function(f) !is.null(f$stan), TRUE)) && !atomic) {
-    fn <- paste0("rc_mix_", paste(vapply(comps, function(f) stan_ident(f$id), ""), collapse = "_"))
+    fn <- stan_fn_name(paste0("mix_", paste(vapply(comps, `[[`, "", "id"), collapse = "_")),
+                       paste(vapply(comps, `[[`, "", "id"), collapse = "\r"))
     yt <- if (disc[1]) "int" else "real"
     args <- stan_args(pars, names(pars), stan_ident(names(pars)))
     terms <- vapply(seq_len(K), function(k) {
@@ -532,7 +533,11 @@ mixture <- function(...) {
       sprintf("log(w[%d]) + %s", k, stan_fill(comps[[k]]$stan$lpdf, "y", pm))
     }, "")
     funs <- unique(vapply(comps, function(f) f$stan$functions, ""))
+    # Component constraints, with the component parameters renamed.
+    cons <- unlist(lapply(seq_len(K), function(k) if (!is.null(comps[[k]]$stan$constraint))
+      stan_fill(comps[[k]]$stan$constraint, "y", stats::setNames(as.list(sprintf("{%s}", cmap[[k]])), names(cmap[[k]])))))
     stan <- list(native = FALSE, needs = unique(unlist(lapply(comps, function(f) f$stan$needs))),
+      constraint = if (length(cons)) paste(sprintf("(%s)", cons), collapse = " && "),
       functions = paste0(paste(funs, collapse = "\n"), sprintf("
   real %s_%s(%s y, %s) {
     vector[%d] w = softmax([0, %s]');

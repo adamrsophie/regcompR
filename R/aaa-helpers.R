@@ -17,6 +17,29 @@ stan_native <- function(lpdf, lcdf = NULL, lccdf = NULL, rng = NULL,
        functions = functions)
 }
 
+# Joint parameter constraints that links cannot express, as Stan conditions
+# that hold on the valid region. The generated model rejects any draw that
+# violates them (target is negative infinity), as the R check does.
+stan_joint_constraints <- list(
+  generalized_log_series = "{theta} * {beta} < 1",
+  generalized_poisson = "{lambda} > fmax(-1, -{theta} / 4) && {lambda} < 1",
+  generalized_poisson_mean = "{lambda} > -1 && {lambda} < 1",
+  nig = "abs({beta}) < {alpha}",
+  discrete_uniform = "{b} >= {a}",
+  truncated_normal = "{a} < {b}",
+  hypergeometric = "{k} <= {m} + {n}",
+  negative_hypergeometric = "{r} <= {K} && {K} <= {N}")
+
+# Stan function name for a package generated helper: a readable prefix and
+# a hash of the full family id, so different operator settings (bounds,
+# points, components) never share a name.
+stan_fn_name <- function(prefix, id) {
+  h <- 5381
+  for (b in utf8ToInt(id)) h <- (h * 33 + b) %% 2147483647
+  base <- gsub("_+", "_", gsub("[^A-Za-z0-9]", "_", prefix))
+  sprintf("rc_%s_%08x", sub("_$", "", substr(base, 1, 40)), as.integer(h))
+}
+
 # Stan template helper for package generated functions.
 stan_generated <- function(functions, lpdf, lcdf = NULL, lccdf = NULL,
                            rng = NULL, needs = character()) {
