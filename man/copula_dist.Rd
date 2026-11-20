@@ -7,7 +7,8 @@
 copula_dist(m1, m2, copula = c("gaussian", "clayton", "gumbel", "frank"))
 }
 \arguments{
-\item{m1, m2}{Margin families (both continuous or both discrete).}
+\item{m1, m2}{Scalar margin families (continuous, discrete, or continuous
+with point masses).}
 
 \item{copula}{Copula name.}
 }
@@ -20,7 +21,10 @@ Joint law of a pair \verb{(y1, y2)} with margins \code{m1}, \code{m2} and a copu
 (\code{theta > 1}, parameterized as \code{1 + exp(eta)}) or \code{"frank"} (\code{theta}
 real, not 0). For continuous margins the log density is
 \verb{log c(F1(y1), F2(y2)) + log f1(y1) + log f2(y2)}; for discrete margins
-the rectangle probability \verb{C(F1, F2) - C(F1-, F2) - C(F1, F2-) + C(F1-, F2-)} is used (Trivedi and Zimmer 2007). Margin parameters get
+the rectangle probability \verb{C(F1, F2) - C(F1-, F2) - C(F1, F2-) + C(F1-, F2-)} is used (Trivedi and Zimmer 2007). Margins may differ in
+type, and continuous margins may have point masses: at a jump of one
+margin and a continuous value of the other the density is
+\verb{(h(F1, F2) - h(F1-, F2)) f2(y2)} with \code{h = dC/dv}. Margin parameters get
 suffixes \code{.1} and \code{.2}; every parameter can take a formula, giving
 copula regression. The response is \code{cbind(y1, y2)}.
 }

@@ -154,6 +154,12 @@ model_family <- function(family, parameterization, formula, data) {
 #'   `"cmdstanr"` or `"rstan"` for Stan, `"jags"` through 'R2jags' or
 #'   `"openbugs"` through 'R2OpenBUGS') and parallel chains.
 #' @param adapt_delta Target acceptance for NUTS.
+#' @param init Initial values for the Stan runners: a radius for uniform
+#'   initial values on the unconstrained scale (the default is 2), or a list
+#'   with one named list per chain using the parameter names of the
+#'   generated program (`b_mu`, `b_mu_1`, ...). Useful for multimodal
+#'   posteriors such as mixtures, where a chain started in another mode
+#'   stays there.
 #' @param start Optional named list of starting values for the coefficients
 #'   of each parameter (vectors on the link scale).
 #' @param prox_maxit,prox_tol Iteration limit and relative step tolerance of
@@ -169,13 +175,13 @@ regcomp_control <- function(maxit = 1000, rel_tol = 1e-10, inner_maxit = 50,
                             iter_sampling = 1000, seed = 1,
                             runner = c("bayescompR", "cmdstanr", "rstan", "jags", "openbugs"),
                             cores = 1, adapt_delta = 0.8, start = NULL,
-                            prox_maxit = 5000, prox_tol = 1e-8) {
+                            prox_maxit = 5000, prox_tol = 1e-8, init = NULL) {
   list(maxit = maxit, rel_tol = rel_tol, inner_maxit = inner_maxit,
        inner_tol = inner_tol, restarts = restarts, hessian = hessian,
        trace = trace, chains = chains, iter_warmup = iter_warmup,
        iter_sampling = iter_sampling, seed = seed, runner = match.arg(runner),
        cores = cores, adapt_delta = adapt_delta, start = start,
-       prox_maxit = prox_maxit, prox_tol = prox_tol)
+       prox_maxit = prox_maxit, prox_tol = prox_tol, init = init)
 }
 
 # Rows used in a fit. External vectors (weights and data arguments given

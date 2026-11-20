@@ -41,7 +41,7 @@ run_stan <- function(code, data, control, runner) {
     f <- bayescompR::bayescomp_sample(m, chains = control$chains, iter_warmup = control$iter_warmup,
                                       iter_sampling = control$iter_sampling, seed = control$seed,
                                       refresh = 0, adapt_delta = control$adapt_delta,
-                                      cores = control$cores)
+                                      cores = control$cores, init = control$init %||% 2)
     arr <- bayescompR::bayescomp_draws(f, format = "array")
     div <- tryCatch(sum(bayescompR::bayescomp_draws(f, variables = "divergent__", format = "matrix")),
                     error = function(e) NA)
@@ -55,16 +55,18 @@ run_stan <- function(code, data, control, runner) {
     f <- m$sample(data = data, chains = control$chains, iter_warmup = control$iter_warmup,
                   iter_sampling = control$iter_sampling, seed = control$seed, refresh = 0,
                   adapt_delta = control$adapt_delta, parallel_chains = control$cores,
-                  show_messages = FALSE, show_exceptions = FALSE)
+                  init = control$init, show_messages = FALSE, show_exceptions = FALSE)
     arr <- unclass(f$draws())
     div <- tryCatch(sum(f$diagnostic_summary(quiet = TRUE)$num_divergent), error = function(e) NA)
     return(list(draws = arr, language = "stan", sampler = f, divergences = div))
   }
   if (!requireNamespace("rstan", quietly = TRUE))
     stop_unsupported("The 'rstan' runner needs the 'rstan' package; it")
+  ini <- control$init %||% 2
   f <- rstan::stan(model_code = code, data = data, chains = control$chains,
                    warmup = control$iter_warmup, iter = control$iter_warmup + control$iter_sampling,
                    seed = control$seed, refresh = 0, cores = control$cores,
+                   init = if (is.numeric(ini)) "random" else ini, init_r = if (is.numeric(ini)) ini else 2,
                    control = list(adapt_delta = control$adapt_delta))
   arr <- as.array(f)
   div <- tryCatch(sum(rstan::get_divergent_iterations(f)), error = function(e) NA)

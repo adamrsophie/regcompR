@@ -7,11 +7,6 @@ new_par_name <- function(base, nm) {
 
 sub_pars <- function(p, names) p[intersect(names(p), names)]
 
-# Continuous laws with point masses (see has_atoms()). Operators whose
-# formulas assume a density reject them.
-reject_atoms <- function(f, what) if (has_atoms(f))
-  stop_unsupported(sprintf("%s of a continuous law with point masses", what), f$id)
-
 op_family <- function(base, id, display, pars, lpdf, cdf = NULL, lccdf = NULL,
                       quantile = NULL, rng = NULL, mean = NULL, variance = NULL,
                       support = NULL, discrete = base$discrete, stan = NULL, bugs = NULL,
@@ -351,7 +346,7 @@ hurdle <- function(base, at = 0, name = "hu") {
 #' tn <- truncate_dist("normal", lower = 0)
 truncate_dist <- function(base, lower = -Inf, upper = Inf) {
   base <- get_family(base)
-  reject_atoms(base, "Truncation")
+  atomic <- has_atoms(base)
   if (lower == -Inf && upper == Inf) return(base)
   if (base$variate_type != "scalar") stop_unsupported("Truncation of a vector valued law", base$id)
   if (lower >= upper) stop_input("lower must be smaller than upper.")
@@ -360,19 +355,24 @@ truncate_dist <- function(base, lower = -Inf, upper = Inf) {
   lo_q <- if (base$discrete) lower - lattice_step(base) else lower
   # Log normalizer and conditional probabilities in log space, so a region
   # far in a tail keeps its mass.
-  lnorm <- function(p) { n <- max(lengths(p))
-    family_log_interval(base, rep(lo_q, n), rep(upper, n), recycle_pars(p, n)) }
+  # A law with point masses keeps the atoms at both bounds: the region is
+  # [lower, upper], with mass F(upper) - F(lower-).
+  Fleft <- function(n, pp) if (is.finite(lower)) family_cdf_left(base, rep(lower, n), pp) else rep(0, n)
+  lnorm <- function(p) { n <- max(lengths(p)); pp <- recycle_pars(p, n)
+    if (atomic) return(log(family_cdf(base, rep(upper, n), pp) - Fleft(n, pp)))
+    family_log_interval(base, rep(lo_q, n), rep(upper, n), pp) }
   lpdf <- function(y, p) eval_lpdf(base, y, p) - lnorm(p)
   cdf <- function(q, p) {
     n <- length(q); pp <- recycle_pars(p, n)
     qq <- pmin(pmax(q, lower), upper)
-    out <- exp(family_log_interval(base, rep(lo_q, n), qq, pp) - lnorm(pp))
+    out <- if (atomic) (family_cdf(base, qq, pp) - Fleft(n, pp)) / exp(lnorm(pp))
+           else exp(family_log_interval(base, rep(lo_q, n), qq, pp) - lnorm(pp))
     out[q < lower] <- 0; out[q >= upper] <- 1
     pmin(pmax(out, 0), 1)
   }
   quantile <- function(pr, p) {
     n <- length(pr); pp <- recycle_pars(p, n)
-    Fl <- if (is.finite(lo_q)) family_cdf(base, rep(lo_q, n), pp) else rep(0, n)
+    Fl <- if (atomic) Fleft(n, pp) else if (is.finite(lo_q)) family_cdf(base, rep(lo_q, n), pp) else rep(0, n)
     Fu <- if (is.finite(upper)) family_cdf(base, rep(upper, n), pp) else rep(1, n)
     out <- family_quantile(base, Fl + pr * (Fu - Fl), pp)
     # Where the region is too far in a tail for that, solve on the log scale.
@@ -399,7 +399,8 @@ truncate_dist <- function(base, lower = -Inf, upper = Inf) {
     list(lower = pmax(s$lower, lower), upper = pmin(s$upper, upper))
   }
   stan <- NULL
-  if (!is.null(base$stan) && !is.null(base$stan$lcdf)) {
+  # The Stan normalizer F(upper) - F(lower) would drop a point mass at lower.
+  if (!is.null(base$stan) && !is.null(base$stan$lcdf) && !atomic) {
     fn <- stan_fn_name(paste0("trunc_", base$id), paste(base$id, format(lower), format(upper)))
     pm <- stats::setNames(as.list(stan_ident(bn)), bn)
     args <- stan_args(base$pars, bn, stan_ident(bn))
@@ -424,6 +425,9 @@ truncate_dist <- function(base, lower = -Inf, upper = Inf) {
             base$pars, lpdf, cdf = cdf, quantile = quantile,
             rng = function(n, p) quantile(stats::runif(n), p),
             support = support, stan = stan,
+            atom = if (atomic) function(y, p) ifelse(y >= lower & y <= upper, family_atom(base, y, p) / exp(lnorm(p)), 0),
+            extra = if (atomic && !is.null(base$extra$atom_points)) {
+              pts <- base$extra$atom_points; list(atom_points = pts[pts >= lower & pts <= upper]) } else list(),
             operator = list(type = "truncate", base = base, lower = lower, upper = upper),
             formula = "f(y) / (F(upper) - F(lower-)) on the retained region")
 }
@@ -594,7 +598,9 @@ transform_dist <- function(base, transform = c("log", "exp", "logit", "inv_logit
                            increasing = TRUE, support = NULL) {
   base <- get_family(base)
   if (base$discrete) stop_unsupported("Monotone transformation of a discrete law (use discretize())", base$id)
-  reject_atoms(base, "Monotone transformation")
+  atomic <- has_atoms(base)
+  if (atomic && is.null(base$extra$atom_points))
+    stop_unsupported("Monotone transformation of a law whose point mass locations are unknown", base$id)
   label <- "custom"
   if (is.null(forward)) {
     transform <- match.arg(transform)
@@ -614,16 +620,30 @@ transform_dist <- function(base, transform = c("log", "exp", "logit", "inv_logit
     if (anyNA(c(a, b))) stop_domain("The transformation is not defined on the whole support of the base law.")
     list(lower = pmin(a, b), upper = pmax(a, b))
   }
-  lpdf <- function(y, p) eval_lpdf(base, inverse(y), p) + log_jacobian(y)
+  # Point masses move to forward(c) with their mass and no Jacobian; the
+  # base atom is looked up at its exact location (inverse() may round).
+  pts <- base$extra$atom_points
+  at_pts <- function(y) { if (!atomic) return(rep(NA_real_, length(y)))
+    fp <- suppressWarnings(forward(pts))
+    vapply(y, function(v) { k <- which(abs(fp - v) <= 1e-10 * pmax(1, abs(v)) | fp == v); if (length(k)) pts[k[1]] else NA_real_ }, 0) }
+  atom <- if (atomic) function(y, p) { c0 <- at_pts(y); out <- rep(0, length(y)); k <- !is.na(c0)
+    if (any(k)) out[k] <- family_atom(base, c0[k], lapply(p, function(v) rep_len(v, length(y))[k])); out }
+  lpdf <- function(y, p) {
+    out <- eval_lpdf(base, inverse(y), p) + log_jacobian(y)
+    if (atomic) { c0 <- at_pts(y); k <- !is.na(c0)
+      if (any(k)) out[k] <- eval_lpdf(base, c0[k], lapply(p, function(v) rep_len(v, length(y))[k])) }
+    out
+  }
   cdf <- function(q, p) {
-    v <- family_cdf(base, inverse(q), p)
-    if (increasing) v else 1 - v
+    x <- inverse(q)
+    if (increasing) family_cdf(base, x, p) else 1 - family_cdf_left(base, x, p)
   }
   quantile <- function(pr, p) forward(family_quantile(base, if (increasing) pr else 1 - pr, p))
   rng <- function(n, p) forward(family_rng(base, n, p))
   op_family(base, sprintf("transform(%s, %s)", base$id, label),
             sprintf("%s transformed (%s)", base$display_name, label), base$pars,
-            lpdf, cdf = cdf, quantile = quantile, rng = rng, support = sup,
+            lpdf, cdf = cdf, quantile = quantile, rng = rng, support = sup, atom = atom,
+            extra = if (atomic) list(atom_points = sort(suppressWarnings(forward(pts)))) else list(),
             operator = list(type = "transform", base = base, transform = label),
             formula = "log f_Y(y) = log f_X(g^-1(y)) + log |d g^-1(y)/dy|")
 }
@@ -675,7 +695,7 @@ discretize <- function(base, offset = 0) {
 round_dist <- function(base, digits = 0) {
   base <- get_family(base)
   if (base$discrete) stop_input("The base law is already discrete.")
-  reject_atoms(base, "Rounding")
+  # Bins are (y - h/2, y + h/2]; point masses of the base fall in their bin.
   h <- 10^-digits
   f <- family_def(
     sprintf("round(%s, %d)", base$id, as.integer(digits)), sprintf("Rounded %s", base$display_name),
@@ -683,7 +703,7 @@ round_dist <- function(base, digits = 0) {
     lpdf = function(y, p) family_log_interval(base, y - h / 2, y + h / 2, recycle_pars(p, length(y))),
     cdf = function(q, p) family_cdf(base, floor(q / h + 1e-9) * h + h / 2, p),
     quantile = function(pr, p) ceiling((family_quantile(base, pr, p) - h / 2) / h - 1e-9) * h,
-    rng = function(n, p) round(family_rng(base, n, p) / h) * h,
+    rng = function(n, p) ceiling(family_rng(base, n, p) / h - 0.5) * h,
     support = function(p) { s <- base$support(p); g <- function(x) ifelse(is.finite(x), ceiling((x - h / 2) / h - 1e-9) * h, x)
       list(lower = g(s$lower), upper = g(s$upper)) },
     status = "implemented", numeric_moments = FALSE,

@@ -13,6 +13,12 @@
 * The multivariate hypergeometric law takes the number of draws `size`.
 * Finite difference scores and Hessians respect joint parameter
   constraints.
+* Truncation, censoring, rounding, monotone transformations, splicing,
+  CDF generators, convolutions (including two laws that both have point
+  masses) and copulas now accept continuous laws with point masses;
+  copula margins may also differ in type (a count and a continuous
+  amount, say).
+* `regcomp_control(init = )` sets initial values for the Stan runners.
 * Registry of 278 distribution families with densities, distribution
   functions, quantiles, random generation, moments and references.
 * Distributional regression by maximum likelihood with a Laplace

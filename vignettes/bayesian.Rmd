@@ -118,6 +118,21 @@ fit_ob <- regcomp(y ~ x + (1 | g), family = "poisson", data = d, engine = "bayes
                   control = regcomp_control(runner = "openbugs"))
 ```
 
+Mixture posteriors are multimodal: a chain started near the label swapped
+mode stays there, which the R-hat warning reports. Informative priors on
+the component parameters together with `init`, a list with one named list
+of starting values per chain using the names of the generated program,
+keep every chain in the intended mode:
+
+```{r, eval = FALSE}
+ym <- c(rnorm(150, -2, 1), rnorm(150, 2, 0.7))
+ini <- rep(list(list(b_mu_1 = array(-2), b_mu_2 = array(2))), 4)
+fm <- regcomp(y ~ 1, family = mixture("normal", "normal"), data = data.frame(y = ym), engine = "bayes",
+              priors = c(prior("normal(-2, 0.5)", par = "mu.1", class = "Intercept"),
+                         prior("normal(2, 0.5)", par = "mu.2", class = "Intercept")),
+              control = regcomp_control(runner = "cmdstanr", init = ini))
+```
+
 `predict()` for a Bayesian fit summarizes the posterior of the conditional
 quantity (for `"variance"`, the posterior mean of the conditional
 variance); `scoring_rule()` uses the posterior predictive law.

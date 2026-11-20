@@ -230,6 +230,9 @@ invert_cdf <- function(cdf, p, pars, discrete, lower = -Inf, upper = Inf,
     } else {
       lo <- if (is.finite(lower[i])) lower[i] else start[i] - 1
       hi <- if (is.finite(upper[i])) upper[i] else start[i] + 1
+      # A point mass at the lower bound holds this quantile; jumps inside
+      # the support still bracket a sign change.
+      if (is.finite(lower[i]) && F(lower[i]) >= 0) { out[i] <- lower[i]; next }
       w <- 1
       while (!is.finite(lower[i]) && F(lo) > 0) {
         w <- w * 2; lo <- start[i] - w

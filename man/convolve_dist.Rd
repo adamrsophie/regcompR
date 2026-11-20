@@ -7,7 +7,9 @@
 convolve_dist(a, b)
 }
 \arguments{
-\item{a, b}{Families, both continuous or both discrete.}
+\item{a, b}{Families, both continuous (possibly with point masses at
+known places, which give point masses of the sum at the sums of their
+locations) or both discrete.}
 }
 \value{
 A \code{regcomp_family}.

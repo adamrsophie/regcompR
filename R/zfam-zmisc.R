@@ -180,9 +180,13 @@ censor <- function(base, lower = -Inf, upper = Inf) {
   if (lower >= upper) stop_input("lower must be smaller than upper.")
   if (base$discrete && any(is.finite(c(lower, upper)) & abs(c(lower, upper) - round(c(lower, upper))) > 1e-12))
     stop_input("Censoring bounds of a discrete law must be integers.")
-  # Upper censoring keeps P(Y >= upper); for counts that is 1 - F(upper - 1).
-  reject_atoms(base, "Censoring")
+  # Upper censoring keeps P(Y >= upper); for counts that is 1 - F(upper - 1),
+  # and for a law with point masses 1 - F(upper-).
+  atomic <- has_atoms(base)
+  if (atomic && is.null(base$extra$atom_points))
+    stop_unsupported("Censoring a law whose point mass locations are unknown", base$id)
   lccdf <- function(q, p) { if (base$discrete) q <- q - lattice_step(base)
+    if (atomic) return(log1p(-family_cdf_left(base, q, p)))
     if (!is.null(base$lccdf)) base$lccdf(q, p) else log1p(-family_cdf(base, q, p)) }
   lpdf <- function(y, p) {
     out <- eval_lpdf(base, y, p)
@@ -200,9 +204,12 @@ censor <- function(base, lower = -Inf, upper = Inf) {
                  lpdf, cdf = cdf, rng = function(n, p) pmin(pmax(family_rng(base, n, p), lower), upper),
                  quantile = function(pr, p) pmin(pmax(family_quantile(base, pr, p), lower), upper),
                  support = support, operator = list(type = "censor", base = base, lower = lower, upper = upper),
-                 extra = if (!base$discrete) list(atom_points = c(lower, upper)[is.finite(c(lower, upper))]) else list(),
+                 extra = if (!base$discrete) { bp <- base$extra$atom_points
+                   list(atom_points = sort(unique(c(c(lower, upper)[is.finite(c(lower, upper))], bp[bp > lower & bp < upper])))) } else list(),
                  atom = if (!base$discrete) function(y, p) {
                    out <- rep(0, length(y)); lo <- y == lower; hi <- y == upper
+                   mid <- y > lower & y < upper
+                   if (atomic && any(mid)) out[mid] <- family_atom(base, y[mid], lapply(p, `[`, mid))
                    if (any(lo)) out[lo] <- family_cdf(base, y[lo], lapply(p, `[`, lo))
                    if (any(hi)) out[hi] <- exp(lccdf(y[hi], lapply(p, `[`, hi)))
                    out },

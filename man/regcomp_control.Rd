@@ -21,7 +21,8 @@ regcomp_control(
   adapt_delta = 0.8,
   start = NULL,
   prox_maxit = 5000,
-  prox_tol = 1e-08
+  prox_tol = 1e-08,
+  init = NULL
 )
 }
 \arguments{
@@ -53,6 +54,13 @@ of each parameter (vectors on the link scale).}
 \item{prox_maxit, prox_tol}{Iteration limit and relative step tolerance of
 the proximal gradient (FISTA) solver used for lasso type penalties
 (\code{maxit} and \code{rel_tol} apply to \code{nlminb()} only).}
+
+\item{init}{Initial values for the Stan runners: a radius for uniform
+initial values on the unconstrained scale (the default is 2), or a list
+with one named list per chain using the parameter names of the
+generated program (\code{b_mu}, \code{b_mu_1}, ...). Useful for multimodal
+posteriors such as mixtures, where a chain started in another mode
+stays there.}
 }
 \value{
 A list.

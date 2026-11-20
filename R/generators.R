@@ -4,7 +4,7 @@
 
 gen_family <- function(base, tag, display, newpars, T, logt, Tinv = NULL, formula = "", refs = character()) {
   base <- get_family(base)
-  reject_atoms(base, "A CDF generator")
+  atomic <- has_atoms(base)
   if (base$variate_type != "scalar") stop_unsupported("A generator on a vector valued law", base$id)
   wanted <- vapply(newpars, `[[`, "", "name")
   actual <- character(0)
@@ -22,9 +22,17 @@ gen_family <- function(base, tag, display, newpars, T, logt, Tinv = NULL, formul
     function(y, p) {
       lb <- eval_lpdf(base, y, bp(p))
       u <- pmin(pmax(G(y, p), 1e-300), 1 - .Machine$double.eps / 2)
-      ifelse(lb == -Inf, -Inf, logt(u, gp(p)) + lb)
+      out <- ifelse(lb == -Inf, -Inf, logt(u, gp(p)) + lb)
+      # A point mass c of the base becomes T(G(c)) - T(G(c-)).
+      if (atomic) { a <- atom(y, p); k <- a > 0; out[k] <- log(a[k]) }
+      out
     }
   }
+  atom <- if (atomic) function(y, p) {
+    a <- family_atom(base, y, bp(p)); out <- rep(0, length(y)); k <- a > 0
+    if (any(k)) { pk <- lapply(p, function(v) rep_len(v, length(y))[k])
+      out[k] <- T(G(y[k], pk), gp(pk)) - T(pmin(pmax(family_cdf_left(base, y[k], bp(pk)), 0), 1), gp(pk)) }
+    out }
   # Every generator maps the endpoints 0 and 1 to themselves; set them
   # exactly, as the formulas give 0 log 0 or Inf / Inf there.
   ends <- function(f) function(u, g) { v <- f(u, g); v[!is.na(u) & u <= 0] <- 0; v[!is.na(u) & u >= 1] <- 1; v }
@@ -33,6 +41,7 @@ gen_family <- function(base, tag, display, newpars, T, logt, Tinv = NULL, formul
   rng <- if (!is.null(Tinv)) function(n, p) family_quantile(base, ends(Tinv)(stats::runif(n), gp(p)), bp(p)) else NULL
   f <- op_family(base, sprintf("%s(%s)", tag, base$id), sprintf("%s %s", display, base$display_name),
                  c(base$pars, stats::setNames(newpars, actual)), lpdf, cdf = cdf, quantile = quantile, rng = rng,
+                 atom = atom, extra = if (atomic && !is.null(base$extra$atom_points)) list(atom_points = base$extra$atom_points) else list(),
                  operator = list(type = "generator", generator = tag, base = base),
                  formula = paste0("F(y) = T(G(y)); ", formula))
   f$references <- c(refs, base$references)

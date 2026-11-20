@@ -15,7 +15,13 @@ test_that("mixed laws combine atoms and densities under one measure", {
   expect_equal(tot, 1, tolerance = 1e-8)
   dc <- distribution(convolve_dist(inflate("normal"), "normal"), mu.1 = 0, sigma.1 = 1, zi.1 = .2, mu.2 = 0, sigma.2 = 1)
   expect_equal(prob(dc, 0), .2 * dnorm(0) + .8 * dnorm(0, sd = sqrt(2)), tolerance = 1e-8)
-  expect_error(convolve_dist(inflate("normal"), inflate("normal")), class = "regcomp_unsupported")
+  # Two laws with point masses: the atom of the sum is the product of masses.
+  d2 <- distribution(convolve_dist(inflate("normal"), inflate("normal")), mu.1 = 0, sigma.1 = 1, zi.1 = .2, mu.2 = 0, sigma.2 = 1, zi.2 = .3)
+  expect_equal(prob(d2, 0), .2 * .3)
+  expect_equal(cdf(d2, 0), .06 + .5 * (1 - .06), tolerance = 1e-8)
+  expect_error(convolve_dist(custom_family("atom_unknown", list(par_spec("m", "real")), lpdf = function(y, p) dnorm(y, p$m, log = TRUE),
+    support = function(p) list(lower = -Inf, upper = Inf), check = list(m = 0), atom = function(y, p) 0 * y), "normal"),
+    class = "regcomp_unsupported")
   dd <- distribution(discretize(inflate("exponential")), lambda = 1, zi = .2)
   expect_equal(prob(dd, 0), .2 + .8 * pexp(1))
   expect_equal(sum(prob(dd, 0:100)), 1)
@@ -167,4 +173,32 @@ test_that("numerical regimes: far tails, moments, periodicity and boundaries", {
   expect_false(gp$pars$mu$is_mean)
   expect_equal(mean(distribution(gp, mu = .2, lambda = -.8)), 0)
   expect_equal(mean(distribution(gp, mu = 2, lambda = .3)), 2)
+})
+
+test_that("operators accept laws with point masses and keep their mass", {
+  zg <- inflate("gamma"); zp <- list(mu = 2, sigma = .5, zi = .3)
+  mass <- function(f, pars, at) { d <- do.call(distribution, c(list(f), pars)); s <- f$support(d$pars)
+    pts <- f$extra$atom_points; A <- family_atom(f, pts, lapply(d$pars, rep, length(pts)))
+    dens <- function(y) { v <- exp(log_prob(d, y)); v[y %in% pts] <- 0; v }
+    br <- sort(unique(c(s$lower, pts[pts > s$lower & pts < s$upper], s$upper)))
+    c(total = sum(vapply(seq_len(length(br) - 1), function(i) integrate(dens, br[i], br[i + 1])$value, 0)) + sum(A),
+      atom = A[pts == at]) }
+  pg0 <- .3; pg <- function(q) .3 + .7 * pgamma(q, shape = 4, rate = 2)
+  m <- mass(truncate_dist(zg, 0, 3), zp, 0); expect_equal(unname(m), c(1, pg0 / pg(3)), tolerance = 1e-7)
+  m <- mass(censor(zg, upper = 3), zp, 3); expect_equal(unname(m), c(1, 1 - pg(3)), tolerance = 1e-7)
+  m <- mass(transform_dist(zg, "sqrt"), zp, 0); expect_equal(unname(m), c(1, .3), tolerance = 1e-7)
+  m <- mass(splice(zg, "lomax"), list(mu.b = 2, sigma.b = .5, zi.b = .3, scale.t = 2, alpha.t = 3, threshold = 3, w = .8), 0)
+  expect_equal(unname(m), c(1, .8 * pg0 / pg(3)), tolerance = 1e-7)
+  m <- mass(kumaraswamy_g(zg), c(zp, list(a = 2, b = .7)), 0); expect_equal(unname(m), c(1, 1 - (1 - .3^2)^.7), tolerance = 1e-7)
+  r <- distribution(round_dist(zg, 0), mu = 2, sigma = .5, zi = .3)
+  expect_equal(prob(r, 0), pg(.5)); expect_equal(sum(prob(r, 0:60)), 1)
+  expect_equal(quantile(distribution(truncate_dist(zg, 0, 3), mu = 2, sigma = .5, zi = .3), .1), 0)
+  # Copulas with a margin that has a point mass: margins are recovered.
+  cf <- copula_dist(zg, "normal", "clayton")
+  j <- function(y1, y2) exp(log_prob(distribution(cf, mu.1 = 2, sigma.1 = .5, zi.1 = .3, mu.2 = 0, sigma.2 = 1, theta = 2), cbind(y1, y2)))
+  expect_equal(integrate(function(z) j(rep(0, length(z)), z), -Inf, Inf)$value, .3, tolerance = 1e-6)
+  expect_equal(j(0, .4) + integrate(function(z) j(z, rep(.4, length(z))), 0, Inf)$value, dnorm(.4), tolerance = 1e-6)
+  cp <- copula_dist("poisson", "normal", "frank")
+  jp <- function(k, z) exp(log_prob(distribution(cp, lambda.1 = 2, mu.2 = 0, sigma.2 = 1, theta = 4), cbind(rep(k, length(z)), z)))
+  expect_equal(integrate(function(z) jp(3, z), -Inf, Inf)$value, dpois(3, 2), tolerance = 1e-6)
 })
