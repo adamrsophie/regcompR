@@ -263,6 +263,8 @@ build_predictor <- function(rhs, data, par, xlev = NULL, smooth_specs = NULL,
   for (j in seq_along(sm)) {
     if (!requireNamespace("mgcv", quietly = TRUE))
       stop_unsupported("Smooth terms need the 'mgcv' package; it")
+    if (as.character(sm[[j]][[1]]) %in% c("te", "ti"))
+      stop_unsupported("Tensor product smooths te() and ti() (no mixed model form; use t2())")
     sobj <- eval(sm[[j]], envir = asNamespace("mgcv"))
     key <- paste(deparse(sm[[j]], width.cutoff = 500L), collapse = "")
     if (is.null(smooth_specs[[key]])) {
@@ -270,14 +272,23 @@ build_predictor <- function(rhs, data, par, xlev = NULL, smooth_specs = NULL,
                             scale.penalty = TRUE)[[1]]
       rp <- tryCatch(mgcv::smooth2random(sc, names(data), type = 2), error = function(e)
         stop_unsupported(sprintf("The smooth '%s' (mixed model form: %s); it", paste(deparse(sm[[j]]), collapse = ""), conditionMessage(e))))
-      spec <- list(sc = sc, rp = rp)
+      # For some bases (t2) the fitting matrix sc$X is an affine function of
+      # PredictMat() rather than equal to it; store that exact map.
+      P0 <- cbind(1, mgcv::PredictMat(sc, as.data.frame(data)))
+      M <- qr.solve(P0, sc$X)
+      if (max(abs(P0 %*% M - sc$X)) > 1e-8 * max(1, abs(sc$X)))
+        stop_unsupported(sprintf("The smooth '%s' (its basis cannot be reproduced for prediction); it", key))
+      spec <- list(sc = sc, rp = rp, M = M)
     } else spec <- smooth_specs[[key]]
-    Xs <- mgcv::PredictMat(spec$sc, as.data.frame(data))
+    Xs <- cbind(1, mgcv::PredictMat(spec$sc, as.data.frame(data))) %*% spec$M
     # Transform to the random effect parameterization.
     # mgcv: b_original = trans.U %*% (trans.D * b_fit).
     if (!is.null(spec$rp$trans.U)) Xs <- Xs %*% spec$rp$trans.U
     if (!is.null(spec$rp$trans.D)) Xs <- sweep(Xs, 2, spec$rp$trans.D, `*`)
-    nr <- spec$rp$rind
+    # One variance component per penalty: pen.ind gives each column's
+    # penalty (0 for unpenalized columns).
+    pen <- spec$rp$pen.ind
+    nr <- unname(split(seq_along(pen), pen)[as.character(setdiff(sort(unique(pen)), 0))])
     fixed_cols <- setdiff(seq_len(ncol(Xs)), unlist(nr))
     if (length(fixed_cols)) {
       Xf <- Xs[, fixed_cols, drop = FALSE]
@@ -358,7 +369,7 @@ parse_formulas <- function(formula, dots, fam) {
 # response variables.
 expand_dot <- function(f, data, response_vars) {
   if (!"." %in% all.vars(f) || is.null(data)) return(f)
-  vars <- setdiff(names(data), response_vars)
+  vars <- setdiff(grep("^\\(", names(data), value = TRUE, invert = TRUE), response_vars)
   rhs <- paste(deparse(f[[length(f)]], width.cutoff = 500L), collapse = " ")
   rhs <- gsub("(^|[^A-Za-z0-9_.])\\.($|[^A-Za-z0-9_.])", paste0("\\1(", paste(sprintf("`%s`", vars), collapse = " + "), ")\\2"), rhs)
   stats::as.formula(paste("~", rhs), env = environment(f))

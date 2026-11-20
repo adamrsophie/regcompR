@@ -14,8 +14,9 @@
 #' (`(1 | g)`, `(1 + x | g)`, uncorrelated `(1 + x || g)`, nested `(1 | a/b)`,
 #' crossed `(1 | a) + (1 | b)`), structured random effects for longitudinal and
 #' spatial data written as glmmTMB style wrappers, and smooth terms
-#' `s()`, `te()`, `ti()` and `t2()` from 'mgcv', which are fitted in their
-#' mixed model representation.
+#' `s()` and `t2()` from 'mgcv', which are fitted in their mixed model
+#' representation (as in `mgcv::gamm()`). Tensor products `te()` and `ti()`
+#' have no such representation; use `t2()` instead.
 #'
 #' @section Random effect structures:
 #' A bar term may be wrapped in a covariance structure:
@@ -97,16 +98,19 @@ regcomp <- function(formula, ..., family, data, engine = c("ml", "tmb", "bayes")
                     parameterization = NULL, subset = NULL) {
   engine <- match.arg(engine)
   cl <- match.call()
-  if (missing(data)) data <- environment(formula)
+  dots <- eval(substitute(alist(...)))
+  if (missing(data)) data <- env_data(formula, dots, parent.frame())
+  if (!is.null(penalty) && engine != "ml") stop_input("penalty is only used by engine = \"ml\".")
+  if (!is.null(priors) && engine != "bayes") stop_input("priors are only used by engine = \"bayes\".")
   fam <- model_family(family, parameterization, formula, data)
   if (isTRUE(fam$extra$no_regression))
     stop_unsupported("Regression", fam$id)
   data <- as.data.frame(data)
   if (!is.null(subset)) data <- data[subset, , drop = FALSE]
-  dots <- eval(substitute(alist(...)))
-  data <- model_rows(formula, dots, data, substitute(weights), parent.frame())
-  spec <- build_spec(formula, dots, fam, data, weights = substitute(weights),
+  mr <- model_rows(formula, dots, data, substitute(weights), parent.frame())
+  spec <- build_spec(formula, mr$dots, fam, mr$data, weights = mr$weights,
                      links = links, fixed = fixed, env = parent.frame())
+  spec$data_args <- dots[setdiff(names(spec$data_args), "")]
   spec$call <- cl
   fit <- switch(engine,
     ml = fit_ml(spec, control, penalty),
@@ -164,20 +168,40 @@ regcomp_control <- function(maxit = 1000, rel_tol = 1e-10, inner_maxit = 50,
 # missing value in any variable the model uses, or with zero weight, are
 # omitted (as na.omit does for glm).
 model_rows <- function(formula, dots, data, weights, env) {
+  n <- nrow(data)
+  # Weights and data arguments given as vectors outside `data` are stored
+  # as reserved columns so they stay aligned when rows are dropped.
   w <- if (is.null(weights)) NULL else eval(weights, data, env)
   if (!is.null(w)) {
-    if (!is.numeric(w) || !length(w) %in% c(1L, nrow(data)) || any(!is.finite(w) | w < 0))
+    if (!is.numeric(w) || !length(w) %in% c(1L, n) || any(!is.finite(w) | w < 0))
       stop_input("weights must be finite, nonnegative and have one value per row.")
-    w <- rep_len(w, nrow(data))
+    data[["(weights)"]] <- rep_len(w, n)
+    # Weights named by columns of data keep their expression.
+    if (!length(setdiff(all.vars(weights), names(data)))) wname <- weights else wname <- as.name("(weights)")
   }
-  vars <- unique(c(all.vars(formula), unlist(lapply(dots, function(d) {
-    v <- tryCatch(eval(d, env), error = function(e) NULL)
-    if (inherits(v, "formula")) all.vars(v) else all.vars(d) }))))
+  is_formula <- vapply(dots, function(d) inherits(tryCatch(eval(d, env), error = function(e) NULL), "formula"), TRUE)
+  for (k in names(dots)[!is_formula & nzchar(names(dots))]) {
+    if (!length(setdiff(all.vars(dots[[k]]), names(data)))) next
+    v <- tryCatch(eval(dots[[k]], data, env), error = function(e) NULL)
+    if (length(v) == n && n > 1) { data[[paste0("(", k, ")")]] <- v; dots[[k]] <- as.name(paste0("(", k, ")")) }
+  }
+  vars <- unique(c(all.vars(formula), unlist(lapply(seq_along(dots), function(i) {
+    if (is_formula[i]) all.vars(eval(dots[[i]], env)) else all.vars(dots[[i]]) }))))
   vars <- intersect(vars, names(data))
-  keep <- if (length(vars)) stats::complete.cases(data[vars]) else rep(TRUE, nrow(data))
-  if (!is.null(w)) keep <- keep & w > 0
+  keep <- if (length(vars)) stats::complete.cases(data[vars]) else rep(TRUE, n)
+  if (!is.null(w)) keep <- keep & data[["(weights)"]] > 0
   if (!any(keep)) stop_input("No rows remain after removing missing values and zero weights.")
-  data[keep, , drop = FALSE]
+  list(data = data[keep, , drop = FALSE], dots = dots, weights = if (!is.null(w)) wname)
+}
+
+# Data frame for a model fitted without `data`: the formula variables from
+# its environment.
+env_data <- function(formula, dots, env) {
+  fe <- environment(formula) %||% env
+  vars <- unique(c(all.vars(formula), unlist(lapply(dots, all.vars))))
+  vals <- lapply(vars, function(v) tryCatch(eval(as.name(v), fe), error = function(e) NULL))
+  keep <- vapply(vals, function(v) is.atomic(v) && length(v) > 1 || is.factor(v) || is.matrix(v), TRUE)
+  as.data.frame(stats::setNames(vals[keep], vars[keep]), optional = TRUE, stringsAsFactors = FALSE)
 }
 
 # Assemble everything the engines need.

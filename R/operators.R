@@ -165,7 +165,7 @@ inflate <- function(base, at = 0, names = NULL) {
                    format(at), names, format(at), names, gsub("\\{y\\}", "({y} + equals({y}, %s))", bl)))
     if (!base$discrete) bugs$loglik <- sprintf(bugs$loglik, format(at))
   }
-  op_family(base, sprintf("inflate(%s, at = %s)", base$id, paste(format(at), collapse = ",")),
+  f <- op_family(base, sprintf("inflate(%s, at = %s)", base$id, paste(format(at), collapse = ",")),
             sprintf("%s inflated at %s", base$display_name, paste(format(at), collapse = ", ")),
             newpars, lpdf, cdf = cdf, rng = rng, mean = mean, variance = variance,
             support = support, discrete = base$discrete, stan = stan, bugs = bugs,
@@ -174,6 +174,16 @@ inflate <- function(base, at = 0, names = NULL) {
               if (!is.null(m)) return(m)
               if (k > 1 && any(Reduce(`+`, p[names]) >= 1, na.rm = TRUE)) "Inflation weights must sum to less than 1." },
             formula = sprintf("P(Y = c) = pi + (1 - pi) P0(Y = c); elsewhere (1 - pi) f0(y)"))
+  # Starts: observed proportions at the points (sum below 0.9), base law
+  # starts from the remaining observations.
+  f$start <- function(y) {
+    pr <- pmin(pmax(vapply(at, function(a) base::mean(y == a), 0), 0.01), 0.9 / k)
+    yr <- y[!y %in% at]; if (!length(yr)) yr <- y
+    st <- if (!is.null(base$start)) tryCatch(base$start(yr), error = function(e) list()) else list()
+    for (b in bnames) if (is.null(st[[b]])) st[[b]] <- generic_start(base$pars[[b]], yr)
+    c(st, stats::setNames(as.list(pr), names))
+  }
+  f
 }
 
 #' Hurdle distributions
@@ -418,7 +428,7 @@ mixture <- function(...) {
     interpretation = sprintf("Log odds of component %d against component 1", k))
   weights <- function(p) {
     n <- max(lengths(p))
-    E <- cbind(0, sapply(2:K, function(k) rep_len(p[[paste0("w", k)]], n)))
+    E <- cbind(0, matrix(vapply(2:K, function(k) rep_len(p[[paste0("w", k)]], n), numeric(n)), nrow = n))
     E <- matrix(E, nrow = n)
     E <- E - apply(E, 1, max)
     W <- exp(E); W / rowSums(W)

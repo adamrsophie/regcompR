@@ -72,8 +72,9 @@ offsets, factors and interactions, random effects in \code{lme4} syntax
 (\code{(1 | g)}, \code{(1 + x | g)}, uncorrelated \code{(1 + x || g)}, nested \code{(1 | a/b)},
 crossed \code{(1 | a) + (1 | b)}), structured random effects for longitudinal and
 spatial data written as glmmTMB style wrappers, and smooth terms
-\code{s()}, \code{te()}, \code{ti()} and \code{t2()} from 'mgcv', which are fitted in their
-mixed model representation.
+\code{s()} and \code{t2()} from 'mgcv', which are fitted in their mixed model
+representation (as in \code{mgcv::gamm()}). Tensor products \code{te()} and \code{ti()}
+have no such representation; use \code{t2()} instead.
 }
 \section{Random effect structures}{
 

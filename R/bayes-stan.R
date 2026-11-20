@@ -45,7 +45,8 @@ stan_code <- function(formula, ..., family, data, weights = NULL, links = NULL,
                       fixed = NULL, priors = NULL, parameterization = NULL) {
   fam <- model_family(family, parameterization, formula, as.data.frame(data))
   dots <- eval(substitute(alist(...)))
-  spec <- build_spec(formula, dots, fam, model_rows(formula, dots, as.data.frame(data), substitute(weights), parent.frame()), weights = substitute(weights),
+  mr <- model_rows(formula, dots, as.data.frame(data), substitute(weights), parent.frame())
+  spec <- build_spec(formula, mr$dots, fam, mr$data, weights = mr$weights,
                      links = links, fixed = fixed, env = parent.frame())
   list(code = stan_program(spec, priors), data = stan_data(spec))
 }

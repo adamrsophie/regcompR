@@ -22,10 +22,10 @@ Adds point masses to a base law: with weights \code{pi_j} at points \code{c_j},
 is scaled by \code{1 - sum(pi)}. For a continuous base law the result is a
 mixed distribution whose log likelihood uses the point mass at \code{c_j} and
 the scaled density elsewhere. One inflation parameter per point is added
-(named \code{zi}, \code{oi} or \code{pi1}, \code{pi2}, ...), each in (0, 1) with a logit link;
-with several points the parameters are mapped to weights through a
-multinomial logit (stick breaking is not used), so
-\code{pi_j = exp(eta_j) / (1 + sum(exp(eta)))}.
+(named \code{zi}, \code{oi} or \code{pi1}, \code{pi2}, ...), each in (0, 1) with a logit link.
+The parameters are the point mass weights themselves; with several points
+their sum must stay below one. Points must be distinct, and for a discrete
+base law they must lie on its integer support.
 }
 \details{
 Zero inflation can only add zeros; compare \code{\link[=hurdle]{hurdle()}}.

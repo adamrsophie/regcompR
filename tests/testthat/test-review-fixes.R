@@ -233,3 +233,31 @@ test_that("minor edge cases: seeds, infinities, domains, degenerate laws", {
   expect_false(supports("skellam", "cdf"))
   expect_warning(gee(y ~ 1, data.frame(y = c(1, 4, 2, 8), g = 1:4), g, corstr = "exchangeable"), "not estimable")
 })
+
+test_that("smooths match gamm, tails stay in log space, mixtures and weights align", {
+  skip_if_not_installed("mgcv")
+  set.seed(1); n <- 150
+  d <- data.frame(x = runif(n), z = rnorm(n))
+  d$y <- sin(2 * pi * d$x) + 0.5 * d$z + rnorm(n, 0, 0.3)
+  f <- regcomp(y ~ z + s(x, k = 6), family = "normal", data = d)
+  g <- mgcv::gamm(y ~ z + s(x, k = 6), data = d, method = "ML")
+  expect_equal(f$logLik, as.numeric(logLik(g$lme)), tolerance = 1e-5)
+  expect_error(regcomp(y ~ te(x, z), family = "normal", data = d), "t2")
+  dl <- distribution("lognormal", mu = 0, sigma = 0.25)
+  expect_equal(survival(dl, 9, log_p = TRUE), plnorm(9, 0, 0.25, lower.tail = FALSE, log.p = TRUE), tolerance = 1e-6)
+  expect_equal(log_prob(distribution(truncate_dist("lognormal", lower = 9), mu = 0, sigma = 0.25), 9.5),
+               dlnorm(9.5, 0, 0.25, log = TRUE) - plnorm(9, 0, 0.25, lower.tail = FALSE, log.p = TRUE), tolerance = 1e-6)
+  d3 <- distribution(mixture("normal", "normal", "normal"), mu.1 = -2, sigma.1 = 1, mu.2 = 0, sigma.2 = 1,
+                     mu.3 = 3, sigma.3 = 1, w2 = 0.5, w3 = -1)
+  w <- exp(c(0, 0.5, -1)); w <- w / sum(w)
+  expect_equal(prob(d3, 0.3), sum(w * dnorm(0.3, c(-2, 0, 3), 1)))
+  set.seed(2); dn <- data.frame(x = rnorm(60)); dn$y <- rpois(60, exp(0.5 + 0.3 * dn$x)); dn$x[7] <- NA
+  wv <- rep(c(1, 5), each = 30)
+  expect_equal(unname(coef(regcomp(y ~ x, family = "poisson", data = dn, weights = wv))),
+               unname(coef(glm(y ~ x, poisson, dn, weights = wv))), tolerance = 1e-5)
+  expect_error(regcomp(y ~ x, family = "poisson", data = dn, engine = "tmb", penalty = penalty("ridge", lambda = 1)), "engine")
+  set.seed(9); x <- rnorm(200)
+  yz <- rbeta(200, plogis(0.3 + 0.5 * x) * 8, (1 - plogis(0.3 + 0.5 * x)) * 8); yz[1:20] <- 0; yz[21:30] <- 1
+  fz <- regcomp(yz ~ x, family = inflate("beta", c(0, 1)), data = data.frame(yz, x))
+  expect_equal(unname(plogis(coef(fz)[c("pi1:(Intercept)", "pi2:(Intercept)")])), c(0.1, 0.05), tolerance = 1e-3)
+})

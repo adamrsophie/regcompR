@@ -215,13 +215,9 @@ cdf.regcomp_dist <- function(x, q, lower_tail = TRUE, log_p = FALSE, ...) {
   if (fam$variate_type == "scalar") { r <- recycle_pars(c(list(.q = q), x$pars)); q <- r$.q; p <- r[-1] }
   else if (scalar_vecpar(fam)) p <- x$pars
   else stop_unsupported("A univariate CDF", fam$id)
-  if (!lower_tail && !is.null(fam$lccdf)) {
-    out <- fam$lccdf(q, p)
-    return(if (log_p) out else exp(out))
-  }
-  val <- family_cdf(fam, q, p)
-  if (!lower_tail) val <- 1 - val
-  if (log_p) log(val) else val
+  if (!log_p && lower_tail) return(family_cdf(fam, q, p))
+  out <- if (lower_tail) family_lcdf(fam, q, p) else family_lccdf(fam, q, p)
+  if (log_p) out else exp(out)
 }
 
 # Category probabilities of an ordinal or nominal law (n x K matrix).
@@ -235,11 +231,43 @@ cat_probs <- function(fam, p, n) {
 # P(a < Y <= b) chosen from the tail with usable precision.
 family_lcdf <- function(fam, q, p) {
   if (!is.null(fam$lcdf)) return(fam$lcdf(q, p))
-  log(family_cdf(fam, q, p))
+  F <- family_cdf(fam, q, p)
+  tail_refine(fam, q, p, log(F), F < 1e-12, upper = FALSE)
 }
 family_lccdf <- function(fam, q, p) {
   if (!is.null(fam$lccdf)) return(fam$lccdf(q, p))
-  log1p(-family_cdf(fam, q, p))
+  F <- family_cdf(fam, q, p)
+  tail_refine(fam, q, p, log1p(-F), F > 1 - 1e-12, upper = TRUE)
+}
+
+# Where a tail probability from the CDF has lost its precision, recompute it
+# in log space from the density: an integral scaled by the density at q
+# (continuous laws) or a log sum of masses (discrete laws).
+tail_refine <- function(fam, q, p, out, bad, upper) {
+  bad <- which(bad & is.finite(q))
+  if (!length(bad) || fam$variate_type != "scalar" || scalar_vecpar(fam)) return(out)
+  n <- length(q); pr <- lapply(p, function(v) if (length(v) == n && n > 1) v else rep_len(v, n))
+  for (i in bad) out[i] <- tryCatch({
+    pi_ <- lapply(pr, `[`, i)
+    lf <- function(t) eval_lpdf(fam, t, lapply(pi_, rep_len, length(t)))
+    if (fam$discrete) {
+      # Masses beyond q (upper) or up to q (lower), in blocks until negligible.
+      acc <- -Inf; start <- if (upper) floor(q[i]) + 1 else floor(q[i])
+      for (b in 0:199) {
+        t <- if (upper) start + b * 1000 + 0:999 else start - b * 1000 - 0:999
+        l <- lf(t); m <- suppressWarnings(max(l))
+        acc <- log_sum_exp(c(acc, l))
+        if (!is.finite(m) && b > 0 || is.finite(m) && m < acc - 40) break
+      }
+      acc
+    } else {
+      l0 <- lf(q[i]); if (!is.finite(l0)) stop("no density")
+      I <- stats::integrate(function(t) exp(lf(t) - l0), if (upper) q[i] else -Inf, if (upper) Inf else q[i],
+                            rel.tol = 1e-8)$value
+      if (I > 0) l0 + log(I) else out[i]
+    }
+  }, error = function(e) out[i])
+  out
 }
 family_log_interval <- function(fam, a, b, p) {
   n <- length(a); out <- rep(-Inf, n)
