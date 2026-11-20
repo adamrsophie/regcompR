@@ -20,7 +20,10 @@
 
 \item{which}{Plot type(s).}
 
-\item{variable}{Covariate for \code{"effects"}.}
+\item{variable}{Covariate for \code{"effects"}. Pass \verb{by =} (a moderator)
+and optionally \verb{at =} (its values; mean and mean plus and minus one
+standard deviation by default) to draw one curve per moderator value
+(an interaction plot).}
 
 \item{par}{Distribution parameter for \code{"effects"}, or \code{"mean"}.}
 

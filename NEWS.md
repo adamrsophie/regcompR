@@ -1,6 +1,28 @@
 # regcompR 0.1.0
 
 * First release.
+* Reporting: `regcomp_table()` builds regression tables of one or several
+  fits (rows grouped by distribution parameter, random effect standard
+  deviations and correlations, fit statistics, optional standardized or
+  exponentiated coefficients and sandwich or quasi standard errors) that
+  print in the console and render in R Markdown and Quarto (HTML, PDF,
+  Word). `tidy()`, `glance()` and `augment()` methods work with broom and
+  modelsummary. `export_table()` writes `.csv`, `.html`, `.tex`, `.md` and
+  `.docx`; `export_plot()` saves any diagnostic plot; `coef_plot()` draws
+  estimates of several fits.
+* Inference: `anova()` likelihood ratio tests of nested fits,
+  `wald_test()` for linear hypotheses, `simple_slopes()` and
+  `johnson_neyman()` for moderation, interaction plots through
+  `plot(which = "effects", by = )`, `vif()` generalized variance inflation
+  factors, and `step_regcomp()` stepwise selection by AIC or BIC.
+* `vcov(type = "quasi")` and `summary(vcov = )` give quasi-likelihood
+  (Pearson dispersion) standard errors, matching `quasibinomial` and
+  `quasipoisson`.
+* Dirichlet regression (matrix response; one log linked concentration per
+  component) and the shifted lognormal family.
+* `person_period(cuts = "events")` builds Cox risk sets: a Poisson fit
+  reproduces `coxph()` with Breslow ties exactly, and random effects give
+  Cox frailty models.
 * `family_capabilities()` (formerly `capabilities()`, renamed so that
   attaching the package masks no base R function) labels family specific
   numerical methods `"algorithm"`, separately from closed forms

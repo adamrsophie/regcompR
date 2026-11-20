@@ -136,7 +136,7 @@ model_family <- function(family, parameterization, formula, data) {
   fam <- get_family(family, parameterization)
   if (is.null(fam$extra$expand)) return(fam)
   y0 <- eval(formula[[2]], data, environment(formula))
-  fam$extra$expand(if (is.factor(y0)) nlevels(y0) else max(y0, na.rm = TRUE))
+  fam$extra$expand(if (is.matrix(y0)) ncol(y0) else if (is.factor(y0)) nlevels(y0) else max(y0, na.rm = TRUE))
 }
 
 #' Control settings for model fitting

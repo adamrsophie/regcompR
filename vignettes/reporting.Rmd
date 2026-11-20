@@ -1,0 +1,91 @@
+---
+title: "Reporting results: tables, tidy output and export"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Reporting results: tables, tidy output and export}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(collapse = TRUE, comment = "#>", fig.width = 6, fig.height = 4)
+set.seed(1)
+```
+
+```{r}
+library(regcompR)
+n <- 300
+d <- data.frame(x = rnorm(n), g = factor(rep(1:30, each = 10)))
+d$y <- rnbinom(n, mu = exp(1 + 0.4 * d$x + rnorm(30, 0, 0.4)[d$g]), size = 2)
+f1 <- regcomp(y ~ x, family = "poisson", data = d)
+f2 <- regcomp(y ~ x + (1 | g), phi ~ x, family = "nb2", data = d)
+```
+
+## Regression tables
+
+`regcomp_table()` puts one or several fits side by side. Rows are grouped
+by distribution parameter (each parameter has its own regression), random
+effects are reported as standard deviations and correlations, and fit
+statistics close the table. In a document chunk the table renders as a
+formatted HTML, LaTeX or Word table, in R Markdown and Quarto alike:
+
+```{r}
+tab <- regcomp_table(Poisson = f1, `NB mixed` = f2, exponentiate = TRUE, stars = TRUE)
+tab
+```
+
+In the console the same object prints as text:
+
+```{r}
+print(tab)
+```
+
+`show = "se"` gives standard errors instead of intervals; `conf.level`,
+`digits` and `stats` control the rest. For Bayesian fits the table shows
+posterior means with credible intervals, the number of draws and the
+largest R-hat.
+
+```{r}
+regcomp_table(f1, f2, show = "se", stats = c("nobs", "AIC"))
+```
+
+`standardize = TRUE` reports each coefficient per standard deviation of
+its covariate, and `vcov = "sandwich"` or `"quasi"` changes the standard
+errors. `coef_plot()` draws the estimates of several fits side by side:
+
+```{r, fig.height = 3}
+coef_plot(Poisson = f1, `NB mixed` = f2, exponentiate = TRUE)
+```
+
+## Tidy output
+
+`tidy()`, `glance()` and `augment()` methods follow the broom conventions,
+so every package built on them works with regcompR fits: broom,
+modelsummary, gtsummary, and others. `tidy()` adds a `component` column
+naming the distribution parameter.
+
+```{r, eval = requireNamespace("broom", quietly = TRUE)}
+broom::tidy(f2)
+broom::glance(f2)
+head(broom::augment(f1))
+```
+
+```{r, eval = requireNamespace("modelsummary", quietly = TRUE)}
+modelsummary::modelsummary(list(Poisson = f1, NB = f2), shape = term + component ~ model,
+                           output = "markdown")
+```
+
+## Export
+
+`export_table()` writes a table, a fit or a list of fits to a file whose
+format follows the extension: `.csv`, `.html`, `.tex`, `.md` or `.docx`
+(Word, with the flextable package). `export_plot()` saves any diagnostic
+plot as `.png`, `.jpeg`, `.tiff`, `.pdf` or `.svg`.
+
+```{r}
+out <- tempdir()
+export_table(tab, file.path(out, "models.html"))
+export_table(list(f1, f2), file.path(out, "models.csv"), show = "se")
+export_plot(f2, file.path(out, "qq.png"), which = "qq", width = 6, height = 4)
+list.files(out, pattern = "models|qq")
+```

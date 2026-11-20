@@ -176,6 +176,21 @@ posfam("log_logistic", "Log-logistic (Fisk)", list(P("scale", "positive", role =
                      "log1m(loglogistic_cdf({y} | {scale}, {shape}))"),
   status = "validated")
 
+posfam("shifted_lognormal", "Shifted lognormal", list(loc_par("mu"), scale_par("sigma"),
+    P("ndt", "positive", role = "shift (non decision time)", interpretation = "Lower bound of the support; must be below every response")),
+  formula = "log(Y - ndt) ~ Normal(mu, sigma), y > ndt", mean_formula = "ndt + exp(mu + sigma^2 / 2)",
+  lpdf = function(y, p) ifelse(y > p$ndt, stats::dlnorm(y - p$ndt, p$mu, p$sigma, log = TRUE), -Inf),
+  cdf = function(q, p) stats::plnorm(q - p$ndt, p$mu, p$sigma),
+  quantile = function(pr, p) p$ndt + stats::qlnorm(pr, p$mu, p$sigma), rng = function(n, p) p$ndt + stats::rlnorm(n, p$mu, p$sigma),
+  mean = function(p) p$ndt + exp(p$mu + p$sigma^2 / 2), variance = function(p) (exp(p$sigma^2) - 1) * exp(2 * p$mu + p$sigma^2),
+  support = function(p) list(lower = p$ndt, upper = Inf),
+  start = function(y) { s <- 0.5 * min(y); list(mu = mean(log(y - s)), sigma = stats::sd(log(y - s)), ndt = s) },
+  references = c("Heathcote, Brown and Cousineau (2004), QMPE: estimating lognormal, Wald, and Weibull RT distributions with a parameter-dependent lower bound. Behav. Res. Methods, 36, 277-290.", JKB),
+  reference = ref_impl("stats", function(y, p) stats::dlnorm(y - p$ndt, p$mu, p$sigma, log = TRUE)),
+  stan = stan_native("lognormal_lpdf({y} - {ndt} | {mu}, {sigma})", "lognormal_lcdf({y} - {ndt} | {mu}, {sigma})",
+                     "lognormal_lccdf({y} - {ndt} | {mu}, {sigma})", "{ndt} + lognormal_rng({mu}, {sigma})"),
+  status = "validated")
+
 posfam("pareto", "Pareto (type I)", list(P("xm", "positive", role = "minimum", data = TRUE), shp("alpha")),
   formula = "f(y) = alpha xm^alpha / y^(alpha + 1), y >= xm",
   mean_formula = "alpha xm / (alpha - 1) for alpha > 1",

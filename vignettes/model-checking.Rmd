@@ -111,6 +111,44 @@ compare_models(poisson = fp, nb2 = fnb, cv = "crps", K = 5)
 try(compare_models(fp, regcomp(log1p(y) ~ x, family = "normal", data = d)))
 ```
 
+## Tests, simple slopes and collinearity
+
+`anova()` gives likelihood ratio tests of nested fits; `wald_test()` tests
+linear hypotheses such as equal coefficients (with any covariance choice);
+`simple_slopes()` gives the slope of a covariate on a parameter's linear
+predictor at values of a moderator, with delta method standard errors;
+`vif()` gives generalized variance inflation factors for each parameter's
+regression.
+
+```{r}
+d$z <- rnorm(n)
+fi <- regcomp(y ~ x * z, family = "nb2", data = d)
+anova(fnb, fi)
+wald_test(fi, c("mu:x" = 1, "mu:z" = -1))
+wald_test(fi, c("mu:z", "mu:x:z"), vcov = "sandwich")
+simple_slopes(fi, "x", "z")
+vif(fi)
+```
+
+`johnson_neyman()` finds the moderator values where the slope of `x` is
+significant, and `plot(which = "effects", by =)` draws the interaction:
+
+```{r}
+johnson_neyman(fi, "x", "z", plot = TRUE)$bounds
+plot(fi, which = "effects", variable = "x", by = "z")
+```
+
+`step_regcomp()` selects terms of one parameter's formula forward,
+backward or both ways by AIC or BIC. Selection makes the final standard
+errors too optimistic; prefer penalties or cross validation for
+prediction.
+
+```{r}
+d$x2 <- rnorm(n); d$x3 <- rnorm(n)
+fs <- step_regcomp(regcomp(y ~ 1, family = "nb2", data = d), scope = ~ x + x2 + x3, criterion = "BIC")
+attr(fs, "steps")
+```
+
 ## Identifiability, covariances and influence of the data
 
 ```{r}
@@ -118,6 +156,16 @@ identifiability_check(fnb)
 sqrt(diag(vcov(fp)))
 sqrt(diag(vcov(fp, type = "sandwich")))
 sqrt(diag(vcov(fp, type = "sandwich", cluster = ~ g)))
+```
+
+`type = "quasi"` scales the model covariance by the Pearson dispersion,
+which for binomial and Poisson fits gives the standard errors of
+`glm(family = quasibinomial)` and `quasipoisson`; `summary()`,
+`tidy()` and `regcomp_table()` take the same choice through `vcov =`.
+
+```{r}
+sqrt(diag(vcov(fp, type = "quasi")))
+summary(fp, vcov = "quasi")$table[, c("estimate", "std_error")]
 ```
 
 ## Simulation based checks

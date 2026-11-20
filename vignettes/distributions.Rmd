@@ -137,6 +137,15 @@ c(prob(tob, 0), cdf(tob, -1e-9), cdf(tob, 0))   # an atom and the jump of the CD
 prob(distribution("poisson", lambda = 2), 1.5)  # off the lattice: no mass
 ```
 
+Some families estimate a bound of their support. The shifted lognormal,
+common for reaction times, estimates the shift `ndt` below every
+response:
+
+```{r}
+rt <- data.frame(x = rnorm(200)); rt$y <- 0.3 + rlnorm(200, -0.5 + 0.3 * rt$x, 0.4)
+exp(coef(regcomp(y ~ x, family = "shifted_lognormal", data = rt))["ndt:(Intercept)"])
+```
+
 ## Families beyond the real line
 
 ```{r}
@@ -158,6 +167,18 @@ Multivariate families check their structured parameters (symmetric
 positive definite covariance and scale matrices, Wishart degrees of
 freedom, orthonormal frames) and the shape of each response. Multinomial
 and Ewens laws take the sample size as a parameter.
+
+Dirichlet regression takes a matrix response with one composition per
+row; `regcomp()` expands the family to one log linked concentration per
+component (`alpha1`, `alpha2`, ...), which share the main formula unless
+given their own (the common parameterization of DirichletReg):
+
+```{r}
+x <- rnorm(150)
+Y <- cbind(rgamma(150, exp(0.5 + 0.3 * x)), rgamma(150, 1), rgamma(150, 1.5))
+dd <- data.frame(x = x); dd$Y <- Y / rowSums(Y)
+coef(regcomp(Y ~ x, alpha3 ~ 1, family = "dirichlet", data = dd))
+```
 
 ## Links
 

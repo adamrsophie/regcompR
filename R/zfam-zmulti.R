@@ -89,9 +89,22 @@ mfam("dirichlet", "Dirichlet", list(P("alpha", "positive", role = "concentration
   formula = "f(y) = Gamma(A) / prod Gamma(a_k) prod y_k^(a_k - 1) on the simplex",
   lpdf = function(y, p) { y <- as_rows(y); lgamma(sum(p$alpha)) - sum(lgamma(p$alpha)) + drop(log(y) %*% (p$alpha - 1)) },
   rng = function(n, p) { g <- matrix(stats::rgamma(n * length(p$alpha), p$alpha), n, byrow = TRUE); g / rowSums(g) },
-  regression_notes = "Dirichlet regression: log link on each alpha_k, or the mean/precision form of Maier (2014).",
+  regression_notes = "Dirichlet regression (Hijazi and Jernigan 2009; Maier 2014, common parameterization): the response is a matrix with one composition per row; regcomp() expands the family to alpha1, ..., alphaK, each with a log link, sharing the main formula unless given their own.",
+  extra = list(expand = function(K) dirichlet_reg_family(K)),
   references = "Kotz, Balakrishnan and Johnson (2000), Continuous Multivariate Distributions, ch. 49.",
   reference = ref_impl("extraDistr", function(y, p) extraDistr::ddirichlet(as_rows(y), p$alpha, log = TRUE)), status = "validated")
+
+# Dirichlet regression with K components as K regression parameters.
+dirichlet_reg_family <- function(K) {
+  nm <- paste0("alpha", seq_len(K))
+  family_def("dirichlet", sprintf("Dirichlet (%d components)", K), "multivariate",
+    lapply(nm, function(k) P(k, "positive", role = sprintf("concentration of component %s", sub("alpha", "", k)), link = "log")),
+    variate_type = "vector", numeric_cdf = FALSE, numeric_moments = FALSE,
+    lpdf = function(y, p) { y <- as_rows(y); A <- do.call(cbind, lapply(p[nm], rep_len, nrow(y)))
+      lgamma(rowSums(A)) - rowSums(lgamma(A)) + rowSums((A - 1) * log(y)) },
+    mean = function(p) { A <- do.call(cbind, p[nm]); A / rowSums(A) },
+    extra = list(share_formula = TRUE), status = "validated")
+}
 
 # log C(eta): 1/C is the divided difference of exp at eta, read off the
 # matrix exponential of the bidiagonal matrix with eta on the diagonal

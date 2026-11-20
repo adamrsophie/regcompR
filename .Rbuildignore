@@ -26,3 +26,4 @@
 ^Meta$
 ^Rplots\.pdf$
 ^vignettes/.*\.Rmd\.orig$
+^\.gstack$

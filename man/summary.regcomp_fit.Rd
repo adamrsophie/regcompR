@@ -4,12 +4,24 @@
 \alias{summary.regcomp_fit}
 \title{Summarize a fitted model}
 \usage{
-\method{summary}{regcomp_fit}(object, level = 0.95, ...)
+\method{summary}{regcomp_fit}(
+  object,
+  level = 0.95,
+  vcov = c("model", "sandwich", "quasi"),
+  cluster = NULL,
+  ...
+)
 }
 \arguments{
 \item{object}{A fitted model.}
 
 \item{level}{Interval level.}
+
+\item{vcov}{Covariance for the Wald statistics: \code{"model"}, \code{"sandwich"}
+or \code{"quasi"} (see \code{\link[=vcov.regcomp_fit]{vcov.regcomp_fit()}}); the last two cover the
+regression coefficients only.}
+
+\item{cluster}{Cluster identifier for \code{vcov = "sandwich"}.}
 
 \item{...}{Unused.}
 }

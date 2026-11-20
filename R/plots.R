@@ -138,7 +138,10 @@ plot_multivariate <- function(x, ...) {
 #'
 #' @param x A fitted model.
 #' @param which Plot type(s).
-#' @param variable Covariate for `"effects"`.
+#' @param variable Covariate for `"effects"`. Pass `by =` (a moderator)
+#'   and optionally `at =` (its values; mean and mean plus and minus one
+#'   standard deviation by default) to draw one curve per moderator value
+#'   (an interaction plot).
 #' @param par Distribution parameter for `"effects"`, or `"mean"`.
 #' @param nsim Number of simulated replicates for `"qq"` and `"ppc"`.
 #' @param rows Observations for `"fitted"`.
@@ -252,8 +255,9 @@ plot_ppc <- function(fit, nsim = 50, ...) {
   }
 }
 
-plot_effects <- function(fit, variable, par = "mean", level = 0.95, n = 50, ...) {
+plot_effects <- function(fit, variable, par = "mean", level = 0.95, n = 50, by = NULL, at = NULL, ...) {
   data <- model_data(fit)
+  if (!is.null(by)) return(plot_interaction(fit, data, variable, by, at, par, level, n, ...))
   if (is.null(variable)) {
     vars <- unique(unlist(lapply(fit$spec$preds, function(p) all.vars(p$formula))))
     vars <- intersect(vars, names(data))
@@ -290,6 +294,68 @@ plot_effects <- function(fit, variable, par = "mean", level = 0.95, n = 50, ...)
     if (!is.null(lo)) graphics::polygon(c(xv, rev(xv)), c(lo, rev(hi)), col = grDevices::adjustcolor("#1b6ca8", 0.2), border = NA)
     graphics::lines(xv, est, col = "#1b6ca8", lwd = 2)
   }
+}
+
+# Effect of a numeric covariate at several values of a moderator, with
+# confidence bands (an interaction plot).
+plot_interaction <- function(fit, data, variable, by, at, par, level, n, ...) {
+  z <- data[[by]]
+  at <- at %||% if (is.numeric(z)) mean(z) + c(-1, 0, 1) * stats::sd(z) else levels(factor(z))
+  type <- if (par %in% c("mean", "median", "variance", "sd")) par else "parameter"
+  cols <- palette_rc(length(at))
+  curves <- lapply(at, function(a) {
+    nd <- reference_grid(data, variable, n); nd[[by]] <- if (is.factor(z)) factor(a, levels(z)) else a
+    pr <- predict(fit, nd, type = type, interval = "confidence", level = level, ndraws = 300)
+    pick <- function(v) if (is.matrix(v)) v[, par] else v
+    list(x = nd[[variable]], est = pick(pr$estimate), lo = pick(pr$lower), hi = pick(pr$upper))
+  })
+  graphics::plot(range(curves[[1]]$x), range(unlist(lapply(curves, `[`, c("lo", "hi")))), type = "n",
+                 xlab = variable, ylab = par, main = paste("Effect of", variable, "by", by), ...)
+  for (i in seq_along(curves)) with(curves[[i]], {
+    graphics::polygon(c(x, rev(x)), c(lo, rev(hi)), col = grDevices::adjustcolor(cols[i], 0.15), border = NA)
+    graphics::lines(x, est, col = cols[i], lwd = 2) })
+  lab <- if (is.numeric(at)) formatC(at, digits = 3, format = "g") else at
+  graphics::legend("topleft", legend = paste(by, "=", lab), col = cols, lwd = 2, bty = "n")
+  invisible(NULL)
+}
+
+#' Coefficient plot
+#'
+#' Estimates with confidence (credible) intervals of one or several fits,
+#' one row per coefficient, grouped by distribution parameter; several fits
+#' are drawn side by side in different colors.
+#'
+#' @param ... Fitted models, optionally named.
+#' @param conf.level Interval level.
+#' @param exponentiate Exponentiate the estimates (then the reference line
+#'   is at 1).
+#' @param intercept Show intercepts.
+#' @param standardize Standardize coefficients (see [tidy.regcomp_fit()]).
+#' @param vcov Covariance choice for frequentist fits.
+#' @return The plotted data, invisibly.
+#' @export
+#' @examples
+#' d <- data.frame(x = rnorm(200), z = rnorm(200)); d$y <- rnbinom(200, mu = exp(1 + 0.4 * d$x), size = 2)
+#' coef_plot(Poisson = regcomp(y ~ x + z, family = "poisson", data = d),
+#'           NB = regcomp(y ~ x + z, family = "nb2", data = d))
+coef_plot <- function(..., conf.level = 0.95, exponentiate = FALSE, intercept = FALSE, standardize = FALSE, vcov = "model") {
+  fits <- list(...)
+  mn <- names(fits) %||% rep("", length(fits)); mn[mn == ""] <- paste0("(", which(mn == ""), ")")
+  tb <- do.call(rbind, lapply(seq_along(fits), function(i) cbind(model = mn[i],
+    tidy.regcomp_fit(fits[[i]], conf.level = conf.level, exponentiate = exponentiate, vcov = vcov, standardize = standardize))))
+  tb <- tb[tb$effect == "fixed" & (intercept | tb$term != "(Intercept)"), ]
+  key <- unique(paste0(tb$component, ": ", tb$term)); k <- length(key); m <- length(fits)
+  y <- match(paste0(tb$component, ": ", tb$term), key) + (match(tb$model, mn) - (m + 1) / 2) * 0.6 / max(m, 1)
+  cols <- palette_rc(m)[match(tb$model, mn)]
+  op <- graphics::par(mar = c(4, max(8, max(nchar(key)) * 0.55), 2, 1)); on.exit(graphics::par(op))
+  graphics::plot(range(c(tb$conf.low, tb$conf.high), na.rm = TRUE), c(0.5, k + 0.5), type = "n", yaxt = "n", ylab = "",
+                 xlab = if (exponentiate) "exp(estimate)" else "estimate", log = if (exponentiate) "x" else "")
+  graphics::axis(2, seq_len(k), key, las = 1, cex.axis = 0.8)
+  graphics::abline(v = if (exponentiate) 1 else 0, lty = 2, col = "grey50")
+  graphics::segments(tb$conf.low, y, tb$conf.high, y, col = cols, lwd = 2)
+  graphics::points(tb$estimate, y, pch = 16, col = cols)
+  if (m > 1) graphics::legend("topright", legend = mn, col = palette_rc(m), pch = 16, bty = "n")
+  invisible(tb)
 }
 
 plot_trace <- function(fit, pars = NULL, ...) {

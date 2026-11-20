@@ -76,10 +76,15 @@ ranef_regcomp <- function(object, ...) {
 #'
 #' @param object A fitted model.
 #' @param level Interval level.
+#' @param vcov Covariance for the Wald statistics: `"model"`, `"sandwich"`
+#'   or `"quasi"` (see [vcov.regcomp_fit()]); the last two cover the
+#'   regression coefficients only.
+#' @param cluster Cluster identifier for `vcov = "sandwich"`.
 #' @param ... Unused.
 #' @return An object of class `summary.regcomp_fit`.
 #' @export
-summary.regcomp_fit <- function(object, level = 0.95, ...) {
+summary.regcomp_fit <- function(object, level = 0.95, vcov = c("model", "sandwich", "quasi"), cluster = NULL, ...) {
+  vcov <- match.arg(vcov)
   if (object$inference == "bayesian") {
     dr <- object$draws
     a <- (1 - level) / 2
@@ -91,13 +96,14 @@ summary.regcomp_fit <- function(object, level = 0.95, ...) {
   } else {
     est <- c(object$coefficients, object$theta)
     se <- rep(NA_real_, length(est))
-    if (!is.null(object$vcov)) { dv <- diag(object$vcov); dv[dv < 0] <- NA; se <- sqrt(dv)[seq_along(est)] }
+    if (vcov != "model") { dv <- diag(stats::vcov(object, type = vcov, cluster = cluster)); se[seq_along(dv)] <- sqrt(dv) }
+    else if (!is.null(object$vcov)) { dv <- diag(object$vcov); dv[dv < 0] <- NA; se <- sqrt(dv)[seq_along(est)] }
     z <- est / se
     q <- stats::qnorm(1 - (1 - level) / 2)
     tab <- data.frame(estimate = est, std_error = se, lower = est - q * se, upper = est + q * se,
                       z = z, p_value = 2 * stats::pnorm(-abs(z)))
     if (!is.null(object$penalty) && !object$penalty$type %in% pen_valid_cov) tab$p_value <- NA_real_
-    out <- list(table = tab, fit = object, level = level, kind = "wald")
+    out <- list(table = tab, fit = object, level = level, kind = "wald", vcov = vcov)
   }
   class(out) <- "summary.regcomp_fit"
   out
@@ -106,7 +112,8 @@ summary.regcomp_fit <- function(object, level = 0.95, ...) {
 #' @export
 print.summary.regcomp_fit <- function(x, digits = 4, ...) {
   print(x$fit)
-  cat(if (x$kind == "wald") sprintf("\nWald estimates with %g%% confidence intervals:\n", 100 * x$level)
+  cat(if (x$kind == "wald") sprintf("\nWald estimates with %g%% confidence intervals%s:\n", 100 * x$level,
+                                    if (x$vcov != "model") sprintf(" (%s covariance)", x$vcov) else "")
       else sprintf("\nPosterior summary with %g%% credible intervals:\n", 100 * x$level))
   print(round(as.matrix(x$table), digits))
   if (x$kind == "wald") {

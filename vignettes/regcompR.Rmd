@@ -161,7 +161,8 @@ plot(fit, which = "effects", variable = "x", par = "sigma")
 * `vignette("count-models")`: overdispersion, zeros and the count families.
 * `vignette("hierarchical-longitudinal")`: random effects, covariance structures, smooth terms and GEE.
 * `vignette("ordinal-categorical")`: ordinal, nominal, bivariate binary and selection models.
-* `vignette("survival")`: censoring, truncation, cure models and discrete time hazards.
+* `vignette("survival")`: censoring, truncation, cure models, Cox and frailty models and discrete time hazards.
 * `vignette("regularization")`: penalized and bias reduced estimation.
 * `vignette("model-checking")`: residuals, scoring rules, cross validation and comparison.
+* `vignette("reporting")`: regression tables, tidy output and export of tables and plots.
 * `vignette("bayesian")`: priors, generated Stan and BUGS programs and Bayesian fitting.

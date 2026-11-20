@@ -14,12 +14,24 @@
 #' grouped proportional hazards model; random effects such as `(1 | id)`
 #' give frailty and multilevel survival models.
 #'
+#' With `cuts = "events"` the time is continuous and the periods are the
+#' distinct event times: each subject has one row per event time at or
+#' before its own time, the risk set of that time. A Poisson regression of
+#' `event` on `0 + factor(period)` and covariates then gives exactly the
+#' Cox proportional hazards estimates with Breslow ties and their standard
+#' errors (Whitehead 1980; Laird and Olivier 1981); random effects give
+#' Cox frailty models, and `engine = "bayes"` a Bayesian Cox model.
+#'
 #' @param data Data frame with one row per subject.
 #' @param time Name of the column with the last observed period (a
-#'   positive integer).
+#'   positive integer), or the observed time when `cuts` is given.
 #' @param status Name of the column with 1 for an event in period `time`
 #'   and 0 for censoring after it.
 #' @param start First period (default 1).
+#' @param cuts `NULL` for integer periods, `"events"` for the distinct event
+#'   times, or a sorted numeric vector of period end points. Subjects whose
+#'   time is before the first cut are dropped, as in the Cox risk sets. The
+#'   column `period_time` holds the cut of each row.
 #' @return The expanded data frame with columns `period` and `event`.
 #' @export
 #' @examples
@@ -30,7 +42,17 @@
 #'                links = list(prob = "cloglog"), data = person_period(
 #'                  data.frame(t = rpois(200, 3) + 1, d = rbinom(200, 1, 0.7),
 #'                             x = rnorm(200)), "t", "d"))
-person_period <- function(data, time, status, start = 1) {
+person_period <- function(data, time, status, start = 1, cuts = NULL) {
+  if (!is.null(cuts)) {
+    if (identical(cuts, "events")) cuts <- sort(unique(data[[time]][data[[status]] == 1]))
+    k <- findInterval(data[[time]], cuts)
+    # An event at a time that is not a cut cannot be placed in a risk set.
+    if (any(data[[status]] == 1 & !data[[time]] %in% cuts, na.rm = TRUE)) stop_input("Every event time must be one of the cuts.")
+    data <- data[k > 0, , drop = FALSE]; data[[time]] <- k[k > 0]
+    out <- person_period(data, time, status)
+    out$period_time <- cuts[out$period]
+    return(out)
+  }
   tt <- data[[time]]
   if (any(tt < start | tt != round(tt), na.rm = TRUE)) stop_input("time must contain integers not below start.")
   reps <- tt - start + 1

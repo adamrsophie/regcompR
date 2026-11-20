@@ -32,9 +32,14 @@ obs_scores <- function(fit) {
 #' Zeger 1986) and `M` is multiplied by `G / (G - 1)` for `G` clusters.
 #' This is the independence working model of generalized estimating
 #' equations for any family; see [gee()] for other working correlations.
+#' `type = "quasi"` multiplies the model covariance by the Pearson
+#' dispersion `sum(r^2) / (n - p)` of the Pearson residuals `r`: the
+#' quasi-likelihood covariance of `glm(family = quasibinomial)` and
+#' `quasipoisson` (McCullagh and Nelder 1989, ch. 9) when the family is
+#' binomial or Poisson, whose estimates are the same.
 #'
 #' @param object A fitted model.
-#' @param type `"model"` or `"sandwich"`.
+#' @param type `"model"`, `"sandwich"` or `"quasi"`.
 #' @param cluster Optional cluster identifier: a vector, or a one sided
 #'   formula evaluated in the model data.
 #' @param ... Unused.
@@ -46,18 +51,19 @@ obs_scores <- function(fit) {
 #' d$y <- rpois(150, exp(0.3 + 0.5 * d$x + rnorm(30, 0, 0.5)[d$g]))
 #' fit <- regcomp(y ~ x, family = "poisson", data = d)
 #' sqrt(diag(vcov(fit, type = "sandwich", cluster = ~ g)))
-vcov.regcomp_fit <- function(object, type = c("model", "sandwich"), cluster = NULL, ...) {
+vcov.regcomp_fit <- function(object, type = c("model", "sandwich", "quasi"), cluster = NULL, ...) {
   type <- match.arg(type)
   bn <- object$spec$beta_names
   if (object$inference == "bayesian") {
-    if (type == "sandwich") stop_unsupported("A sandwich covariance for a Bayesian fit")
+    if (type != "model") stop_unsupported(sprintf("A %s covariance for a Bayesian fit", type))
     return(stats::cov(object$draws[, bn, drop = FALSE]))
   }
   v <- object$vcov
   if (is.null(v)) stop_unsupported("A covariance matrix for this fit (penalized or hessian = FALSE)")
   V <- v[bn, bn, drop = FALSE]
   if (type == "model") return(V)
-  if (object$spec$Q > 0) stop_unsupported("A sandwich covariance for models with random effects or smooths")
+  if (object$spec$Q > 0) stop_unsupported(sprintf("A %s covariance for models with random effects or smooths", type))
+  if (type == "quasi") return(V * sum(stats::residuals(object, type = "pearson")^2) / (object$nobs - length(bn)))
   S <- obs_scores(object)
   if (!is.null(cluster)) {
     if (inherits(cluster, "formula"))

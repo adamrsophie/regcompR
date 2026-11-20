@@ -4,18 +4,23 @@
 \alias{person_period}
 \title{Person period data for discrete time hazard models}
 \usage{
-person_period(data, time, status, start = 1)
+person_period(data, time, status, start = 1, cuts = NULL)
 }
 \arguments{
 \item{data}{Data frame with one row per subject.}
 
 \item{time}{Name of the column with the last observed period (a
-positive integer).}
+positive integer), or the observed time when \code{cuts} is given.}
 
 \item{status}{Name of the column with 1 for an event in period \code{time}
 and 0 for censoring after it.}
 
 \item{start}{First period (default 1).}
+
+\item{cuts}{\code{NULL} for integer periods, \code{"events"} for the distinct event
+times, or a sorted numeric vector of period end points. Subjects whose
+time is before the first cut are dropped, as in the Cox risk sets. The
+column \code{period_time} holds the cut of each row.}
 }
 \value{
 The expanded data frame with columns \code{period} and \code{event}.
@@ -29,6 +34,15 @@ effects and covariates is the discrete time hazard model: the \code{logit}
 link gives the proportional odds model and the \code{cloglog} link the
 grouped proportional hazards model; random effects such as \code{(1 | id)}
 give frailty and multilevel survival models.
+}
+\details{
+With \code{cuts = "events"} the time is continuous and the periods are the
+distinct event times: each subject has one row per event time at or
+before its own time, the risk set of that time. A Poisson regression of
+\code{event} on \code{0 + factor(period)} and covariates then gives exactly the
+Cox proportional hazards estimates with Breslow ties and their standard
+errors (Whitehead 1980; Laird and Olivier 1981); random effects give
+Cox frailty models, and \code{engine = "bayes"} a Bayesian Cox model.
 }
 \examples{
 d <- data.frame(id = 1:3, t = c(2, 3, 1), d = c(1, 0, 1), x = c(0.5, -1, 2))

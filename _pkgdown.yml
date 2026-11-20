@@ -22,6 +22,7 @@ articles:
   - survival
   - regularization
   - model-checking
+  - reporting
   - bayesian
 
 reference:
@@ -81,6 +82,11 @@ reference:
   - skew_symmetric
   - sine_skew
   - exponentiated
+- title: Tables and export
+  contents:
+  - regcomp_table
+  - tidy.regcomp_fit
+  - export_table
 - title: Results and prediction
   contents:
   - summary.regcomp_fit

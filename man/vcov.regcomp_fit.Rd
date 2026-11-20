@@ -4,12 +4,12 @@
 \alias{vcov.regcomp_fit}
 \title{Covariance of the estimates}
 \usage{
-\method{vcov}{regcomp_fit}(object, type = c("model", "sandwich"), cluster = NULL, ...)
+\method{vcov}{regcomp_fit}(object, type = c("model", "sandwich", "quasi"), cluster = NULL, ...)
 }
 \arguments{
 \item{object}{A fitted model.}
 
-\item{type}{\code{"model"} or \code{"sandwich"}.}
+\item{type}{\code{"model"}, \code{"sandwich"} or \code{"quasi"}.}
 
 \item{cluster}{Optional cluster identifier: a vector, or a one sided
 formula evaluated in the model data.}
@@ -28,6 +28,11 @@ with \code{cluster} the scores are first summed within clusters (Liang and
 Zeger 1986) and \code{M} is multiplied by \code{G / (G - 1)} for \code{G} clusters.
 This is the independence working model of generalized estimating
 equations for any family; see \code{\link[=gee]{gee()}} for other working correlations.
+\code{type = "quasi"} multiplies the model covariance by the Pearson
+dispersion \code{sum(r^2) / (n - p)} of the Pearson residuals \code{r}: the
+quasi-likelihood covariance of \code{glm(family = quasibinomial)} and
+\code{quasipoisson} (McCullagh and Nelder 1989, ch. 9) when the family is
+binomial or Poisson, whose estimates are the same.
 }
 \examples{
 set.seed(1)
