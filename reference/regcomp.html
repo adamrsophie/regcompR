@@ -11,8 +11,9 @@ offsets, factors and interactions, random effects in lme4 syntax
 ((1 | g), (1 + x | g), uncorrelated (1 + x || g), nested (1 | a/b),
 crossed (1 | a) + (1 | b)), structured random effects for longitudinal and
 spatial data written as glmmTMB style wrappers, and smooth terms
-s(), te(), ti() and t2() from 'mgcv', which are fitted in their
-mixed model representation."><meta property="og:description" content="Every regression parameter of the response distribution gets its own
+s() and t2() from 'mgcv', which are fitted in their mixed model
+representation (as in mgcv::gamm()). Tensor products te() and ti()
+have no such representation; use t2() instead."><meta property="og:description" content="Every regression parameter of the response distribution gets its own
 linear predictor on its link scale. The first formula gives the response
 and the predictor of the main parameter: the parameter equal to the mean
 if there is one, else the location, scale or rate parameter, else the
@@ -24,8 +25,9 @@ offsets, factors and interactions, random effects in lme4 syntax
 ((1 | g), (1 + x | g), uncorrelated (1 + x || g), nested (1 | a/b),
 crossed (1 | a) + (1 | b)), structured random effects for longitudinal and
 spatial data written as glmmTMB style wrappers, and smooth terms
-s(), te(), ti() and t2() from 'mgcv', which are fitted in their
-mixed model representation."><meta property="og:image" content="https://adamrsophie.github.io/regcompR/logo.svg"></head><body>
+s() and t2() from 'mgcv', which are fitted in their mixed model
+representation (as in mgcv::gamm()). Tensor products te() and ti()
+have no such representation; use t2() instead."><meta property="og:image" content="https://adamrsophie.github.io/regcompR/logo.svg"></head><body>
     <a href="#main" class="visually-hidden-focusable">Skip to contents</a>
 
 
@@ -88,8 +90,9 @@ offsets, factors and interactions, random effects in <code>lme4</code> syntax
 (<code>(1 | g)</code>, <code>(1 + x | g)</code>, uncorrelated <code>(1 + x || g)</code>, nested <code>(1 | a/b)</code>,
 crossed <code>(1 | a) + (1 | b)</code>), structured random effects for longitudinal and
 spatial data written as glmmTMB style wrappers, and smooth terms
-<code>s()</code>, <code>te()</code>, <code>ti()</code> and <code>t2()</code> from 'mgcv', which are fitted in their
-mixed model representation.</p>
+<code>s()</code> and <code>t2()</code> from 'mgcv', which are fitted in their mixed model
+representation (as in <code><a href="https://rdrr.io/pkg/mgcv/man/gamm.html" class="external-link">mgcv::gamm()</a></code>). Tensor products <code>te()</code> and <code>ti()</code>
+have no such representation; use <code>t2()</code> instead.</p>
     </div>
 
     <div class="section level2">

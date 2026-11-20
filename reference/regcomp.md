@@ -12,8 +12,11 @@ offsets, factors and interactions, random effects in `lme4` syntax
 (`(1 | g)`, `(1 + x | g)`, uncorrelated `(1 + x || g)`, nested
 `(1 | a/b)`, crossed `(1 | a) + (1 | b)`), structured random effects for
 longitudinal and spatial data written as glmmTMB style wrappers, and
-smooth terms `s()`, `te()`, `ti()` and `t2()` from 'mgcv', which are
-fitted in their mixed model representation.
+smooth terms `s()` and `t2()` from 'mgcv', which are fitted in their
+mixed model representation (as in
+[`mgcv::gamm()`](https://rdrr.io/pkg/mgcv/man/gamm.html)). Tensor
+products `te()` and `ti()` have no such representation; use `t2()`
+instead.
 
 ## Usage
 

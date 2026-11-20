@@ -6,9 +6,9 @@ law is scaled by `1 - sum(pi)`. For a continuous base law the result is
 a mixed distribution whose log likelihood uses the point mass at `c_j`
 and the scaled density elsewhere. One inflation parameter per point is
 added (named `zi`, `oi` or `pi1`, `pi2`, ...), each in (0, 1) with a
-logit link; with several points the parameters are mapped to weights
-through a multinomial logit (stick breaking is not used), so
-`pi_j = exp(eta_j) / (1 + sum(exp(eta)))`.
+logit link. The parameters are the point mass weights themselves; with
+several points their sum must stay below one. Points must be distinct,
+and for a discrete base law they must lie on its integer support.
 
 ## Usage
 

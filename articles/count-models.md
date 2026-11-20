@@ -61,8 +61,8 @@ AIC(fzi, fhu)
 #> fhu  5 1683.325
 predict(fzi, data.frame(x = c(-1, 1)), type = "probability", at = 0)
 #>      probability(0)
-#> [1,]      0.4427475
-#> [2,]      0.5988394
+#> [1,]      0.4427496
+#> [2,]      0.5988429
 ```
 
 ## Exact and quantile methods
