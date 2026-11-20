@@ -63,9 +63,13 @@ cfam3("eppm_faddy", "Extended Poisson process model (Faddy and Smith)", list(P("
   P("c", "real", role = "rate power", link = "identity", interpretation = "c < 1; c = 0 is Poisson, c = 1 the negative binomial limit")),
   aliases = c("eppm", "faddy"),
   formula = "State at time 1 of a pure birth process from 0 with rates lambda_n = a (b + n)^c",
-  lpdf = function(y, p) pervec(y, p, function(x, pp) {
-    if (abs(pp$c) < 1e-12) return(stats::dpois(x, pp$a, log = TRUE))
-    nmax <- max(50, x + 40, ceiling(5 * pp$a * (pp$b + x)^max(pp$c, 0) + 50)); log(eppm_probs(pp$a, pp$b, pp$c, nmax)[x + 1]) }),
+  # One matrix exponential per distinct parameter set, covering all its counts.
+  lpdf = function(y, p) { r <- recycle_pars(c(list(.y = y), p)); key <- paste(r$a, r$b, r$c); out <- numeric(length(r$.y))
+    for (g in unique(key)) { i <- which(key == g); a <- r$a[i[1]]; b <- r$b[i[1]]; cc <- r$c[i[1]]; x <- r$.y[i]
+      if (abs(cc) < 1e-12) { out[i] <- stats::dpois(x, a, log = TRUE); next }
+      xm <- max(x); nmax <- max(50, xm + 40, ceiling(5 * a * (b + xm)^max(cc, 0) + 50))
+      out[i] <- log(eppm_probs(a, b, cc, nmax)[x + 1]) }
+    out },
   numerical_notes = "Probabilities from the matrix exponential of the generator truncated at a state far beyond the data (the last state absorbs).",
   references = c("Faddy (1997), Extended Poisson process modelling and analysis of count data. Biometrical J., 39, 431-440.",
                  "Faddy and Smith (2011), Analysis of count data with covariate dependence in both mean and variance. J. Appl. Stat., 38, 2683-2694."),

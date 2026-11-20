@@ -314,10 +314,17 @@ weighted <- function(base, k = 1) {
   base <- get_family(base)
   if (k == 0) return(base)
   if (k < 0) stop_input("k must be nonnegative.")
+  # E[Y^k]: analytic for k = 1, 2 when the base law has moments; otherwise a
+  # sum or integral, computed once per distinct parameter row.
   logm <- function(p) {
-    n <- max(lengths(p))
-    vapply(seq_len(n), function(i) {
-      pi_ <- lapply(p, function(v) v[(i - 1) %% length(v) + 1])
+    n <- max(lengths(p)); r <- lapply(p, rep_len, n)
+    if (k %in% c(1, 2) && !is.null(base$mean) && (k == 1 || !is.null(base$variance))) {
+      m <- base$mean(r); if (k == 2) m <- base$variance(r) + m^2
+      if (all(is.finite(m) & m > 0)) return(log(rep_len(m, n)))
+    }
+    key <- do.call(paste, unname(r)); u <- which(!duplicated(key))
+    vals <- vapply(u, function(i) {
+      pi_ <- lapply(r, `[`, i)
       m <- if (base$discrete) {
         s <- base$support(pi_)
         hi <- if (is.finite(s$upper)) s$upper else family_quantile(base, 1 - 1e-16, pi_) * 2 + 100
@@ -329,6 +336,7 @@ weighted <- function(base, k = 1) {
                          max(s$lower, 0), s$upper, rel.tol = 1e-10, subdivisions = 500L)$value
       }
       log(m) }, 0)
+    vals[match(key, key[u])]
   }
   op_family(base, sprintf("weighted(%s, %s)", base$id, k), sprintf("Weighted (y^%s) %s", k, base$display_name),
             base$pars, function(y, p) k * log(y) + eval_lpdf(base, y, p) - logm(p),

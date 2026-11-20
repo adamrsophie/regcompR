@@ -345,6 +345,9 @@ build_spec <- function(formula, dots, fam, data, weights = NULL, links = NULL,
     if (is.character(msg) && length(msg) && nzchar(msg[1]))
       stop_domain(paste("With the fixed parameter values:", msg[1]))
   }
+  # Dense copies of small random effect designs (faster Laplace iterations).
+  if (isTRUE(spec$Q > 0 && spec$Q <= 300 && spec$Q * spec$n <= 5e6))
+    spec$Zd <- lapply(spec$Z, function(z) if (!is.null(z)) as.matrix(z))
   spec
 }
 
@@ -451,6 +454,9 @@ laplace_inner <- function(spec, beta, theta, u0, control, retry = TRUE) {
   Lam <- re_precision(spec, theta)
   u <- if (is.null(u0)) rep(0, spec$Q) else u0
   rk <- spec$rpars[!vapply(spec$rpars, function(k) is.null(spec$Z[[k]]), TRUE)]
+  # Few random effects: dense base matrices avoid the sparse S4 overhead.
+  dense <- spec$Q <= 300
+  if (dense) { Lam <- as.matrix(Lam); Zs <- if (!is.null(spec$Zd)) spec$Zd[rk] else lapply(spec$Z[rk], as.matrix) } else Zs <- spec$Z[rk]
   fval <- function(u) {
     eta <- compute_eta(spec, beta, u)
     sum(spec$weights * loglik_eta(spec, eta)) - 0.5 * sum(u * as.vector(Lam %*% u))
@@ -461,30 +467,34 @@ laplace_inner <- function(spec, beta, theta, u0, control, retry = TRUE) {
     d <- eta_derivs(spec, compute_eta(spec, beta, u), second = TRUE, which = rk)
     grad <- -as.vector(Lam %*% u); H <- Lam
     for (a in seq_along(rk)) {
-      Za <- spec$Z[[rk[a]]]
-      grad <- grad + as.vector(Matrix::crossprod(Za, spec$weights * d$g[, a]))
+      Za <- Zs[[a]]
+      grad <- grad + as.vector(crossprod(Za, spec$weights * d$g[, a]))
       for (b in seq_along(rk))
-        H <- H - Matrix::crossprod(Za, spec$Z[[rk[b]]] * (spec$weights * d$W[, a, b]))
+        H <- H - crossprod(Za, Zs[[b]] * (spec$weights * d$W[, a, b]))
     }
-    list(grad = grad, negH = Matrix::forceSymmetric(H))
+    list(grad = grad, negH = if (dense) (H + t(H)) / 2 else Matrix::forceSymmetric(H))
+  }
+  chol1 <- function(M) {
+    fail <- function(e) NULL
+    if (dense) tryCatch(chol(M), error = fail, warning = fail)
+    else tryCatch(Matrix::Cholesky(M, perm = TRUE, LDL = FALSE), error = fail, warning = fail)
   }
   factor <- function(negH) {
-    fail <- function(e) NULL
-    ch <- tryCatch(Matrix::Cholesky(negH, perm = TRUE, LDL = FALSE), error = fail, warning = fail)
+    ch <- chol1(negH)
     lam <- 0
     while (is.null(ch) && lam <= 1e8) {
       lam <- if (lam == 0) 1e-6 else lam * 10
-      ch <- tryCatch(Matrix::Cholesky(negH + lam * Matrix::Diagonal(spec$Q), perm = TRUE),
-                     error = fail, warning = fail)
+      ch <- chol1(negH + lam * (if (dense) diag(spec$Q) else Matrix::Diagonal(spec$Q)))
     }
     list(ch = ch, lam = lam)
   }
+  csolve <- function(ch, g) if (dense) backsolve(ch, backsolve(ch, g, transpose = TRUE)) else as.vector(Matrix::solve(ch, g))
   f <- fval(u)
   for (it in seq_len(control$inner_maxit)) {
     dd <- derivs(u)
     if (max(abs(dd$grad)) < control$inner_tol) break
     fc <- factor(dd$negH)
-    step <- as.vector(Matrix::solve(fc$ch, dd$grad))
+    step <- csolve(fc$ch, dd$grad)
     if (max(abs(step)) < 1e-9) break
     t <- 1
     repeat {
@@ -507,7 +517,8 @@ laplace_inner <- function(spec, beta, theta, u0, control, retry = TRUE) {
     max(abs(dd$grad)) < sqrt(control$inner_tol) * (1 + max(abs(u)))
   if (!ok && retry && !is.null(u0) && any(u0 != 0))
     return(laplace_inner(spec, beta, theta, NULL, control, retry = FALSE))
-  ld <- if (ok) 2 * as.numeric(Matrix::determinant(fc$ch, logarithm = TRUE, sqrt = TRUE)$modulus) else NA_real_
+  ld <- if (!ok) NA_real_ else if (dense) 2 * sum(log(diag(fc$ch))) else
+    2 * as.numeric(Matrix::determinant(fc$ch, logarithm = TRUE, sqrt = TRUE)$modulus)
   list(u = u, f = f, logdet = ld, negH = dd$negH, converged = ok)
 }
 

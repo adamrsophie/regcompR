@@ -183,8 +183,8 @@ gee <- function(formula, data, id, family = stats::gaussian(),
     A <- matrix(0, p, p); U <- numeric(p)
     for (i in cl) {
       D <- X[i, , drop = FALSE] * dmu[i]
-      Vi <- sqrt(v[i]) * t(sqrt(v[i]) * Rfun(alpha, wv[i]))
-      Wi <- solve(Vi, D)
+      # Independence: V_i is diagonal, no dense solve.
+      Wi <- if (corstr == "independence") D / v[i] else solve(sqrt(v[i]) * t(sqrt(v[i]) * Rfun(alpha, wv[i])), D)
       A <- A + crossprod(D, Wi); U <- U + drop(crossprod(Wi, y[i] - mu[i]))
     }
     step <- solve(A, U)
@@ -197,8 +197,7 @@ gee <- function(formula, data, id, family = stats::gaussian(),
   A <- matrix(0, p, p); B <- matrix(0, p, p)
   for (i in cl) {
     D <- X[i, , drop = FALSE] * dmu[i]
-    Vi <- phi * sqrt(v[i]) * t(sqrt(v[i]) * Rfun(alpha, wv[i]))
-    Wi <- solve(Vi, D)
+    Wi <- if (corstr == "independence") D / (phi * v[i]) else solve(phi * sqrt(v[i]) * t(sqrt(v[i]) * Rfun(alpha, wv[i])), D)
     A <- A + crossprod(D, Wi)
     s <- drop(crossprod(Wi, y[i] - mu[i])); B <- B + tcrossprod(s)
   }

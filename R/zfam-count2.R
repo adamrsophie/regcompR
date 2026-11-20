@@ -22,12 +22,39 @@ register_family(family_def(
                         "rc_cmp_lpmf({y} | {lambda}, {nu})"),
   start = function(y) list(lambda = max(mean(y), 0.1), nu = 1), status = "validated"))
 
-cmp_lambda_for_mean <- function(mu, nu) vapply(seq_along(mu), function(i) {
-  f <- function(ll) cmp_nc$mean(list(lambda = exp(ll), nu = nu[i])) - mu[i]
-  a <- nu[i] * log(max(mu[i], 1e-8)); lo <- a - 5; hi <- a + 5
-  while (f(lo) > 0) lo <- lo - 5
-  while (f(hi) < 0) hi <- hi + 5
-  exp(stats::uniroot(f, c(lo, hi), tol = 1e-12)$root) }, 0)
+# Newton steps in log(lambda), using d E(Y) / d log(lambda) = Var(Y), from
+# the asymptotic start lambda = (mu + (nu - 1) / (2 nu))^nu; bracketing root
+# search only as a fallback. Solved once per distinct (mu, nu) pair.
+# Mean and variance of CMP(lambda, nu) in one pass over the series.
+cmp_moments <- function(lambda, nu) {
+  K <- 256
+  repeat {
+    k <- 0:(K - 1); lt <- k * log(lambda) - nu * lgamma(k + 1); mx <- max(lt)
+    if (lt[K] < mx - 45 && lt[K] < lt[K - 1] || K > 4e6) break
+    K <- K * 4
+  }
+  w <- exp(lt - mx); w <- w / sum(w); m <- sum(k * w)
+  c(m, sum((k - m)^2 * w))
+}
+cmp_lambda_for_mean <- function(mu, nu) {
+  r <- recycle_pars(list(mu = mu, nu = nu)); key <- paste(r$mu, r$nu); u <- !duplicated(key)
+  sol <- vapply(which(u), function(i) {
+    m <- r$mu[i]; v <- r$nu[i]; pp <- function(ll) list(lambda = exp(ll), nu = v)
+    ll <- v * log(max(m + (v - 1) / (2 * v), m / 2, 1e-8))
+    for (it in 1:50) {
+      mv <- cmp_moments(exp(ll), v)
+      d <- (m - mv[1]) / mv[2]
+      if (!is.finite(d)) break
+      ll <- ll + max(min(d, 2), -2)
+      if (abs(d) < 1e-10) return(exp(ll))
+    }
+    f <- function(ll) cmp_nc$mean(pp(ll)) - m
+    a <- v * log(max(m, 1e-8)); lo <- a - 5; hi <- a + 5
+    while (f(lo) > 0) lo <- lo - 5
+    while (f(hi) < 0) hi <- hi + 5
+    exp(stats::uniroot(f, c(lo, hi), tol = 1e-12)$root) }, 0)
+  sol[match(key, key[u])]
+}
 register_family(family_def(
   "conway_maxwell_poisson_mean", "Conway-Maxwell-Poisson (mean parameterization)", cnt, discrete = TRUE, aliases = "cmp_mu",
   pars = list(log_mean_par("mu"), cnt_par("nu", role = "dispersion")),

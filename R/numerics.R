@@ -153,6 +153,20 @@ integrate_safe <- function(f, lower, upper, rel_tol = 1e-10, ...) {
 # Generic numerical CDF of a continuous family by integrating its density from
 # the lower end of the support.
 numeric_cdf_cont <- function(lpdf, q, pars, lower, whole = FALSE) {
+  # One parameter set and many points: integrate between sorted points and
+  # accumulate, instead of integrating from the lower bound for each point.
+  if (!whole && length(q) > 5 && length(unique(lower)) == 1 &&
+      all(vapply(pars, function(v) length(unique(v)) <= 1, TRUE))) {
+    p1 <- lapply(pars, `[`, 1); lo <- lower[1]
+    f <- function(t) exp(lpdf(t, lapply(p1, rep_len, length(t))))
+    ok <- which(!is.na(q) & q > lo); out <- rep(NA_real_, length(q)); out[!is.na(q) & q <= lo] <- 0
+    if (length(ok)) {
+      uq <- sort(unique(q[ok])); br <- c(lo, uq)
+      seg <- vapply(seq_along(uq), function(j) integrate_safe(f, br[j], br[j + 1]), 0)
+      out[ok] <- pmin(1, pmax(0, cumsum(seg)))[match(q[ok], uq)]
+    }
+    return(out)
+  }
   vapply(seq_along(q), function(i) {
     if (is.na(q[i])) return(NA_real_)
     if (q[i] <= lower[i]) return(0)
@@ -186,8 +200,9 @@ invert_cdf <- function(cdf, p, pars, discrete, lower = -Inf, upper = Inf,
   p <- rep_len(p, n)
   lower <- rep_len(lower, n); upper <- rep_len(upper, n); start <- rep_len(start, n)
   out <- numeric(n)
+  pars <- lapply(pars, rep_len, n)
   for (i in seq_len(n)) {
-    pi_ <- lapply(pars, function(v) rep_len(v, n)[i])
+    pi_ <- lapply(pars, `[`, i)
     if (is.na(p[i]) || any(is.na(unlist(pi_)))) { out[i] <- NA; next }
     if (p[i] < 0 || p[i] > 1) { out[i] <- NaN; next }
     if (p[i] == 0) { out[i] <- lower[i]; next }

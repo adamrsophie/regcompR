@@ -392,11 +392,16 @@ quantile.regcomp_dist <- function(x, probs = c(0.025, 0.5, 0.975),
   out
 }
 
-family_quantile <- function(fam, p, pars) {
+family_quantile <- function(fam, p, pars, grid = TRUE) {
   if (!is.null(fam$quantile)) return(fam$quantile(p, pars))
   if (is.null(fam$cdf) && !isTRUE(fam$numeric_cdf)) stop_unsupported("The quantile function", fam$id)
   s <- fam$support(pars)
   n <- length(p)
+  # Many probabilities with one parameter set (random draws): invert on a
+  # grid once, then refine every value at once inside its grid cell.
+  if (grid && !fam$discrete && !scalar_vecpar(fam) && n > 40 && length(pars) &&
+      all(vapply(pars, function(v) length(unique(v)) == 1, TRUE)))
+    return(quantile_grid(fam, p, lapply(pars, `[`, 1)))
   start <- tryCatch({
     m <- family_moment(fam, "mean", pars, quiet = TRUE)
     ifelse(is.finite(m), m, 0)
@@ -638,3 +643,33 @@ format.regcomp_dist <- function(x, ...) sprintf("%s(%s)", x$family$id,
   paste(names(x$pars), "=", vapply(x$pars, function(v)
     paste(format(utils::head(as.numeric(v), 3), digits = 3), collapse = ","), ""),
     collapse = ", "))
+
+quantile_grid <- function(fam, p, p1) {
+  g <- c(1e-8, 1e-5, 1e-3, seq(0.01, 0.99, by = 0.02), 1 - 1e-3, 1 - 1e-5, 1 - 1e-8)
+  qg <- family_quantile(fam, g, p1, grid = FALSE)
+  out <- rep(NA_real_, length(p))
+  F <- function(q) family_cdf(fam, q, lapply(p1, rep, length(q)))
+  inn <- which(!is.na(p) & p >= g[1] & p <= g[length(g)])
+  if (length(inn)) {
+    j <- findInterval(p[inn], g, rightmost.closed = TRUE)
+    a <- qg[j]; b <- qg[j + 1]; fa <- g[j] - p[inn]; fb <- g[j + 1] - p[inn]
+    # Illinois (modified regula falsi), vectorized over all values.
+    x <- a; side <- 0L
+    for (it in 1:60) {
+      x <- ifelse(fb != fa, (a * fb - b * fa) / (fb - fa), (a + b) / 2)
+      fx <- F(x) - p[inn]
+      if (max(abs(fx)) < 1e-13 || max(abs(b - a) / pmax(1, abs(x))) < 1e-14) break
+      lft <- fx * fa > 0
+      a[lft] <- x[lft]; fa[lft] <- fx[lft]; fb[lft & side == 1L] <- fb[lft & side == 1L] / 2
+      b[!lft] <- x[!lft]; fb[!lft] <- fx[!lft]; fa[!lft & side == -1L] <- fa[!lft & side == -1L] / 2
+      side <- ifelse(lft, 1L, -1L)
+    }
+    out[inn] <- x
+  }
+  rest <- setdiff(seq_along(p), inn)
+  if (length(rest)) {
+    pr <- p[rest]; ok <- !is.na(pr)
+    if (any(ok)) out[rest[ok]] <- vapply(pr[ok], function(u) family_quantile(fam, u, p1), 0)
+  }
+  out
+}

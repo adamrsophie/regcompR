@@ -313,3 +313,15 @@ test_that("generators, scoring, capabilities and limits", {
   db <- data.frame(y = 1:6, g = rep(1:2, each = 3), t = factor(rep(1:3, 2)))
   expect_error(bugs_code(y ~ 1 + ar1(0 + t | g), family = "normal", data = db), "BUGS")
 })
+
+test_that("fast paths agree with the direct computations", {
+  lam <- cmp_lambda_for_mean(c(0.5, 5, 20), c(0.4, 1, 2.5))
+  expect_equal(vapply(1:3, function(i) cmp_nc$mean(list(lambda = lam[i], nu = c(0.4, 1, 2.5)[i])), 0), c(0.5, 5, 20), tolerance = 1e-8)
+  w <- distribution(weighted("poisson"), lambda = 2)
+  expect_equal(prob(w, 3), 3 * dpois(3, 2) / 2)
+  d <- distribution("hyperbolic", mu = 0, delta = 1, alpha = 2, beta = 0.5)
+  u <- seq(0.05, 0.95, length.out = 60)
+  expect_equal(quantile(d, u)[c(1, 30, 60)], vapply(u[c(1, 30, 60)], function(v) quantile(d, v), 0), tolerance = 1e-8)
+  set.seed(4); dd <- data.frame(g = rep(1:20, each = 3), x = rnorm(60)); dd$y <- rpois(60, exp(0.3 + 0.2 * dd$x))
+  expect_equal(unname(coef(gee(y ~ x, data = dd, id = g, family = poisson()))), unname(coef(glm(y ~ x, poisson, dd))), tolerance = 1e-6)
+})

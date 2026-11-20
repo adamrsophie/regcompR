@@ -56,8 +56,34 @@ loglik_eta <- function(spec, eta) {
 # First and second derivatives of per observation log likelihood with
 # respect to each linear predictor, by central finite differences.
 # Returns g (n x K) and W (n x K x K) together with ll.
+# First and second derivatives of the log density in one parameter, for
+# common families (uncensored rows); others use finite differences.
+analytic_dpar <- list(
+  normal = list(mu = function(y, p) list((y - p$mu) / p$sigma^2, rep(-1, length(y)) / p$sigma^2)),
+  poisson = list(lambda = function(y, p) list(y / p$lambda - 1, -y / p$lambda^2)),
+  bernoulli = list(prob = function(y, p) list(y / p$prob - (1 - y) / (1 - p$prob), -y / p$prob^2 - (1 - y) / (1 - p$prob)^2)),
+  binomial = list(prob = function(y, p) list(y / p$prob - (p$size - y) / (1 - p$prob), -y / p$prob^2 - (p$size - y) / (1 - p$prob)^2)),
+  negative_binomial_nb2 = list(mu = function(y, p) list(y / p$mu - (y + p$phi) / (p$mu + p$phi), -y / p$mu^2 + (y + p$phi) / (p$mu + p$phi)^2)))
+
+# d theta / d eta and d2 theta / d eta2 of an inverse link.
+link_d12 <- function(lk, e) {
+  switch(lk$name,
+    identity = list(rep(1, length(e)), rep(0, length(e))),
+    log = { v <- exp(e); list(v, v) },
+    logit = { v <- stats::plogis(e); d <- v * (1 - v); list(d, d * (1 - 2 * v)) },
+    { h <- 1e-4 * pmax(1, abs(e)); i0 <- lk$linkinv(e); ip <- lk$linkinv(e + h); im <- lk$linkinv(e - h)
+      list((ip - im) / (2 * h), (ip - 2 * i0 + im) / h^2) })
+}
+
 eta_derivs <- function(spec, eta, second = TRUE, which = spec$rpars) {
   rp <- which
+  if (length(rp) == 1 && is.null(spec$cmat) && !is.null(f1 <- analytic_dpar[[spec$fam$id]][[rp]])) {
+    ll0 <- loglik_eta(spec, eta)
+    pars <- eta_to_pars(spec, eta); d <- f1(spec$y, pars); hd <- link_d12(spec$links[[rp]], eta[[rp]])
+    g <- d[[1]] * hd[[1]]; w <- d[[2]] * hd[[1]]^2 + d[[1]] * hd[[2]]
+    g[!is.finite(g)] <- 0; w[!is.finite(w)] <- 0
+    return(list(ll = ll0, g = matrix(g, ncol = 1), W = if (second) array(w, c(spec$n, 1, 1))))
+  }
   K <- length(rp)
   n <- spec$n
   ll0 <- loglik_eta(spec, eta)
@@ -106,7 +132,8 @@ compute_eta <- function(spec, beta, u = NULL) {
   for (k in spec$rpars) {
     pr <- spec$preds[[k]]
     e <- drop(pr$X %*% beta[spec$beta_idx[[k]]]) + pr$offset
-    if (!is.null(u) && !is.null(spec$Z[[k]])) e <- e + drop(as.matrix(spec$Z[[k]] %*% u))
+    if (!is.null(u) && !is.null(spec$Z[[k]]))
+      e <- e + if (!is.null(spec$Zd[[k]])) drop(spec$Zd[[k]] %*% u) else drop(as.matrix(spec$Z[[k]] %*% u))
     out[[k]] <- e
   }
   if (length(spec$aux)) attr(out, "aux") <- lapply(stats::setNames(nm = names(spec$aux)), function(k)

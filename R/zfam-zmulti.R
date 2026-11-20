@@ -223,9 +223,25 @@ xfam("stiefel_uniform", "Uniform (Haar) on the Stiefel manifold", list(P("n", "p
 ml_log0F1 <- function(Fm, nsim = 2e5) { Fm <- as.matrix(Fm); n <- nrow(Fm); k <- ncol(Fm)
   if (k == 1) { kap <- sqrt(sum(Fm^2)); if (kap < 1e-10) return(0)
     return(lgamma(n / 2) + (1 - n / 2) * log(kap / 2) + log(besselI(kap, n / 2 - 1, expon.scaled = TRUE)) + kap) }
+  # The constant depends on F only through its singular values d, and then
+  # tr(F'Q) = sum_j d_j Q_jj. Haar draws by Gram-Schmidt on Gaussian columns,
+  # vectorized over draws; cached per distinct d.
+  d <- svd(Fm, nu = 0, nv = 0)$d; key <- paste(signif(c(n, d), 12), collapse = ",")
+  if (!is.null(ml_cache[[key]])) return(ml_cache[[key]])
   local_seed(20240101L)
-  v <- vapply(seq_len(nsim), function(i) { Z <- matrix(stats::rnorm(n * k), n); Q <- qr.Q(qr(Z)) %*% diag(sign(diag(qr.R(qr(Z)))), k); etr(t(Fm) %*% Q) }, 0)
-  log_sum_exp(v) - log(nsim) }
+  Qs <- list(); v <- numeric(nsim)
+  for (j in seq_len(k)) {
+    z <- matrix(stats::rnorm(nsim * n), nsim)
+    for (q in Qs) z <- z - rowSums(z * q) * q
+    z <- z / sqrt(rowSums(z^2)); Qs[[j]] <- z
+    v <- v + d[j] * z[, j]
+  }
+  w <- exp(v - max(v))
+  if (sum(w)^2 / sum(w^2) < 200)
+    stop_numerical("The matrix Langevin normalizing constant cannot be estimated reliably at this concentration.")
+  ml_cache[[key]] <- log_sum_exp(v) - log(nsim)
+}
+ml_cache <- new.env(parent = emptyenv())
 xfam("matrix_langevin", "Matrix Langevin (matrix von Mises-Fisher) on the Stiefel manifold", list(P("F", "real", role = "parameter matrix", regression = FALSE)),
   aliases = "matrix_von_mises_fisher",
   formula = "f(X) = etr(F'X) / 0F1(n/2; F'F/4) with respect to the normalized Haar measure on V_{n,k}",
