@@ -102,6 +102,7 @@ wald_test <- function(object, L, rhs = 0, vcov = "model", ...) {
 #' d$y <- rpois(300, exp(0.5 + 0.3 * d$x + 0.2 * d$x * d$z))
 #' simple_slopes(regcomp(y ~ x * z, family = "poisson", data = d), "x", "z")
 simple_slopes <- function(object, x, moderator, at = NULL, par = NULL, vcov = "model", ...) {
+  no_nl(object, "Simple slopes")
   if (object$inference != "frequentist") stop_unsupported("Simple slopes for a Bayesian fit")
   d <- object$model_data
   if (is.null(d) || !is.numeric(d[[x]])) stop_input("x must be a numeric covariate of the analysis data.")
@@ -138,6 +139,7 @@ simple_slopes <- function(object, x, moderator, at = NULL, par = NULL, vcov = "m
 #' d <- data.frame(x = rnorm(100)); d$z <- d$x + rnorm(100, 0, 0.3); d$y <- rnorm(100)
 #' vif(regcomp(y ~ x + z, family = "normal", data = d))
 vif <- function(object) {
+  no_nl(object, "Variance inflation factors")
   V <- stats::vcov(object)
   out <- lapply(object$spec$rpars, function(k) {
     X <- object$spec$preds[[k]]$X; asg <- attr(X, "assign")
@@ -178,6 +180,7 @@ vif <- function(object) {
 #' d$y <- rpois(300, exp(0.5 + 0.3 * d$x + 0.2 * d$x * d$z))
 #' johnson_neyman(regcomp(y ~ x * z, family = "poisson", data = d), "x", "z")
 johnson_neyman <- function(object, x, moderator, par = NULL, level = 0.05, n = 101, vcov = "model", plot = FALSE, ...) {
+  no_nl(object, "Johnson-Neyman intervals")
   z <- object$model_data[[moderator]]
   if (!is.numeric(z)) stop_input("The moderator must be numeric.")
   g <- simple_slopes(object, x, moderator, at = seq(min(z), max(z), length.out = n), par = par, vcov = vcov, ...)
@@ -225,6 +228,7 @@ johnson_neyman <- function(object, x, moderator, par = NULL, level = 0.05, n = 1
 #' attr(fs, "steps")
 step_regcomp <- function(object, scope = NULL, direction = c("both", "backward", "forward"),
                          criterion = c("AIC", "BIC"), par = NULL, trace = FALSE) {
+  no_nl(object, "Stepwise selection")
   direction <- match.arg(direction); criterion <- match.arg(criterion)
   if (object$inference != "frequentist") stop_unsupported("Stepwise selection of a Bayesian fit")
   par <- par %||% object$spec$rpars[1]

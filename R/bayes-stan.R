@@ -79,6 +79,7 @@ stan_spec <- function(spec) {
 }
 
 stan_program <- function(spec, priors = NULL) {
+  if (!is.null(spec$nl)) stop_unsupported("A nonlinear formula in Stan")
   spec <- stan_spec(spec)
   # Priors name the user facing parameters (mu.1); map them to the Stan
   # identifiers before matching.

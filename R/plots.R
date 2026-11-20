@@ -259,7 +259,7 @@ plot_effects <- function(fit, variable, par = "mean", level = 0.95, n = 50, by =
   data <- model_data(fit)
   if (!is.null(by)) return(plot_interaction(fit, data, variable, by, at, par, level, n, ...))
   if (is.null(variable)) {
-    vars <- unique(unlist(lapply(fit$spec$preds, function(p) all.vars(p$formula))))
+    vars <- unique(c(all.vars(fit$spec$nl$expr), unlist(lapply(fit$spec$preds, function(p) all.vars(p$formula)))))
     vars <- intersect(vars, names(data))
     if (!length(vars)) stop_input("No covariate to plot.")
     variable <- vars[1]

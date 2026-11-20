@@ -61,7 +61,15 @@
 #'
 #' @param formula Two sided formula `response ~ predictors` for the first
 #'   regression parameter. The response may be wrapped in [cens()] or
-#'   [surv()].
+#'   [surv()]. A nonlinear predictor is written `response ~ nl(expr)`, as in
+#'   `y ~ nl(a * exp(-b * x))`: the names of `expr` that have their own
+#'   formula in `...` (`a ~ 1 + (1 | g)`, `b ~ z`) are nonlinear parameters,
+#'   each with a linear predictor that may hold covariates and random
+#'   effects; the other names are covariates. `expr` gives the first
+#'   parameter on its link scale, as in `nls()`, `nlme()` and `nlmer()`.
+#'   Nonlinear parameters need starting values (`control =
+#'   regcomp_control(start = list(a = 10, b = 0.5))`) and are fitted by
+#'   `engine = "ml"`.
 #' @param ... Further formulas for other parameters, such as `sigma ~ x`,
 #'   and data arguments of the family (for example `trials = n` for the
 #'   binomial), evaluated in `data`.
@@ -113,6 +121,7 @@ regcomp <- function(formula, ..., family, data, engine = c("ml", "tmb", "bayes")
     penalty$type %in% c("ridge", "lasso", "elastic_net", "adaptive_lasso", "group_lasso", "scad", "mcp")
   spec <- build_spec(formula, mr$dots, fam, mr$data, weights = mr$weights,
                      links = links, fixed = fixed, env = parent.frame(), allow_aliased = shrink)
+  if (!is.null(spec$nl) && engine != "ml") stop_unsupported(sprintf("A nonlinear formula with engine \"%s\" (use engine = \"ml\")", engine))
   spec$data_args <- dots[setdiff(names(spec$data_args), "")]
   spec$call <- cl
   fit <- switch(engine,
@@ -258,7 +267,7 @@ nonfinite_rows <- function(f, data, env) {
     if (!is.call(e)) return()
     fn <- as.character(e[[1]])[1]
     if (fn %in% c("+", "-", "*", ":", "/", "(", "^", "%in%")) { for (a in as.list(e)[-1]) walk(a); return() }
-    if (fn %in% c("|", "||") || is_smooth_call(e) || is_struct_call(e)) {
+    if (fn %in% c("|", "||", "nl") || is_smooth_call(e) || is_struct_call(e)) {
       # Random effect and smooth terms: their variables must be present.
       for (v in all.vars(e)) if (v %in% names(data)) mark(data[[v]])
       return()
@@ -291,11 +300,18 @@ build_spec <- function(formula, dots, fam, data, weights = NULL, links = NULL,
   if (length(forms)) names(forms) <- NULL
   dargs <- dots[!is_formula]
   fl <- parse_formulas(formula, forms, fam)
+  nl <- attr(fl, "nl")
+  if (!is.null(nl)) {
+    dv <- intersect(nl$pars, names(data))
+    if (length(dv)) stop_input(sprintf("Nonlinear parameter names must differ from data columns: rename %s.", paste(dv, collapse = ", ")))
+    vs <- setdiff(all.vars(nl$expr), nl$pars)
+    nl$data <- stats::setNames(lapply(vs, function(v) eval(as.name(v), data, nl$env)), vs)
+  }
   for (k in setdiff(fam$extra$fixed_unless_formula, attr(fl, "given")))
     if (is.null(fixed[[k]])) fixed[[k]] <- fam$pars[[k]]$default
   # Parameters that take no formula, no data and are not estimated keep
   # their family default.
-  for (k in setdiff(names(fam$pars), c(names(fl), names(fixed), data_pars(fam)))) {
+  for (k in setdiff(names(fam$pars), c(names(fl), nl$par, names(fixed), data_pars(fam)))) {
     pk <- fam$pars[[k]]
     if (is.null(pk$estimate) && !is.null(pk$default)) fixed[[k]] <- pk$default
   }
@@ -313,7 +329,8 @@ build_spec <- function(formula, dots, fam, data, weights = NULL, links = NULL,
   if (is.null(prev) && is.null(cmat) && fam$variate_type == "scalar") check_response(y, fam)
   # Links.
   lk <- list()
-  for (k in rpars) {
+  for (k in nl$pars) lk[[k]] <- link("identity")
+  for (k in c(setdiff(rpars, nl$pars), nl$par)) {
     nm <- if (!is.null(links[[k]])) links[[k]] else fam$pars[[k]]$link
     if (!nm %in% fam$pars[[k]]$links)
       stop_input(sprintf("Link '%s' is not allowed for parameter '%s' (%s).", nm, k,
@@ -334,7 +351,7 @@ build_spec <- function(formula, dots, fam, data, weights = NULL, links = NULL,
     if (length(preds[[k]]$aliased) && !allow_aliased)
       stop_input(sprintf("The design for '%s' is rank deficient; aliased columns: %s. Remove them from the formula, or use a shrinkage penalty (ridge, lasso and similar) with the ml engine.",
                          k, paste(preds[[k]]$aliased, collapse = ", ")))
-    if (any(preds[[k]]$offset != 0) && !fam$pars[[k]]$offset_allowed &&
+    if (any(preds[[k]]$offset != 0) && isFALSE(fam$pars[[k]]$offset_allowed) &&
         is.null(prev))
       stop_input(sprintf("An offset is not allowed for parameter '%s' of '%s'.", k, fam$id))
   }
@@ -412,7 +429,7 @@ build_spec <- function(formula, dots, fam, data, weights = NULL, links = NULL,
     beta_idx = beta_idx, beta_names = beta_names, blocks = blocks,
     theta_idx = theta_idx, u_idx = u_idx, Z = Z, Q = Q, ntheta = toff,
     data_args = dargs, formula = formula, fixed_data = fixed_data, response_name = paste(deparse(formula[[2]]), collapse = ""),
-    aux = aux, ylev = ylev
+    aux = aux, ylev = ylev, nl = nl
   ), class = "regcomp_spec")
   if (is.null(prev) && length(fixed) && !is.null(fam$check) && length(rpars)) {
     # The family constraint with the fixed values and the starting values of
@@ -616,7 +633,14 @@ start_values <- function(spec, control) {
   ok <- is.finite(y)
   st <- if (!is.null(fam$start)) tryCatch(fam$start(y[ok]), error = function(e) list())
         else list()
-  for (k in spec$rpars) {
+  for (k in spec$nl$pars) {
+    v <- control$start[[k]]
+    if (is.null(v)) stop_input(sprintf("Nonlinear parameters need starting values, as in regcomp_control(start = list(%s)).",
+                                       paste0(spec$nl$pars, " = 1", collapse = ", ")))
+    X <- spec$preds[[k]]$X; idx <- spec$beta_idx[[k]]
+    if (length(v) == length(idx)) beta[idx] <- v else beta[idx[colnames(X) == "(Intercept)"]] <- v[1]
+  }
+  for (k in setdiff(spec$rpars, spec$nl$pars)) {
     X <- spec$preds[[k]]$X
     v <- st[[k]]
     if (is.null(v)) v <- generic_start(fam$pars[[k]], y[ok])

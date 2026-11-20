@@ -159,7 +159,7 @@ plot(fit, which = "effects", variable = "x", par = "sigma")
 * `vignette("distributions")`: the registry and distribution objects.
 * `vignette("operators")`: inflation, hurdles, mixtures, truncation, generated families and custom families.
 * `vignette("count-models")`: overdispersion, zeros and the count families.
-* `vignette("hierarchical-longitudinal")`: random effects, covariance structures, smooth terms and GEE.
+* `vignette("hierarchical-longitudinal")`: random effects, covariance structures, smooth terms, GEE and nonlinear (mixed) models.
 * `vignette("ordinal-categorical")`: ordinal, nominal, bivariate binary and selection models.
 * `vignette("survival")`: censoring, truncation, cure models, Cox and frailty models and discrete time hazards.
 * `vignette("regularization")`: penalized and bias reduced estimation.

@@ -23,7 +23,14 @@ regcomp(
 \arguments{
 \item{formula}{Two sided formula \code{response ~ predictors} for the first
 regression parameter. The response may be wrapped in \code{\link[=cens]{cens()}} or
-\code{\link[=surv]{surv()}}.}
+\code{\link[=surv]{surv()}}. A nonlinear predictor is written \code{response ~ nl(expr)}, as in
+\code{y ~ nl(a * exp(-b * x))}: the names of \code{expr} that have their own
+formula in \code{...} (\code{a ~ 1 + (1 | g)}, \code{b ~ z}) are nonlinear parameters,
+each with a linear predictor that may hold covariates and random
+effects; the other names are covariates. \code{expr} gives the first
+parameter on its link scale, as in \code{nls()}, \code{nlme()} and \code{nlmer()}.
+Nonlinear parameters need starting values (\code{control = regcomp_control(start = list(a = 10, b = 0.5))}) and are fitted by
+\code{engine = "ml"}.}
 
 \item{...}{Further formulas for other parameters, such as \code{sigma ~ x},
 and data arguments of the family (for example \code{trials = n} for the

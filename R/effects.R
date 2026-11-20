@@ -35,6 +35,8 @@ effect_inference <- function(object, q, level, vcov = "model", ...) {
              lower = est - z * se, upper = est + z * se)
 }
 
+no_nl <- function(object, what) if (!is.null(object$spec$nl)) stop_unsupported(paste(what, "for a nonlinear formula"))
+
 effect_data <- function(object, newdata) {
   d <- newdata %||% object$model_data
   if (is.null(d)) stop_input("Pass newdata: the fit stores no analysis rows.")
@@ -81,7 +83,7 @@ avg_effects <- function(object, variables = NULL, type = c("mean", "parameter", 
   par <- par %||% object$spec$rpars[1]
   d <- effect_data(object, newdata)
   if (is.null(variables)) {
-    variables <- unique(unlist(lapply(object$spec$rpars, function(k) all.vars(rhs_of(object$spec$formulas[[k]])))))
+    variables <- unique(c(all.vars(object$spec$nl$expr), unlist(lapply(object$spec$rpars, function(k) all.vars(rhs_of(object$spec$formulas[[k]]))))))
     variables <- setdiff(intersect(variables, names(d)), all.vars(object$spec$formulas[[1]][[2]]))
     grp <- unlist(lapply(object$spec$blocks, function(b) all.vars(str2lang(b$group))))
     variables <- setdiff(variables, grp)
@@ -145,7 +147,7 @@ marginal_means <- function(object, variable = NULL, at = NULL, type = c("mean", 
 # Refit with the main formula reduced to an intercept (keeping its random
 # effect terms when keep_re) and every other parameter intercept only.
 null_fit <- function(object, keep_re = FALSE) {
-  fo <- object$spec$formulas[[object$spec$rpars[1]]]
+  fo <- object$spec$formula %||% object$spec$formulas[[object$spec$rpars[1]]]
   tl <- attr(stats::terms(fo), "term.labels"); re <- if (keep_re) tl[grepl("\\|", tl)]
   nf <- stats::reformulate(c("1", if (length(re)) paste0("(", re, ")")), response = fo[[2]], env = environment(fo))
   cl <- as.list(object$call); env <- environment(fo)
@@ -181,6 +183,7 @@ obs_level_variance <- function(object) {
 # Fixed and random effect variances of the main parameter's linear predictor.
 nakagawa_parts <- function(object) {
   if (object$inference != "frequentist") stop_unsupported("R2 and ICC for a Bayesian fit")
+  no_nl(object, "Nakagawa R2 and ICC")
   spec <- object$spec; k <- spec$rpars[1]
   var_f <- stats::var(drop(spec$preds[[k]]$X %*% object$coefficients[spec$beta_idx[[k]]]))
   list(fixed = var_f, random = random_variance(object), residual = obs_level_variance(object))

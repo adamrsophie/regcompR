@@ -366,10 +366,24 @@ parse_formulas <- function(formula, dots, fam) {
     stop_input("The first formula must be two sided: response ~ predictors.")
   prim <- primary_par(fam, rp)
   fl[[prim]] <- formula
+  # A nonlinear predictor y ~ nl(expr): the names of expr that have their
+  # own formula are nonlinear parameters, each with a linear predictor.
+  rhs <- formula[[3]]
+  nl <- if (is.call(rhs) && identical(rhs[[1]], as.name("nl"))) {
+    if (length(rhs) != 2) stop_input("nl() takes one expression, as in y ~ nl(a * exp(-b * x)).")
+    lhs <- vapply(dots, function(f) if (length(f) == 3 && is.name(f[[2]])) as.character(f[[2]]) else "", "")
+    np <- intersect(lhs, all.vars(rhs[[2]]))
+    clash <- intersect(np, names(fam$pars))
+    if (length(clash)) stop_input(sprintf("Nonlinear parameter names must differ from the parameters of '%s': rename %s.",
+                                          fam$id, paste(clash, collapse = ", ")))
+    if (!length(np)) stop_input("nl() needs a formula for each nonlinear parameter, as in a ~ 1.")
+    list(par = prim, expr = rhs[[2]], pars = np, env = environment(formula))
+  }
   for (f in dots) {
     if (length(f) != 3 || !is.name(f[[2]]))
       stop_input("Formulas for further parameters must look like 'sigma ~ x'.")
     nm <- as.character(f[[2]])
+    if (nm %in% nl$pars) { fl[[nm]] <- f; next }
     if (!nm %in% names(fam$pars))
       stop_input(sprintf("'%s' is not a parameter of '%s'. Parameters: %s.", nm, fam$id,
                          paste(names(fam$pars), collapse = ", ")))
@@ -381,7 +395,8 @@ parse_formulas <- function(formula, dots, fam) {
     stats::as.formula(call("~", formula[[3]]), env = environment(formula)) else
     stats::as.formula("~ 1", env = environment(formula))
   attr(fl, "given") <- c(prim, names(fl)[vapply(names(fl), function(k) k != prim && k %in% vapply(dots, function(f) as.character(f[[2]]), ""), TRUE)])
-  structure(fl[rp], given = attr(fl, "given"))
+  keep <- c(nl$pars, setdiff(rp, nl$par))
+  structure(fl[keep], given = attr(fl, "given"), nl = nl)
 }
 
 # Expand `.` in a one sided formula to every data column except the

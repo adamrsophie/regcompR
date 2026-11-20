@@ -42,6 +42,7 @@ bugs_code <- function(formula, ..., family, data, weights = NULL, links = NULL,
 }
 
 bugs_program <- function(spec, priors = NULL, dialect = "jags") {
+  if (!is.null(spec$nl)) stop_unsupported("A nonlinear formula in BUGS")
   priors <- track_priors(priors)
   fam <- spec$fam
   bg <- fam$bugs

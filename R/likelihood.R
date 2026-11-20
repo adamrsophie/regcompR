@@ -35,6 +35,8 @@ obs_loglik <- function(fam, y, pars, cmat = NULL) {
 eta_to_pars <- function(spec, eta) {
   pars <- spec$data_pars
   for (k in spec$rpars) pars[[k]] <- spec$links[[k]]$linkinv(eta[[k]])
+  if (!is.null(nl <- spec$nl))
+    pars[[nl$par]] <- spec$links[[nl$par]]$linkinv(rep_len(eval(nl$expr, c(eta[nl$pars], nl$data), nl$env), spec$n))
   for (k in names(spec$fixed)) pars[[k]] <- if (k %in% names(spec$aux) || !is.null(spec$fam$pars[[k]]$estimate))
     spec$fixed[[k]] else rep_len(spec$fixed[[k]], spec$n)
   for (k in names(attr(eta, "aux"))) pars[[k]] <- attr(eta, "aux")[[k]]

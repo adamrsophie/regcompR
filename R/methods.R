@@ -5,6 +5,8 @@ print.regcomp_fit <- function(x, ...) {
   cat(sprintf("<regcomp_fit> %s regression, engine '%s' (%s)\n",
               x$family$display_name, x$engine, x$inference))
   if (x$approximation != "none") cat("  marginal likelihood approximation:", x$approximation, "\n")
+  if (!is.null(nl <- x$spec$nl)) cat(sprintf("  %s (%s link): nonlinear %s\n", nl$par, x$spec$links[[nl$par]]$name,
+                                             paste(deparse(nl$expr), collapse = "")))
   for (k in x$spec$rpars) cat(sprintf("  %s (%s link): %s\n", k, x$spec$links[[k]]$name,
                                       paste(deparse(rhs_of(x$spec$formulas[[k]])), collapse = "")))
   if (x$inference == "frequentist") {

@@ -173,3 +173,28 @@ pp <- person_period(sd0, "t", "d")
 fh <- regcomp(event ~ factor(period) + x + (1 | cl), family = "bernoulli", data = pp)
 coef(fh)["prob:x"]
 ```
+
+## Nonlinear models
+
+`y ~ nl(expr)` makes the first parameter a nonlinear function of
+nonlinear parameters, each with its own formula, as in `nls()`, `nlme()`
+and `nlmer()`. A random effect on a nonlinear parameter gives a nonlinear
+mixed model, fitted by the Laplace approximation (as `nlmer()` does). The
+logistic growth of orange trees, with a tree effect on the asymptote:
+
+```{r}
+O <- as.data.frame(Orange)
+O$Tree <- factor(as.character(O$Tree))
+fo <- regcomp(circumference ~ nl(Asym / (1 + exp((xmid - age) / scal))),
+              Asym ~ 1 + (1 | Tree), xmid ~ 1, scal ~ 1, family = "normal", data = O,
+              control = regcomp_control(start = list(Asym = 200, xmid = 725, scal = 350)))
+summary(fo)
+predict(fo, newdata = data.frame(age = c(500, 1500), Tree = "3"))
+```
+
+The expression is on the link scale of the parameter, so any family
+works: `y ~ nl(log(a) + log1p(-exp(-k * x)))` with the Poisson family
+gives the mean `a * (1 - exp(-k * x))`. Nonlinear parameters take
+covariates (`a ~ z`) and need starting values. The fit equals `nls()` and
+`nlmer()`; random effects of different nonlinear parameters are
+independent.
