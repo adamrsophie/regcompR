@@ -73,12 +73,31 @@ map_airy_core <- function(x) { z <- x^2; ze <- 2 / 3 * abs(x)^3
   k1 <- besselK(pmax(ze, 1e-300), 1 / 3, expon.scaled = TRUE); k2 <- besselK(pmax(ze, 1e-300), 2 / 3, expon.scaled = TRUE)
   inner <- x * sqrt(z / 3) / pi * k1 + z / (pi * sqrt(3)) * k2
   inner[abs(x) < 1e-8] <- 0.2588194037928068
-  log(pmax(inner, 0)) - ze - 2 * x^3 / 3 }
+  out <- log(pmax(inner, 0)) - ze - 2 * x^3 / 3
+  # Far left tail: K_{2/3} - K_{1/3} cancels, so use its asymptotic
+  # expansion sqrt(pi / (2 zeta)) (1 / (6 zeta)) (1 - 35 / (72 zeta)).
+  far <- !is.na(x) & x < -20
+  if (any(far)) { a <- abs(x[far]); zf <- 2 / 3 * a^3
+    out[far] <- 2 * log(a) - log(pi * sqrt(3)) + 0.5 * log(pi / 2) - 1.5 * log(zf) - log(6) + log1p(-35 / (72 * zf)) }
+  out }
 rfam("map_airy", "Map-Airy", list(loc_par("mu"), scale_par("sigma")),
   formula = "f(x) = 2 exp(-2 x^3 / 3) (x Ai(x^2) - Ai'(x^2)), x = (y - mu)/sigma",
   lpdf = function(y, p) log(2) + map_airy_core((y - p$mu) / p$sigma) - log(p$sigma),
-  cdf = function(q, p) vapply((q - p$mu) / p$sigma, function(x) 1 - stats::integrate(function(t) 2 * exp(map_airy_core(t)), x, Inf,
-    rel.tol = 1e-10, subdivisions = 2000L)$value, 0),
+  # Integrate the nearer tail (the left tail decays polynomially).
+  # Below -20 the density is 2 K a^(-5/2) (1 - 35 / (48 a^3)), a = -x,
+  # integrated in closed form.
+  cdf = function(q, p) vapply((q - p$mu) / p$sigma, function(x) {
+    if (is.infinite(x)) return(as.numeric(x > 0))
+    dens <- function(t) 2 * exp(map_airy_core(t))
+    tail <- function(a) 2 * exp(-log(pi * sqrt(3)) + 0.5 * log(pi / 2) - 1.5 * log(2 / 3) - log(6)) *
+      (2 / 3 * a^-1.5 - 35 / 216 * a^-4.5)
+    if (x < -20) tail(-x)
+    else if (x < 0) tail(20) + stats::integrate(dens, -20, x, rel.tol = 1e-10, subdivisions = 2000L)$value
+    else 1 - stats::integrate(dens, x, Inf, rel.tol = 1e-10, subdivisions = 2000L)$value }, 0),
+  # The standard law has mean 0; its left tail decays as |x|^(-5/2), so the
+  # variance is infinite.
+  mean = function(p) p$mu, variance = function(p) rep(NA_real_, length(p$sigma)),
+  moment_conditions = "The variance does not exist (left tail of order |y|^(-5/2)).",
   references = "Banderier, Flajolet, Schaeffer and Soria (2001), Random maps, coalescing saddles, singularity analysis, and Airy phenomena. Random Structures and Algorithms, 19, 194-246.",
   reference = ref_impl("unscaled Airy form", function(y, p) { x <- (y - p$mu) / p$sigma; z <- x^2; ze <- 2 / 3 * abs(x)^3
     log(2 * exp(-2 * x^3 / 3) * (x * sqrt(z / 3) / pi * besselK(ze, 1 / 3) + z / (pi * sqrt(3)) * besselK(ze, 2 / 3))) - log(p$sigma) }),

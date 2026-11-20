@@ -68,8 +68,10 @@ db <- data.frame(x = rnorm(100)); db$y <- rbinom(100, 1, plogis(db$x))
 mean(scoring_rule(regcomp(y ~ x, family = "bernoulli", data = db), rule = "brier"))
 ```
 
-`re = "conditional"` scores with the estimated group effects and
-`re = "zero"` as for new groups. For Bayesian fits every rule scores the
+`re = "conditional"` scores with the estimated group effects,
+`re = "zero"` with the effects set to zero, and `re = "marginal"` with the
+predictive law of a new group (the mixture over draws of its random
+effects, the proper score for an unseen group). For Bayesian fits every rule scores the
 posterior predictive distribution (the mixture over posterior draws), not
 the law at the posterior mean. The CRPS is infinite for a predictive law
 without a finite mean:
@@ -84,8 +86,9 @@ scoring_rule(fpar, data.frame(y = 1), rule = "crps")
 `cv_regcomp()` refits on training folds and scores held out rows. Folds
 split the analysis rows of the fit (rows dropped for missing values stay
 out, and external weights and trial counts follow their rows). `group =`
-holds out whole groups, predicted with their random effects at zero;
-`folds =` gives an explicit assignment.
+holds out whole groups, scored by default as new groups with the marginal
+predictive law (`re =` changes this), and its standard error is clustered
+by group; `folds =` gives an explicit assignment.
 
 ```{r}
 cv <- cv_regcomp(fnb, K = 5, rule = "log")

@@ -613,6 +613,8 @@ posfam("mittag_leffler", "Mittag-Leffler (Pillai, heavy tailed)", list(P("alpha"
   lpdf = function(y, p) log(ml_density(y / p$scale, p$alpha)) - log(p$scale),
   rng = function(n, p) { u <- stats::runif(n); v <- stats::runif(n); a <- p$alpha
     -p$scale * log(u) * (sin(a * pi) / tan(a * pi * v) - cos(a * pi))^(1 / a) },
+  mean_formula = "does not exist (infinite for alpha < 1)", moment_conditions = "No moments of order 1 or higher exist for alpha < 1.",
+  mean = function(p) rep(NA_real_, length(p$alpha)), variance = function(p) rep(NA_real_, length(p$alpha)),
   numeric_moments = FALSE,
   references = "Pillai (1990), On Mittag-Leffler functions and related distributions. Ann. Inst. Stat. Math., 42, 157-161.",
   reference = ref_impl("power series", function(y, p) log(vapply(seq_along(y), function(i) { k <- 1:150; z <- y[i] / p$scale[i]; a <- p$alpha[i]

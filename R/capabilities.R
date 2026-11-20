@@ -1,11 +1,11 @@
 #' Capability queries
 #'
 #' `family_capabilities()` reports, for a family or distribution, how each operation
-#' is provided: `"analytic"` (a method specific to the family: a closed
-#' form, or a dedicated algorithm such as a series, recursion or quadrature
-#' written for that law), `"numeric"` (the generic numerical fallback:
-#' inversion, summation or integration of the density, with tolerance
-#' checks) or `"unavailable"`. Ordinal and nominal families draw random
+#' is provided: `"analytic"` (a closed form, possibly through special
+#' functions of base R), `"algorithm"` (a numerical method written for that
+#' law: a series, recursion, root finding or quadrature specific to it),
+#' `"numeric"` (the generic numerical fallback: inversion, summation or
+#' integration of the density, with tolerance checks) or `"unavailable"`. Ordinal and nominal families draw random
 #' values from their class probabilities.
 #' It also reports whether the family can be used as a regression response
 #' and which fitting engines support it. `supports()` answers a single
@@ -27,13 +27,14 @@ family_capabilities <- function(x) {
   fam <- capability_family(x)
   scalar <- fam$variate_type == "scalar" || scalar_vecpar(fam)
   op <- function(slot, fallback) {
-    if (!is.null(fam[[slot]])) "analytic" else if (fallback) "numeric" else "unavailable"
+    if (!is.null(fam[[slot]])) { if (uses_numerics(fam[[slot]])) "algorithm" else "analytic" }
+    else if (fallback) "numeric" else "unavailable"
   }
   # A numerical CDF needs a support bounded below for discrete laws.
   lb <- tryCatch({ dp <- lapply(fam$pars, function(q) q$default %||% 1); is.finite(fam$support(dp)$lower[1]) }, error = function(e) TRUE)
   cdf_ok <- !is.null(fam$cdf) || (scalar && isTRUE(fam$numeric_cdf) && (!fam$discrete || isTRUE(lb)))
   list(
-    log_prob = "analytic",
+    log_prob = if (uses_numerics(fam$lpdf)) "algorithm" else "analytic",
     cdf = if (!scalar) "unavailable" else op("cdf", cdf_ok),
     quantile = if (!scalar) "unavailable" else op("quantile", cdf_ok),
     rng = op("rng", (scalar && cdf_ok) || fam$variate_type == "categorical"),
@@ -53,6 +54,28 @@ family_capabilities <- function(x) {
            else if (!is.null(fam$bugs$native)) "native" else "zeros_trick",
     status = fam$status
   )
+}
+
+# Whether a family method computes numerically (quadrature, root finding,
+# optimization, iteration or a matrix exponential), looking through the
+# package helpers it calls. Calls into other families (operators) are not
+# followed: their bases are reported by their own capabilities.
+uses_numerics <- function(fn, depth = 4) {
+  if (!is.function(fn)) return(FALSE)
+  numeric_calls <- c("integrate", "integrate_safe", "uniroot", "optimize", "optimise", "optim", "nlminb",
+                     "repeat", "while", "expm", "numeric_cdf_cont", "numeric_cdf_disc")
+  dispatch <- c("family_cdf", "family_quantile", "eval_lpdf", "family_rng", "family_moment", "family_log_interval",
+                "family_atom", "family_cdf_left", "family_lccdf", "obs_loglik")
+  nm <- unique(all.names(body(fn)))
+  if (any(nm %in% numeric_calls)) return(TRUE)
+  if (depth == 0) return(FALSE)
+  # Follow helpers and closures defined in the package (not base R).
+  ns <- asNamespace("regcompR"); env <- environment(fn) %||% ns
+  for (h in setdiff(nm, dispatch)) {
+    g <- get0(h, envir = env, mode = "function")
+    if (!is.null(g) && !is.primitive(g) && identical(topenv(environment(g)), ns) && uses_numerics(g, depth - 1)) return(TRUE)
+  }
+  FALSE
 }
 
 capability_family <- function(x) {

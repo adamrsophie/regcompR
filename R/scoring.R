@@ -30,7 +30,12 @@
 #' @param rule Scoring rule.
 #' @param re Random effects used for prediction, as in [predict()]:
 #'   `"conditional"` uses the estimated effects of known groups,
-#'   `"zero"` sets them to zero (new groups).
+#'   `"zero"` sets them to zero, and `"marginal"` scores the predictive
+#'   law of a new group: the mixture over `nmarginal` draws of the random
+#'   effects from their estimated distribution (for each observation; the
+#'   dependence between observations of one group is not used).
+#' @param nmarginal Number of random effect draws for `re = "marginal"`.
+#' @param seed Optional seed for the random effect draws.
 #' @return Numeric vector of scores, one per observation.
 #' @export
 #' @examples
@@ -39,24 +44,34 @@
 #' fit <- regcomp(y ~ x, family = "normal", data = d)
 #' mean(scoring_rule(fit, rule = "crps"))
 scoring_rule <- function(object, newdata = NULL, rule = c("log", "crps", "dss", "brier", "rps"),
-                         re = c("conditional", "zero")) {
+                         re = c("conditional", "zero", "marginal"), nmarginal = 200, seed = NULL) {
   rule <- match.arg(rule); re <- match.arg(re)
+  if (!is.null(seed)) local_seed(seed)
   spec <- new_spec(object, newdata, response = TRUE)
-  # Parameter sets of the predictive law: the estimate, or posterior draws.
-  PS <- if (object$inference == "bayesian") {
-    S <- nrow(object$draws); idx <- if (S <= 1000) seq_len(S) else unique(round(seq(1, S, length.out = 1000)))
-    lapply(idx, function(s) pars_from(spec, unname(object$draws[s, spec$beta_names]),
-                                      if (length(object$u_draws)) object$u_draws[s, ] else NULL, re))
-  } else list(pars_from(spec, unname(object$coefficients), object$u, re))
+  marg <- re == "marginal" && spec$Q > 0
+  if (re == "marginal" && !marg) re <- "zero"
+  # Parameter sets of the predictive law: the estimate, or posterior draws,
+  # each with drawn random effects for marginal (new group) scores.
+  bayes <- object$inference == "bayesian"
+  S <- if (bayes) nrow(object$draws) else 1L
+  cap <- if (marg) nmarginal else 1000
+  idx <- if (bayes) { if (S <= cap) seq_len(S) else unique(round(seq(1, S, length.out = cap))) }
+         else rep(1L, if (marg) nmarginal else 1L)
+  PS <- lapply(idx, function(s) {
+    beta <- if (bayes) unname(object$draws[s, spec$beta_names]) else unname(object$coefficients)
+    if (marg) {
+      theta <- if (bayes) object$draws[s, names(object$theta)] else object$theta
+      return(pars_from(spec, beta, draw_re(spec, theta), "conditional"))
+    }
+    pars_from(spec, beta, if (bayes) { if (length(object$u_draws)) object$u_draws[s, ] } else object$u, re)
+  })
   pars <- PS[[1]]
   y <- spec$y; fam <- spec$fam
   if (rule == "log") {
-    # Bayesian fits: the posterior predictive density, log mean over draws.
-    if (object$inference == "bayesian") {
-      ll <- log_lik(object, newdata, re = re)
-      return(-apply(ll, 2, function(v) log_sum_exp(v) - log(length(v))))
-    }
-    return(-obs_loglik(fam, y, pars, spec$cmat))
+    # The predictive density is the mean over parameter sets.
+    ll <- vapply(PS, function(p) obs_loglik(fam, y, p, spec$cmat), numeric(length(y)))
+    ll <- matrix(ll, length(y))
+    return(-apply(ll, 1, function(v) log_sum_exp(v) - log(length(v))))
   }
   if (!is.null(spec$cmat) && any(spec$cmat[, "lower"] != spec$cmat[, "upper"], na.rm = TRUE))
     stop_unsupported(sprintf("The '%s' score for censored observations", rule))
@@ -136,7 +151,8 @@ new_spec_dots <- function(spec) {
 #' Refits the model on training folds and scores the held out
 #' observations with a proper scoring rule. With `group` the folds leave out
 #' whole groups (leave group out cross validation), and held out groups are
-#' predicted with their random effects at zero.
+#' scored as new groups: by default with the marginal predictive law, the
+#' mixture over draws of their random effects.
 #'
 #' @param object A fitted model from [regcomp()].
 #' @param K Number of folds.
@@ -147,16 +163,24 @@ new_spec_dots <- function(spec) {
 #'   `nobs()` rows used in the fit) to a fold; a vector with one entry per
 #'   row of the original data is also accepted and is restricted to the
 #'   analysis rows.
+#' @param re Random effects for scoring held out rows, as in
+#'   [scoring_rule()]. By default `"marginal"` with `group` (held out groups
+#'   are new groups) and `"conditional"` otherwise.
+#' @param nmarginal Number of random effect draws for `re = "marginal"`.
 #' @param seed Seed for the fold assignment.
 #' @return A list with `scores` (per observation), `estimate` (mean score),
-#'   `se` and `folds`.
+#'   `se` and `folds`. With `group` the standard error is clustered by
+#'   group (scores of one group are dependent); otherwise rows are treated
+#'   as independent.
 #' @export
 #' @examples
 #' set.seed(1)
 #' d <- data.frame(x = rnorm(120)); d$y <- rpois(120, exp(0.5 + 0.3 * d$x))
 #' fit <- regcomp(y ~ x, family = "poisson", data = d)
 #' cv_regcomp(fit, K = 5)$estimate
-cv_regcomp <- function(object, K = 10, rule = "log", group = NULL, folds = NULL, seed = 1) {
+cv_regcomp <- function(object, K = 10, rule = "log", group = NULL, folds = NULL, seed = 1,
+                       re = NULL, nmarginal = 200) {
+  re <- re %||% if (is.null(group)) "conditional" else "marginal"
   env <- environment(object$spec$formula %||% object$spec$formulas[[1]])
   # Folds split the stored analysis rows; external weights and data
   # arguments are columns of that data, so they are split with the rows.
@@ -174,16 +198,23 @@ cv_regcomp <- function(object, K = 10, rule = "log", group = NULL, folds = NULL,
     else { g <- as.character(data[[group]]); ug <- unique(g); fg <- sample(rep_len(seq_len(K), length(ug))); folds <- fg[match(g, ug)] }
   }
   sc <- rep(NA_real_, n)
-  for (k in sort(unique(folds))) {
+  uf <- sort(unique(folds))
+  for (k in uf) {
     test <- folds == k
     cl <- object$call; cl$data <- data[!test, , drop = FALSE]; cl$subset <- NULL
     cl$weights <- object$model_args$weights
     for (a in setdiff(names(object$model_args$dots), "")) if (!is.null(cl[[a]])) cl[[a]] <- object$model_args$dots[[a]]
     cl$control <- utils::modifyList(ctrl, list(hessian = FALSE))
     f <- eval(cl, env)
-    sc[test] <- scoring_rule(f, data[test, , drop = FALSE], rule = rule, re = if (is.null(group)) "conditional" else "zero")
+    sc[test] <- scoring_rule(f, data[test, , drop = FALSE], rule = rule, re = re, nmarginal = nmarginal, seed = seed + match(k, uf))
   }
-  list(scores = sc, estimate = mean(sc), se = stats::sd(sc) / sqrt(n), folds = folds, rule = rule)
+  est <- mean(sc)
+  se <- if (is.null(group)) stats::sd(sc) / sqrt(n) else {
+    # Cluster robust standard error of the mean score.
+    tot <- tapply(sc - est, as.character(data[[group]]), sum); G <- length(tot)
+    sqrt(G / (G - 1) * sum(tot^2)) / n
+  }
+  list(scores = sc, estimate = est, se = se, folds = folds, rule = rule, re = re)
 }
 
 #' Compare fitted models

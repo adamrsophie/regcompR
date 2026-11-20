@@ -24,11 +24,11 @@ or \code{"bugs"} (also \code{"jags"}, \code{"openbugs"}).}
 }
 \description{
 \code{family_capabilities()} reports, for a family or distribution, how each operation
-is provided: \code{"analytic"} (a method specific to the family: a closed
-form, or a dedicated algorithm such as a series, recursion or quadrature
-written for that law), \code{"numeric"} (the generic numerical fallback:
-inversion, summation or integration of the density, with tolerance
-checks) or \code{"unavailable"}. Ordinal and nominal families draw random
+is provided: \code{"analytic"} (a closed form, possibly through special
+functions of base R), \code{"algorithm"} (a numerical method written for that
+law: a series, recursion, root finding or quadrature specific to it),
+\code{"numeric"} (the generic numerical fallback: inversion, summation or
+integration of the density, with tolerance checks) or \code{"unavailable"}. Ordinal and nominal families draw random
 values from their class probabilities.
 It also reports whether the family can be used as a regression response
 and which fitting engines support it. \code{supports()} answers a single

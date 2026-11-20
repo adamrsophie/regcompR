@@ -78,11 +78,19 @@ cfam3("eppm_faddy", "Extended Poisson process model (Faddy and Smith)", list(P("
   status = "validated")
 
 register_family(family_def("multivariate_hypergeometric", "Multivariate hypergeometric", "multivariate",
-  list(P("K", "positive_integer", role = "population counts per category", regression = FALSE)), discrete = TRUE, variate_type = "vector",
+  list(P("K", "positive_integer", role = "population counts per category", regression = FALSE),
+       P("size", "positive_integer", data = TRUE, default = NA, interpretation = "Number of draws; NA conditions on each observed total")),
+  discrete = TRUE, variate_type = "vector",
   numeric_cdf = FALSE, numeric_moments = FALSE,
-  formula = "P(y) = prod C(K_i, y_i) / C(N, n), N = sum K, n = sum y",
+  check = function(p) if (!all(is.na(p$size)) && any(p$size > sum(p$K), na.rm = TRUE)) "The number of draws exceeds the population size sum(K).",
+  formula = "P(y) = prod C(K_i, y_i) / C(N, n), N = sum K, n = sum y (or the given size)",
   lpdf = function(y, p) { y <- if (is.matrix(y)) y else matrix(y, nrow = 1)
-    apply(y, 1, function(r) if (any(r > p$K | r < 0)) -Inf else sum(lchoose(p$K, r)) - lchoose(sum(p$K), sum(r))) },
+    out <- apply(y, 1, function(r) if (any(r > p$K | r < 0)) -Inf else sum(lchoose(p$K, r)) - lchoose(sum(p$K), sum(r)))
+    if (!all(is.na(p$size))) out[rowSums(y) != rep_len(p$size, nrow(y))] <- -Inf
+    out },
+  rng = function(n, p) { if (anyNA(p$size)) stop_input("Simulating a multivariate hypergeometric law needs the number of draws: give size.")
+    K <- p$K; t(vapply(seq_len(n), function(i) tabulate(sample(rep(seq_along(K), K), p$size[1]), length(K)), numeric(length(K)))) },
+  mean = function(p) p$size[1] * p$K / sum(p$K),
   references = "Johnson, Kotz and Balakrishnan (1997), Discrete Multivariate Distributions, ch. 39.",
   reference = ref_impl("extraDistr", function(y, p) { y <- if (is.matrix(y)) y else matrix(y, nrow = 1); extraDistr::dmvhyper(y, p$K, rowSums(y)[1], log = TRUE) }),
   status = "validated"))

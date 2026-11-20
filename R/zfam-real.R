@@ -443,7 +443,11 @@ register_family(family_def(
   cdf = function(q, p) {
     z <- (q - p$mu) / p$sigma
     a <- p$alpha; b <- p$beta; s <- p$sigma
-    stats::pnorm(z) - stats::dnorm(z) * (b * mills(a * s - z) - a * mills(b * s + z)) / (a + b)
+    # dnorm(z) mills(w) on the log scale: finite in both tails.
+    dm <- function(w) exp(stats::dnorm(z, log = TRUE) - stats::dnorm(w, log = TRUE) + stats::pnorm(w, lower.tail = FALSE, log.p = TRUE))
+    out <- stats::pnorm(z) - (b * dm(a * s - z) - a * dm(b * s + z)) / (a + b)
+    out[is.infinite(z)] <- as.numeric(z[is.infinite(z)] > 0)
+    pmin(pmax(out, 0), 1)
   },
   rng = function(n, p) stats::rnorm(n, p$mu, p$sigma) + stats::rexp(n, p$alpha) - stats::rexp(n, p$beta),
   mean = function(p) p$mu + 1 / p$alpha - 1 / p$beta,

@@ -8,7 +8,9 @@ scoring_rule(
   object,
   newdata = NULL,
   rule = c("log", "crps", "dss", "brier", "rps"),
-  re = c("conditional", "zero")
+  re = c("conditional", "zero", "marginal"),
+  nmarginal = 200,
+  seed = NULL
 )
 }
 \arguments{
@@ -21,7 +23,14 @@ fitting data.}
 
 \item{re}{Random effects used for prediction, as in \code{\link[=predict]{predict()}}:
 \code{"conditional"} uses the estimated effects of known groups,
-\code{"zero"} sets them to zero (new groups).}
+\code{"zero"} sets them to zero, and \code{"marginal"} scores the predictive
+law of a new group: the mixture over \code{nmarginal} draws of the random
+effects from their estimated distribution (for each observation; the
+dependence between observations of one group is not used).}
+
+\item{nmarginal}{Number of random effect draws for \code{re = "marginal"}.}
+
+\item{seed}{Optional seed for the random effect draws.}
 }
 \value{
 Numeric vector of scores, one per observation.

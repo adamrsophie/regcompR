@@ -604,6 +604,23 @@ domain_step <- function(spec, v, rel, small) {
   ifelse(is.finite(d) & d > 0, pmin(h, d * 1e-3), h)
 }
 
+# Shrink finite difference steps so that every evaluation point also
+# satisfies the family's joint constraints (theta * beta < 1, say), not only
+# each parameter's own bounds. `dirs` lists the step multipliers per
+# parameter of each evaluation point; steps are halved elementwise.
+joint_steps <- function(fam, p, h, dirs) {
+  if (is.null(fam$check) || fam$variate_type != "scalar") return(h)
+  n <- max(lengths(p))
+  ok <- function(pp) valid_rows(fam, pp, n)
+  for (it in 1:40) {
+    bad <- rep(FALSE, n)
+    for (d in dirs) { pp <- p; for (k in names(d)) pp[[k]] <- p[[k]] + d[[k]] * h[[k]]; bad <- bad | !ok(pp) }
+    if (!any(bad)) break
+    for (k in unique(unlist(lapply(dirs, names)))) h[[k]][bad] <- h[[k]][bad] / 2
+  }
+  h
+}
+
 #' @export
 score.regcomp_dist <- function(x, y, ...) {
   fam <- x$family
@@ -613,6 +630,8 @@ score.regcomp_dist <- function(x, y, ...) {
   out <- matrix(NA_real_, length(y), length(free), dimnames = list(NULL, free))
   for (k in free) {
     h <- domain_step(fam$pars[[k]], p[[k]], 1e-5, 1e-3)
+    h <- joint_steps(fam, p, stats::setNames(list(rep_len(h, length(y))), k),
+                     list(stats::setNames(list(1), k), stats::setNames(list(-1), k)))[[k]]
     up <- p; dn <- p
     up[[k]] <- p[[k]] + h; dn[[k]] <- p[[k]] - h
     out[, k] <- (eval_lpdf(fam, y, up) - eval_lpdf(fam, y, dn)) / (2 * h)
@@ -633,25 +652,44 @@ hessian.regcomp_dist <- function(x, y, ...) {
   K <- length(free)
   out <- array(NA_real_, c(length(y), K, K), list(NULL, free, free))
   f <- function(pp) eval_lpdf(fam, y, pp)
-  h <- lapply(free, function(k) domain_step(fam$pars[[k]], p[[k]], 1e-4, 1e-2)); names(h) <- free
+  n <- length(y)
+  h <- lapply(free, function(k) rep_len(domain_step(fam$pars[[k]], p[[k]], 1e-4, 1e-2), n)); names(h) <- free
+  # Step direction per parameter and row: 0 for central differences, or
+  # +1 / -1 for one sided differences pointing away from a joint constraint
+  # boundary (theta * beta < 1, say), keeping the nominal step so that
+  # second differences do not cancel to noise.
+  s <- lapply(free, function(k) rep(0, n)); names(s) <- free
+  if (!is.null(fam$check) && fam$variate_type == "scalar") for (k in free) {
+    sh <- function(m) { pp <- p; pp[[k]] <- p[[k]] + m * h[[k]]; valid_rows(fam, pp, n) }
+    up <- sh(1) & sh(2); dn <- sh(-1) & sh(-2)
+    s[[k]][!dn & up] <- 1; s[[k]][!up & dn] <- -1
+  }
+  at <- function(ma, ka, mb = 0, kb = ka) { pp <- p
+    pp[[ka]] <- pp[[ka]] + ma * h[[ka]]
+    if (kb != ka) pp[[kb]] <- pp[[kb]] + mb * h[[kb]]
+    f(pp) }
+  f0 <- f(p)
   for (a in seq_len(K)) for (b in a:K) {
-    ka <- free[a]; kb <- free[b]
-    shift <- function(sa, sb) {
-      pp <- p
-      pp[[ka]] <- pp[[ka]] + sa * h[[ka]]
-      pp[[kb]] <- pp[[kb]] + sb * h[[kb]]
-      f(pp)
-    }
+    ka <- free[a]; kb <- free[b]; sa <- s[[ka]]; sb <- s[[kb]]
     v <- if (a == b) {
-      (shift(1, 0) - 2 * f(p) + shift(-1, 0)) / h[[ka]]^2
+      c1 <- (at(1, ka) - 2 * f0 + at(-1, ka)) / h[[ka]]^2
+      o1 <- (f0 - 2 * at(sa, ka) + at(2 * sa, ka)) / h[[ka]]^2
+      ifelse(sa == 0, c1, o1)
     } else {
-      (shift(1, 1) - shift(1, -1) - shift(-1, 1) + shift(-1, -1)) /
-        (4 * h[[ka]] * h[[kb]])
+      c2 <- (at(1, ka, 1, kb) - at(1, ka, -1, kb) - at(-1, ka, 1, kb) + at(-1, ka, -1, kb)) / (4 * h[[ka]] * h[[kb]])
+      da <- ifelse(sa == 0, 1, sa); db <- ifelse(sb == 0, 1, sb)
+      o2 <- (at(da, ka, db, kb) - at(da, ka, 0, kb) - at(0, ka, db, kb) + f0) / (da * db * h[[ka]] * h[[kb]])
+      ifelse(sa == 0 & sb == 0, c2, o2)
     }
     out[, a, b] <- v; out[, b, a] <- v
   }
   out
 }
+
+# Rows whose parameter values satisfy the family's joint constraints.
+valid_rows <- function(fam, p, n) vapply(seq_len(n), function(i) {
+  m <- tryCatch(fam$check(lapply(p, function(v) v[(i - 1) %% length(v) + 1])), error = function(e) "error")
+  !(is.character(m) && length(m) && nzchar(m[1])) }, TRUE)
 
 #' @export
 print.regcomp_dist <- function(x, ...) {
