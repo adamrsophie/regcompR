@@ -180,6 +180,8 @@ make_penalty <- function(pen, spec) {
     firth = , flic = function(beta) -0.5 * safe_logdet(info_matrix(spec, beta)),
     log_f = function(beta) { b <- beta[idx]; -sum(pen$m / 2 * b - pen$m * log1pexp(b)) },
     cauchy = function(beta) sum(log1p((beta[idx] / pen$prior_scale)^2)),
+    group_lasso = function(beta) { b <- beta[idx] * scale
+      lam * sum(vapply(split(b, grp), function(z) sqrt(length(z)) * sqrt(sum(z^2)), 0)) },
     function(beta) { b <- beta[idx] * scale
       lam * (al * sum(pen$w * abs(b)) + (1 - al) / 2 * sum(b^2)) })
   pen$grad <- switch(pen$type,
@@ -195,7 +197,7 @@ make_penalty <- function(pen, spec) {
 
 # FISTA for lasso type penalties without random effects. The proximal step
 # handles weighted lasso, elastic net and group lasso.
-fista <- function(spec, beta0, pen, maxit = 5000) {
+fista <- function(spec, beta0, pen, maxit = 5000, tol = 1e-8) {
   idx <- pen$idx; sc <- pen$scale; lam <- pen$lambda; al <- pen$alpha
   # Work in standardized coordinates c = beta * scale, where the penalty is
   # an ordinary (group) lasso with an exact proximal step.
@@ -235,11 +237,14 @@ fista <- function(spec, beta0, pen, maxit = 5000) {
     tn <- (1 + sqrt(1 + 4 * tk^2)) / 2
     yv <- xn + (tk - 1) / tn * (xn - x)
     if (fn + nonsmooth(xn) > fx + nonsmooth(x)) { yv <- xn; tk <- 1 } else tk <- tn
-    done <- max(abs(xn - x)) < 1e-8 * (1 + max(abs(x)))
+    done <- max(abs(xn - x)) < tol * (1 + max(abs(x)))
     x <- xn; fx <- fn
     if (done) { conv <- 0L; break }
   }
-  list(par = unsc(x), convergence = conv, iterations = it, objective = fx + nonsmooth(x))
+  # Stationarity of the nonsmooth problem: the proximal gradient mapping
+  # L (x - prox(x - g(x) / L)) is zero exactly at a minimizer.
+  kkt <- max(abs(L * (x - prox(x - g(x) / L, 1 / L))))
+  list(par = unsc(x), convergence = conv, iterations = it, objective = fx + nonsmooth(x), kkt = kkt)
 }
 
 # Derivative of the SCAD and MCP penalties, used as LLA weights.
@@ -261,21 +266,21 @@ fit_proximal <- function(spec, beta0, pen, control) {
   }
   if (pen$type %in% c("scad", "mcp")) {
     lasso <- pen; lasso$type <- "lasso"
-    o <- fista(spec, beta0, lasso)
+    o <- fista(spec, beta0, lasso, control$prox_maxit, control$prox_tol)
     for (step in 1:5) {
       lam0 <- pen$lambda / spec$n
       dw <- concave_deriv(pen$type, o$par[pen$idx] * pen$scale, lam0, pen$gamma) / lam0
       pen$w <- dw
-      o <- fista(spec, o$par, pen)
+      o <- fista(spec, o$par, pen, control$prox_maxit, control$prox_tol)
     }
     a <- pen$gamma; lam <- pen$lambda / spec$n; nn <- spec$n
     pen$value <- function(beta) { b <- abs(beta[pen$idx] * pen$scale)
       nn * sum(if (pen$type == "scad") ifelse(b <= lam, lam * b, ifelse(b <= a * lam,
         (2 * a * lam * b - b^2 - lam^2) / (2 * (a - 1)), lam^2 * (a + 1) / 2))
         else ifelse(b <= a * lam, lam * b - b^2 / (2 * a), a * lam^2 / 2)) }
-  } else o <- fista(spec, beta0, pen)
+  } else o <- fista(spec, beta0, pen, control$prox_maxit, control$prox_tol)
   opt <- list(convergence = o$convergence, message = if (o$convergence == 0) "converged" else "iteration limit",
-              iterations = o$iterations, objective = o$objective)
+              iterations = o$iterations, objective = o$objective, kkt = o$kkt)
   new_fit(spec, o$par, numeric(0), numeric(0), NULL, ml_objective(spec, o$par), opt, "none", pen)
 }
 
@@ -296,7 +301,12 @@ flic_adjust <- function(spec, beta, control) {
 
 # FLAC: Firth fit, then maximum likelihood on augmented data. Each
 # observation is duplicated twice with responses y and size - y (binary:
-# y and 1 - y), weights h_i / 2 and an indicator covariate.
+# y and 1 - y), weights h_i / (2 m_i) and an indicator covariate. A row of
+# m_i identical trials is m_i Bernoulli rows of leverage h_i / m_i each, whose
+# pseudo observations add up to one success and one failure of weight
+# h_i / 2; the pair (y, m - y) carries m_i trials, hence the division, so
+# grouped and expanded data give the same fit. Rows with no trials add no
+# pseudo observations.
 flac_fit <- function(spec, control) {
   fam_ok <- spec$fam$id %in% c("bernoulli", "binomial")
   if (!fam_ok) stop_unsupported("FLAC for families other than bernoulli and binomial", spec$fam$id)
@@ -315,7 +325,8 @@ flac_fit <- function(spec, control) {
   aug <- spec
   aug$n <- 3 * spec$n
   aug$y <- c(spec$y, spec$y, size - spec$y)
-  aug$weights <- c(spec$weights, h / 2, h / 2)
+  hw <- ifelse(size > 0, h / (2 * pmax(size, 1)), 0)
+  aug$weights <- c(spec$weights, hw, hw)
   aug$cmat <- if (!is.null(spec$cmat)) rbind(spec$cmat, spec$cmat, spec$cmat) else NULL
   Xa <- cbind(rbind(X, X, X), .flac_g = rep(c(0, 1, 1), each = spec$n))
   attr(Xa, "assign") <- c(attr(X, "assign"), max(c(0, attr(X, "assign"))) + 1)

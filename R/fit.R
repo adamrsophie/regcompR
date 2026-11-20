@@ -107,8 +107,12 @@ regcomp <- function(formula, ..., family, data, engine = c("ml", "tmb", "bayes")
     stop_unsupported("Regression", fam$id)
   data <- as.data.frame(data)
   mr <- model_rows(formula, dots, data, substitute(weights), parent.frame(), subset = subset)
+  # A shrinkage penalty identifies aliased or p > n designs (lasso
+  # coefficients may then be non unique while predictions are unique).
+  shrink <- engine == "ml" && inherits(penalty, "regcomp_penalty") && isTRUE(penalty$lambda > 0) &&
+    penalty$type %in% c("ridge", "lasso", "elastic_net", "adaptive_lasso", "group_lasso", "scad", "mcp")
   spec <- build_spec(formula, mr$dots, fam, mr$data, weights = mr$weights,
-                     links = links, fixed = fixed, env = parent.frame())
+                     links = links, fixed = fixed, env = parent.frame(), allow_aliased = shrink)
   spec$data_args <- dots[setdiff(names(spec$data_args), "")]
   spec$call <- cl
   fit <- switch(engine,
@@ -152,6 +156,9 @@ model_family <- function(family, parameterization, formula, data) {
 #' @param adapt_delta Target acceptance for NUTS.
 #' @param start Optional named list of starting values for the coefficients
 #'   of each parameter (vectors on the link scale).
+#' @param prox_maxit,prox_tol Iteration limit and relative step tolerance of
+#'   the proximal gradient (FISTA) solver used for lasso type penalties
+#'   (`maxit` and `rel_tol` apply to `nlminb()` only).
 #' @return A list.
 #' @export
 #' @examples
@@ -161,12 +168,14 @@ regcomp_control <- function(maxit = 1000, rel_tol = 1e-10, inner_maxit = 50,
                             trace = FALSE, chains = 4, iter_warmup = 1000,
                             iter_sampling = 1000, seed = 1,
                             runner = c("bayescompR", "cmdstanr", "rstan", "jags", "openbugs"),
-                            cores = 1, adapt_delta = 0.8, start = NULL) {
+                            cores = 1, adapt_delta = 0.8, start = NULL,
+                            prox_maxit = 5000, prox_tol = 1e-8) {
   list(maxit = maxit, rel_tol = rel_tol, inner_maxit = inner_maxit,
        inner_tol = inner_tol, restarts = restarts, hessian = hessian,
        trace = trace, chains = chains, iter_warmup = iter_warmup,
        iter_sampling = iter_sampling, seed = seed, runner = match.arg(runner),
-       cores = cores, adapt_delta = adapt_delta, start = start)
+       cores = cores, adapt_delta = adapt_delta, start = start,
+       prox_maxit = prox_maxit, prox_tol = prox_tol)
 }
 
 # Rows used in a fit. External vectors (weights and data arguments given
@@ -267,7 +276,7 @@ env_data <- function(formula, dots, env) {
 # Assemble everything the engines need.
 build_spec <- function(formula, dots, fam, data, weights = NULL, links = NULL,
                        fixed = NULL, env = parent.frame(), xlev = NULL,
-                       prev = NULL, response = is.null(prev)) {
+                       prev = NULL, response = is.null(prev), allow_aliased = FALSE) {
   is_formula <- vapply(dots, function(d) {
     v <- tryCatch(eval(d, env), error = function(e) NULL)
     inherits(v, "formula")
@@ -316,6 +325,9 @@ build_spec <- function(formula, dots, fam, data, weights = NULL, links = NULL,
       re_levels = if (!is.null(prev)) { pb <- prev$preds[[k]]$blocks; lab <- vapply(pb, `[[`, "", "label")
         c(stats::setNames(lapply(pb, `[[`, "levels"), lab), stats::setNames(lapply(pb, `[[`, "coords"), paste0(".coords.", lab))) })
     preds[[k]]$dot_formula <- fk
+    if (length(preds[[k]]$aliased) && !allow_aliased)
+      stop_input(sprintf("The design for '%s' is rank deficient; aliased columns: %s. Remove them from the formula, or use a shrinkage penalty (ridge, lasso and similar) with the ml engine.",
+                         k, paste(preds[[k]]$aliased, collapse = ", ")))
     if (any(preds[[k]]$offset != 0) && !fam$pars[[k]]$offset_allowed &&
         is.null(prev))
       stop_input(sprintf("An offset is not allowed for parameter '%s' of '%s'.", k, fam$id))
@@ -800,7 +812,7 @@ new_fit <- function(spec, beta, theta, u, cov, ll, opt, approx, pen = NULL,
     spec = spec, family = spec$fam, coefficients = beta, theta = theta, u = u,
     vcov = cov, logLik = ll, df = edf, nobs = obs_count(spec),
     optimizer = list(convergence = opt$convergence, message = opt$message,
-                     iterations = opt$iterations, objective = opt$objective),
+                     iterations = opt$iterations, objective = opt$objective, kkt = opt$kkt),
     approximation = approx, penalty = pen, engine = engine,
     inference = "frequentist"
   ), class = "regcomp_fit")
@@ -813,7 +825,11 @@ theta_names <- function(spec) unlist(lapply(spec$blocks, block_theta_names))
 fit_diagnostics <- function(fit) {
   spec <- fit$spec
   out <- list(converged = fit$optimizer$convergence == 0)
-  if (fit$approximation == "none" && length(fit$coefficients)) {
+  if (!is.null(fit$optimizer$kkt)) {
+    # Nonsmooth penalties: the proximal stationarity residual, since the
+    # gradient of a lasso type objective does not vanish at its minimum.
+    out$kkt_residual <- fit$optimizer$kkt
+  } else if (fit$approximation == "none" && length(fit$coefficients)) {
     g <- tryCatch(ml_gradient(spec, unname(fit$coefficients)), error = function(e) NA)
     # Penalized fits: the gradient of the penalized objective.
     if (is.function(fit$penalty$grad)) g <- g - fit$penalty$grad(unname(fit$coefficients))

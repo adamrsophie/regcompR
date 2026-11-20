@@ -180,12 +180,13 @@ build_predictor <- function(rhs, data, par, xlev = NULL, smooth_specs = NULL,
                              xlev = xlev, drop.unused.levels = is.null(xlev))
     tt <- stats::terms(mf)
     X <- stats::model.matrix(tt, mf)
+    # Aliased columns are recorded; build_spec() decides whether the fit
+    # can identify them (a shrinkage penalty does).
     ok <- stats::complete.cases(X)
+    aliased <- character()
     if (ncol(X) && any(ok)) {
       qx <- qr(X[ok, , drop = FALSE])
-      if (qx$rank < ncol(X))
-        stop_input(sprintf("The design for '%s' is rank deficient; aliased columns: %s. Remove them from the formula.",
-                           par, paste(colnames(X)[qx$pivot[-seq_len(qx$rank)]], collapse = ", ")))
+      if (qx$rank < ncol(X)) aliased <- colnames(X)[qx$pivot[-seq_len(qx$rank)]]
     }
   }
   contr <- attr(X, "contrasts")
@@ -276,44 +277,52 @@ build_predictor <- function(rhs, data, par, xlev = NULL, smooth_specs = NULL,
       stop_unsupported("Tensor product smooths te() and ti() (no mixed model form; use t2())")
     sobj <- eval(sm[[j]], envir = asNamespace("mgcv"))
     key <- paste(deparse(sm[[j]], width.cutoff = 500L), collapse = "")
+    # smoothCon() returns one smooth per level of a factor `by` variable;
+    # every one of them is part of the model.
     if (is.null(smooth_specs[[key]])) {
-      sc <- mgcv::smoothCon(sobj, data = as.data.frame(data), absorb.cons = TRUE,
-                            scale.penalty = TRUE)[[1]]
-      rp <- tryCatch(mgcv::smooth2random(sc, names(data), type = 2), error = function(e)
-        stop_unsupported(sprintf("The smooth '%s' (mixed model form: %s); it", paste(deparse(sm[[j]]), collapse = ""), conditionMessage(e))))
-      # For some bases (t2) the fitting matrix sc$X is an affine function of
-      # PredictMat() rather than equal to it; store that exact map.
-      P0 <- cbind(1, mgcv::PredictMat(sc, as.data.frame(data)))
-      M <- qr.solve(P0, sc$X)
-      if (max(abs(P0 %*% M - sc$X)) > 1e-8 * max(1, abs(sc$X)))
-        stop_unsupported(sprintf("The smooth '%s' (its basis cannot be reproduced for prediction); it", key))
-      spec <- list(sc = sc, rp = rp, M = M)
+      scs <- mgcv::smoothCon(sobj, data = as.data.frame(data), absorb.cons = TRUE, scale.penalty = TRUE)
+      parts <- lapply(scs, function(sc) {
+        rp <- tryCatch(mgcv::smooth2random(sc, names(data), type = 2), error = function(e)
+          stop_unsupported(sprintf("The smooth '%s' (mixed model form: %s); it", key, conditionMessage(e))))
+        # For some bases (t2) the fitting matrix sc$X is an affine function
+        # of PredictMat() rather than equal to it; store that exact map.
+        P0 <- cbind(1, mgcv::PredictMat(sc, as.data.frame(data)))
+        Mx <- qr.solve(P0, sc$X)
+        if (max(abs(P0 %*% Mx - sc$X)) > 1e-8 * max(1, abs(sc$X)))
+          stop_unsupported(sprintf("The smooth '%s' (its basis cannot be reproduced for prediction); it", key))
+        list(sc = sc, rp = rp, M = Mx)
+      })
+      spec <- list(parts = parts)
     } else spec <- smooth_specs[[key]]
-    Xs <- cbind(1, mgcv::PredictMat(spec$sc, as.data.frame(data))) %*% spec$M
-    # Transform to the random effect parameterization.
-    # mgcv: b_original = trans.U %*% (trans.D * b_fit).
-    if (!is.null(spec$rp$trans.U)) Xs <- Xs %*% spec$rp$trans.U
-    if (!is.null(spec$rp$trans.D)) Xs <- sweep(Xs, 2, spec$rp$trans.D, `*`)
-    # One variance component per penalty: pen.ind gives each column's
-    # penalty (0 for unpenalized columns).
-    pen <- spec$rp$pen.ind
-    nr <- unname(split(seq_along(pen), pen)[as.character(setdiff(sort(unique(pen)), 0))])
-    fixed_cols <- setdiff(seq_len(ncol(Xs)), unlist(nr))
-    if (length(fixed_cols)) {
-      Xf <- Xs[, fixed_cols, drop = FALSE]
-      colnames(Xf) <- paste0(key, ".fx", seq_along(fixed_cols))
-      X <- cbind(X, Xf)
-    }
-    for (r in seq_along(nr)) {
-      Zr <- Xs[, nr[[r]], drop = FALSE]
-      blocks[[length(blocks) + 1L]] <- list(
-        label = paste0(key, if (length(nr) > 1) paste0(".", r)), group = key,
-        terms = "smooth", Xr = Zr, gi = NULL, levels = paste0("b", seq_along(nr[[r]])),
-        q = 1, L = length(nr[[r]]), corr = FALSE, struct = "diag", type = "smooth", par = par)
+    for (pp in seq_along(spec$parts)) {
+      part <- spec$parts[[pp]]
+      pkey <- if (length(spec$parts) > 1) paste0(key, ":", part$sc$label) else key
+      Xs <- cbind(1, mgcv::PredictMat(part$sc, as.data.frame(data))) %*% part$M
+      # Transform to the random effect parameterization.
+      # mgcv: b_original = trans.U %*% (trans.D * b_fit).
+      if (!is.null(part$rp$trans.U)) Xs <- Xs %*% part$rp$trans.U
+      if (!is.null(part$rp$trans.D)) Xs <- sweep(Xs, 2, part$rp$trans.D, `*`)
+      # One variance component per penalty: pen.ind gives each column's
+      # penalty (0 for unpenalized columns).
+      pen <- part$rp$pen.ind
+      nr <- unname(split(seq_along(pen), pen)[as.character(setdiff(sort(unique(pen)), 0))])
+      fixed_cols <- setdiff(seq_len(ncol(Xs)), unlist(nr))
+      if (length(fixed_cols)) {
+        Xf <- Xs[, fixed_cols, drop = FALSE]
+        colnames(Xf) <- paste0(pkey, ".fx", seq_along(fixed_cols))
+        X <- cbind(X, Xf)
+      }
+      for (r in seq_along(nr)) {
+        Zr <- Xs[, nr[[r]], drop = FALSE]
+        blocks[[length(blocks) + 1L]] <- list(
+          label = paste0(pkey, if (length(nr) > 1) paste0(".", r)), group = pkey,
+          terms = "smooth", Xr = Zr, gi = NULL, levels = paste0("b", seq_along(nr[[r]])),
+          q = 1, L = length(nr[[r]]), corr = FALSE, struct = "diag", type = "smooth", par = par)
+      }
     }
     smooth_info[[key]] <- spec
   }
-  list(X = X, offset = off, terms = tt, contrasts = contr,
+  list(X = X, offset = off, terms = tt, contrasts = contr, aliased = if (is.null(prev_pred)) aliased,
        xlev = if (!is.null(prev_pred)) xlev else stats::.getXlevels(tt, mf),
        blocks = blocks, smooths = smooth_info, formula = rhs)
 }

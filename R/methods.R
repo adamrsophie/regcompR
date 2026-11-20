@@ -112,6 +112,7 @@ print.summary.regcomp_fit <- function(x, digits = 4, ...) {
   if (x$kind == "wald") {
     d <- x$fit$diagnostics
     msg <- c(if (!is.null(d$max_abs_gradient)) sprintf("max |gradient| %.2e", d$max_abs_gradient),
+             if (!is.null(d$kkt_residual)) sprintf("proximal stationarity residual %.2e", d$kkt_residual),
              if (!is.null(d$hessian_positive_definite))
                sprintf("Hessian %s", if (d$hessian_positive_definite) "positive definite" else "NOT positive definite"))
     if (length(msg)) cat(paste(msg, collapse = "; "), "\n")
