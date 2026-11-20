@@ -45,7 +45,7 @@ stan_code <- function(formula, ..., family, data, weights = NULL, links = NULL,
                       fixed = NULL, priors = NULL, parameterization = NULL) {
   fam <- model_family(family, parameterization, formula, as.data.frame(data))
   dots <- eval(substitute(alist(...)))
-  spec <- build_spec(formula, dots, fam, as.data.frame(data), weights = substitute(weights),
+  spec <- build_spec(formula, dots, fam, model_rows(formula, dots, as.data.frame(data), substitute(weights), parent.frame()), weights = substitute(weights),
                      links = links, fixed = fixed, env = parent.frame())
   list(code = stan_program(spec, priors), data = stan_data(spec))
 }
@@ -53,15 +53,20 @@ stan_code <- function(formula, ..., family, data, weights = NULL, links = NULL,
 # Stan identifiers cannot hold dots (operator families name parameters
 # mu.1, w.2 and so on): rename parameters in a copy of the specification
 # used for Stan code, data and draw mapping. Coefficient names are kept.
+stan_reserved <- c("N", "y", "w", "cens", "y_upper", "has_tl", "has_tu", "tl", "tu", "lower", "upper",
+  "offset", "multiplier", "in", "for", "while", "if", "else", "return", "real", "int", "vector",
+  "matrix", "array", "target", "complex", "tuple", "print", "reject", "fatal_error", "break", "continue")
 stan_spec <- function(spec) {
   old <- names(spec$fam$pars)
-  if (!any(grepl(".", old, fixed = TRUE))) return(spec)
-  rn <- function(x) if (is.null(x)) x else gsub(".", "_", x, fixed = TRUE)
+  bad <- grepl(".", old, fixed = TRUE) | old %in% stan_reserved
+  if (!any(bad)) return(spec)
+  rn <- function(x) { if (is.null(x)) return(x)
+    x <- gsub(".", "_", x, fixed = TRUE); ifelse(x %in% stan_reserved, paste0(x, "_par"), x) }
   fam <- spec$fam
   names(fam$pars) <- rn(old)
   for (k in names(fam$pars)) fam$pars[[k]]$name <- k
   sub_t <- function(t) { if (is.null(t)) return(t)
-    for (k in old[grepl(".", old, fixed = TRUE)]) t <- gsub(paste0("{", k, "}"), paste0("{", rn(k), "}"), t, fixed = TRUE); t }
+    for (k in old[bad]) t <- gsub(paste0("{", k, "}"), paste0("{", rn(k), "}"), t, fixed = TRUE); t }
   for (f in c("lpdf", "lcdf", "lccdf", "rng")) if (!is.null(fam$stan[[f]])) fam$stan[[f]] <- sub_t(fam$stan[[f]])
   spec$fam <- fam
   spec$rpars <- rn(spec$rpars)

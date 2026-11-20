@@ -152,28 +152,28 @@ integrate_safe <- function(f, lower, upper, rel_tol = 1e-10, ...) {
 
 # Generic numerical CDF of a continuous family by integrating its density from
 # the lower end of the support.
-numeric_cdf_cont <- function(lpdf, q, pars, lower) {
+numeric_cdf_cont <- function(lpdf, q, pars, lower, whole = FALSE) {
   vapply(seq_along(q), function(i) {
     if (is.na(q[i])) return(NA_real_)
     if (q[i] <= lower[i]) return(0)
-    pi_ <- lapply(pars, `[`, i)
-    f <- function(t) exp(lpdf(t, lapply(pi_, rep_len, length(t))))
+    pi_ <- if (whole) pars else lapply(pars, `[`, i)
+    f <- function(t) exp(lpdf(t, if (whole) pi_ else lapply(pi_, rep_len, length(t))))
     min(1, max(0, integrate_safe(f, lower[i], q[i])))
   }, 0)
 }
 
 # Generic CDF of a discrete family on the non-negative integers by summing
 # the mass function.
-numeric_cdf_disc <- function(lpmf, q, pars, lower = 0) {
+numeric_cdf_disc <- function(lpmf, q, pars, lower = 0, whole = FALSE) {
   q <- floor(q)
   vapply(seq_along(q), function(i) {
     if (is.na(q[i])) return(NA_real_)
     lo <- if (length(lower) > 1) lower[i] else lower
     if (q[i] < lo) return(0)
     if (!is.finite(q[i])) return(1)
-    pi_ <- lapply(pars, `[`, i)
     ys <- lo:q[i]
-    min(1, sum(exp(lpmf(ys, lapply(pi_, rep_len, length(ys))))))
+    pv <- if (whole) pars else lapply(lapply(pars, `[`, i), rep_len, length(ys))
+    min(1, sum(exp(lpmf(ys, pv))))
   }, 0)
 }
 

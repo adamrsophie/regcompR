@@ -142,6 +142,12 @@ find_smooths <- function(term) {
 drop_smooths <- function(term) {
   if (is_smooth_call(term)) return(NULL)
   if (is.name(term) || !is.language(term)) return(term)
+  if (length(term) == 2 && term[[1]] == as.name("~")) {
+    r <- drop_smooths(term[[2]]); term[[2]] <- if (is.null(r)) 1 else r; return(term)
+  }
+  if (length(term) == 2 && term[[1]] == as.name("(")) {
+    r <- drop_smooths(term[[2]]); if (is.null(r)) return(NULL); term[[2]] <- r; return(term)
+  }
   if (length(term) == 3 && (term[[1]] == as.name("+") || term[[1]] == as.name("~"))) {
     l <- drop_smooths(term[[2]]); r <- drop_smooths(term[[3]])
     if (term[[1]] == as.name("~")) { term[[3]] <- if (is.null(r)) 1 else r; return(term) }
@@ -262,13 +268,15 @@ build_predictor <- function(rhs, data, par, xlev = NULL, smooth_specs = NULL,
     if (is.null(smooth_specs[[key]])) {
       sc <- mgcv::smoothCon(sobj, data = as.data.frame(data), absorb.cons = TRUE,
                             scale.penalty = TRUE)[[1]]
-      rp <- mgcv::smooth2random(sc, names(data), type = 2)
+      rp <- tryCatch(mgcv::smooth2random(sc, names(data), type = 2), error = function(e)
+        stop_unsupported(sprintf("The smooth '%s' (mixed model form: %s); it", paste(deparse(sm[[j]]), collapse = ""), conditionMessage(e))))
       spec <- list(sc = sc, rp = rp)
     } else spec <- smooth_specs[[key]]
     Xs <- mgcv::PredictMat(spec$sc, as.data.frame(data))
     # Transform to the random effect parameterization.
-    Xs <- Xs %*% spec$rp$trans.D
+    # mgcv: b_original = trans.U %*% (trans.D * b_fit).
     if (!is.null(spec$rp$trans.U)) Xs <- Xs %*% spec$rp$trans.U
+    if (!is.null(spec$rp$trans.D)) Xs <- sweep(Xs, 2, spec$rp$trans.D, `*`)
     nr <- spec$rp$rind
     fixed_cols <- setdiff(seq_len(ncol(Xs)), unlist(nr))
     if (length(fixed_cols)) {

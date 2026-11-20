@@ -120,18 +120,28 @@ register_family(family_def(
   start = function(y) list(lambda = max(mean(y), 0.1), gamma = 1), status = "validated"))
 
 # Gamma count (Winkelmann) -----------------------------------------------
-gc_cdfg <- function(k, p) ifelse(k <= 0, 1, stats::pgamma(p$lambda, shape = k * p$alpha))
 register_family(family_def(
   "gamma_count", "Gamma count (Winkelmann)", cnt, discrete = TRUE,
   pars = list(cnt_par("lambda", role = "rate", interpretation = "Event rate times exposure"),
               cnt_par("alpha", role = "dispersion", interpretation = "alpha > 1 underdispersion, < 1 overdispersion")),
   formula = "P(Y = y) = G(alpha y, lambda) - G(alpha (y + 1), lambda), G the regularized lower incomplete gamma (G(0, .) = 1)",
-  lpdf = function(y, p) log(pmax(gc_cdfg(y, p) - gc_cdfg(y + 1, p), 0)),
-  cdf = function(q, p) 1 - gc_cdfg(floor(q) + 1, p),
+  lpdf = function(y, p) {
+    # Mass Q(alpha (y + 1), lambda) - Q(alpha y, lambda) with Q the upper
+    # gamma tail, taken in log space from whichever tail keeps precision.
+    lq1 <- stats::pgamma(p$lambda, (y + 1) * p$alpha, lower.tail = FALSE, log.p = TRUE)
+    lq0 <- ifelse(y <= 0, -Inf, stats::pgamma(p$lambda, pmax(y, 1e-300) * p$alpha, lower.tail = FALSE, log.p = TRUE))
+    lg0 <- ifelse(y <= 0, 0, stats::pgamma(p$lambda, pmax(y, 1e-300) * p$alpha, log.p = TRUE))
+    lg1 <- stats::pgamma(p$lambda, (y + 1) * p$alpha, log.p = TRUE)
+    out <- ifelse(lq1 < log(0.5), log_diff_exp(lq1, lq0), log_diff_exp(lg0, lg1))
+    out[is.nan(out)] <- -Inf
+    ifelse(y >= 0 & y == round(y), out, -Inf) },
+  cdf = function(q, p) ifelse(q < 0, 0, stats::pgamma(p$lambda, (floor(q) + 1) * p$alpha, lower.tail = FALSE)),
   references = "Winkelmann (1995), Duration dependence and dispersion in count-data models. JBES, 13, 467-474.",
   reference = ref_impl("definition", function(y, p) log(stats::pgamma(p$lambda, y * p$alpha) - stats::pgamma(p$lambda, (y + 1) * p$alpha)) ),
   stan = sfun("gamma_count", c("lambda", "alpha"),
-    "    real a = y == 0 ? 1 : gamma_p(y * alpha, lambda);\n    return log(a - gamma_p((y + 1) * alpha, lambda));", discrete = TRUE),
+    paste0("    real q1 = gamma_q((y + 1) * alpha, lambda);\n",
+      "    if (q1 < 0.5) return log_diff_exp(log(q1), y == 0 ? negative_infinity() : log(gamma_q(y * alpha, lambda)));\n",
+      "    return log_diff_exp(y == 0 ? 0 : log(gamma_p(y * alpha, lambda)), log(gamma_p((y + 1) * alpha, lambda)));"), discrete = TRUE),
   start = function(y) list(lambda = max(mean(y), 0.1), alpha = 1), status = "validated"))
 
 # Poisson inverse Gaussian and Sichel --------------------------------------
@@ -291,8 +301,11 @@ register_family(family_def(
   formula = "p(k) = -log2(1 - 1/(k + 1)^2), k = 1, 2, ...",
   moment_conditions = "The mean is infinite.",
   lpdf = function(y, p) log(-log2(1 - 1 / (y + 1)^2)),
-  cdf = function(q, p) ifelse(q < 1, 0, 1 - log2((floor(q) + 2) / (floor(q) + 1))),
-  quantile = function(pr, p) pmax(ceiling(1 / (2^(1 - pr) - 1) - 2 - 1e-9), 1),
+  cdf = function(q, p) ifelse(q < 1, 0, ifelse(is.infinite(q), 1, 1 - log2((floor(q) + 2) / (floor(q) + 1)))),
+  quantile = function(pr, p) { F <- function(k) 1 - log2((k + 2) / (k + 1))
+    k <- pmax(ceiling(1 / expm1((1 - pr) * log(2)) - 1), 1)
+    k <- ifelse(k > 1 & F(k - 1) >= pr, k - 1, k); k <- ifelse(F(k) < pr, k + 1, k)
+    ifelse(pr >= 1, Inf, ifelse(pr <= 0, 1, k)) },
   mean = function(p) rep(Inf, length(p[[1]])),
   support = function(p) list(lower = 1, upper = Inf), numeric_moments = FALSE,
   references = "Kuzmin (1928); Khinchin (1964), Continued Fractions.",
@@ -544,6 +557,15 @@ register_family(family_def(
     vapply(y, function(k) { if (k < 1 || k != round(k)) return(-Inf); v <- a
       if (k > 1) for (i in seq_len(k - 1)) v <- v %*% Tm
       log(sum(v * t0)) }, 0) },
+  cdf = function(q, p) { Tm <- as.matrix(p$Tmat)
+    vapply(floor(q), function(k) { if (k < 1) return(0); v <- p$alpha
+      for (i in seq_len(min(k, 1e5))) v <- v %*% Tm
+      1 - sum(v) }, 0) },
+  support = function(p) list(lower = 1, upper = Inf),
+  check = function(p) { Tm <- as.matrix(p$Tmat)
+    if (nrow(Tm) != ncol(Tm) || length(p$alpha) != nrow(Tm)) return("Tmat must be square with one row per element of alpha.")
+    if (any(rowSums(Tm) > 1 + 1e-12) || max(Mod(eigen(Tm, only.values = TRUE)$values)) >= 1)
+      return("Tmat must be substochastic with all states transient.") },
   mean = function(p) { Tm <- as.matrix(p$Tmat); sum(p$alpha %*% solve(diag(nrow(Tm)) - Tm)) },
   rng = function(n, p) { Tm <- as.matrix(p$Tmat); K <- nrow(Tm); P0 <- cbind(Tm, 1 - rowSums(Tm))
     vapply(seq_len(n), function(i) { s <- sample.int(K, 1, prob = p$alpha); k <- 1

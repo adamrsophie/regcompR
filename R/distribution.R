@@ -97,10 +97,31 @@ as_dist <- function(x) {
   stop_input("Expected a distribution object created by distribution().")
 }
 
+# Shape checks for vector and matrix responses: integer counts, simplex
+# rows, unit vectors, symmetric positive definite matrices.
+mv_support <- function(fam, y) {
+  vt <- fam$variate_type
+  if (vt == "matrix" && fam$id %in% c("wishart", "inverse_wishart", "lkj", "matrix_beta")) {
+    mats <- if (is.list(y)) y else if (length(dim(y)) == 3) lapply(seq_len(dim(y)[3]), function(i) y[, , i]) else list(y)
+    pd <- function(m) all(eigen(m, symmetric = TRUE, only.values = TRUE)$values > 0)
+    return(vapply(mats, function(m) { m <- unname(as.matrix(m))
+      all(is.finite(m)) && isSymmetric(m, tol = 1e-8) && pd(m) &&
+        (fam$id != "lkj" || all(abs(diag(m) - 1) < 1e-8)) &&
+        (fam$id != "matrix_beta" || pd(diag(nrow(m)) - m)) }, TRUE))
+  }
+  if (!vt %in% c("vector", "unit_vector")) return(TRUE)
+  Y <- as_rows(y); ok <- rep(TRUE, nrow(Y))
+  if (fam$discrete) ok <- ok & !apply(!is.na(Y) & (Y < 0 | abs(Y - round(Y)) > 1e-9), 1, any)
+  if (vt == "unit_vector") ok <- ok & abs(sqrt(rowSums(Y^2)) - 1) < 1e-6
+  if (fam$id %in% c("dirichlet", "continuous_categorical")) ok <- ok & rowSums(Y <= 0) == 0 & abs(rowSums(Y) - 1) < 1e-8
+  ok
+}
+
 in_support <- function(fam, y, pars) {
   if (fam$variate_type != "scalar") {
-    if (!is.null(fam$response_check)) return(fam$response_check(y, pars))
-    return(rep(TRUE, NROW(y)))
+    ok <- mv_support(fam, y)
+    if (!is.null(fam$response_check)) ok <- ok & fam$response_check(y, pars)
+    return(ok)
   }
   r <- recycle_pars(c(list(.y = y), pars))
   y <- r$.y
@@ -121,7 +142,12 @@ in_support <- function(fam, y, pars) {
 # Core evaluation shared by every method: recycle, mask out of support, call
 # the family function on valid positions.
 eval_lpdf <- function(fam, y, pars) {
-  if (fam$variate_type != "scalar") return(fam$lpdf(y, pars))
+  if (fam$variate_type != "scalar") {
+    out <- fam$lpdf(y, pars)
+    ok <- in_support(fam, y, pars)
+    if (length(ok) == 1L || length(ok) == length(out)) out[!rep_len(ok, length(out))] <- -Inf
+    return(out)
+  }
   r <- recycle_pars(c(list(.y = y), pars))
   y <- r$.y; p <- r[-1]
   out <- rep(-Inf, length(y))
@@ -238,19 +264,32 @@ family_cdf <- function(fam, q, p) {
     k <- pmin(pmax(floor(q), 0), ncol(P))
     return(rowSums(P * (col(P) <= k)))
   }
-  if (!is.null(fam$cdf)) return(fam$cdf(q, p))
-  if (!isTRUE(fam$numeric_cdf)) stop_unsupported("The CDF", fam$id)
-  s <- fam$support(p)
-  lo <- rep_len(s$lower, length(q))
-  if (fam$discrete) {
-    if (any(!is.finite(lo))) stop_unsupported("A numerical CDF on an unbounded integer support", fam$id)
-    out <- numeric_cdf_disc(function(y, pp) eval_lpdf(fam, y, pp), q, p, lo)
-  } else {
-    out <- numeric_cdf_cont(function(y, pp) eval_lpdf(fam, y, pp), q, p, lo)
+  vec <- scalar_vecpar(fam)
+  n <- length(q)
+  # Exterior points get 0 or 1 from the support, so interior formulas are
+  # never evaluated outside their domain.
+  s <- tryCatch(fam$support(p), error = function(e) NULL)
+  lo <- if (is.null(s) || vec && length(s$lower) != 1) rep(-Inf, n) else rep_len(s$lower, n)
+  hi <- if (is.null(s) || vec && length(s$upper) != 1) rep(Inf, n) else rep_len(s$upper, n)
+  out <- rep(NA_real_, n)
+  ok <- !is.na(q) & !is.na(lo) & !is.na(hi)
+  below <- ok & (q < lo | q == -Inf); above <- ok & !below & is.finite(hi) & q >= hi
+  out[below] <- 0; out[above] <- 1
+  inn <- !is.na(q) & !below & !above
+  if (!any(inn)) return(out)
+  pp <- if (vec) p else lapply(p, function(v) if (length(v) == n && n > 1) v[inn] else v)
+  qq <- q[inn]
+  out[inn] <- if (!is.null(fam$cdf)) fam$cdf(qq, pp) else {
+    if (!isTRUE(fam$numeric_cdf)) stop_unsupported("The CDF", fam$id)
+    l <- lo[inn]
+    if (fam$discrete) {
+      if (any(!is.finite(l))) stop_unsupported("A numerical CDF on an unbounded integer support", fam$id)
+      numeric_cdf_disc(function(y, pv) eval_lpdf(fam, y, pv), qq, pp, l, whole = vec)
+    } else numeric_cdf_cont(function(y, pv) eval_lpdf(fam, y, pv), qq, pp, l, whole = vec)
   }
+  out[inn & q == Inf & is.nan(out)] <- 1
   out
 }
-
 #' @rdname probability-interface
 #' @export
 survival <- function(x, q, ...) UseMethod("survival")
@@ -278,11 +317,25 @@ quantile.regcomp_dist <- function(x, probs = c(0.025, 0.5, 0.975),
                                   lower_tail = TRUE, log_p = FALSE, ...) {
   fam <- x$family
   if (fam$variate_type != "scalar" && !scalar_vecpar(fam)) stop_unsupported("A univariate quantile function", fam$id)
-  if (log_p) probs <- exp(probs)
-  if (!lower_tail) probs <- 1 - probs
-  if (scalar_vecpar(fam)) return(family_quantile(fam, probs, x$pars))
-  r <- recycle_pars(c(list(.p = probs), x$pars))
-  family_quantile(fam, r$.p, r[-1])
+  lp <- if (log_p) probs else log(probs)
+  pr <- exp(lp)
+  if (!lower_tail) pr <- -expm1(lp)
+  if (scalar_vecpar(fam)) return(family_quantile(fam, pr, x$pars))
+  r <- recycle_pars(c(list(.p = pr, .lp = lp), x$pars))
+  out <- family_quantile(fam, r$.p, r[-(1:2)])
+  # Tail probabilities that do not survive the conversion to an ordinary
+  # probability are inverted on the log scale.
+  tiny <- which(is.finite(r$.lp) & r$.lp < log(1e-12))
+  if (!fam$discrete) for (i in tiny) {
+    pi <- lapply(r[-(1:2)], `[`, i)
+    g <- function(q) (if (lower_tail) family_lcdf(fam, q, pi) else family_lccdf(fam, q, pi)) - r$.lp[i]
+    s0 <- fam$support(pi); start <- family_quantile(fam, if (lower_tail) 1e-10 else 1 - 1e-10, pi)
+    step <- 1; a <- start; b <- start
+    if (lower_tail) { while (is.finite(g(a)) && g(a) > 0 && a > s0$lower) { a <- max(s0$lower, a - step); step <- 2 * step } }
+    else { while (is.finite(g(b)) && g(b) > 0 && b < s0$upper) { b <- min(s0$upper, b + step); step <- 2 * step } }
+    out[i] <- tryCatch(stats::uniroot(g, sort(c(a, b)), tol = 1e-12)$root, error = function(e) out[i])
+  }
+  out
 }
 
 family_quantile <- function(fam, p, pars) {

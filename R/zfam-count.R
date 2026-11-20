@@ -205,13 +205,15 @@ register_family(family_def(
   pars = list(log_mean_par(), P("sigma", "positive", role = "dispersion"),
               P("nu", "positive", role = "dispersion")),
   formula = "BNB with n = mu nu / sigma, m = 1 / sigma + 1, k = 1 / nu: log p = lbeta(y + n, m + k) - lbeta(n, m) - lgamma(y + 1) - lgamma(k) + lgamma(y + k)",
-  mean_formula = "mu", variance_formula = "computed numerically",
-  moment_conditions = "Mean finite iff sigma < 1 (m > 1); variance finite iff sigma < 1/2.",
+  mean_formula = "mu", variance_formula = "k n (m + k - 1) (m + n - 1) / ((m - 2) (m - 1)^2)",
+  moment_conditions = "The mean is always finite (m > 1); the variance is finite iff sigma < 1 (m > 2).",
   lpdf = function(y, p) {
     m <- 1 / p$sigma + 1; n <- p$mu * p$nu / p$sigma; k <- 1 / p$nu
     lbeta(y + n, m + k) - lbeta(n, m) - lgamma(y + 1) - lgamma(k) + lgamma(y + k)
   },
-  mean = function(p) ifelse(p$sigma < 1, p$mu, NA_real_),
+  mean = function(p) p$mu + 0 * p$sigma,
+  variance = function(p) { m <- 1 / p$sigma + 1; n <- p$mu * p$nu / p$sigma; k <- 1 / p$nu
+    ifelse(m > 2, k * n * (m + k - 1) * (m + n - 1) / ((m - 2) * (m - 1)^2), Inf) },
   rng = function(n, p) {
     m <- 1 / p$sigma + 1; nn <- p$mu * p$nu / p$sigma; k <- 1 / p$nu
     pr <- stats::rbeta(n, m, nn)

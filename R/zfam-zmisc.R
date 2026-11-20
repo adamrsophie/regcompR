@@ -28,7 +28,8 @@ posfam("noncentral_chi", "Noncentral chi", list(P("k", "positive"), P("lambda", 
   references = JKB, reference = ref_impl("Bessel form", function(y, p) log(exp(-(y^2 + p$lambda^2) / 2) * y^p$k * p$lambda / (p$lambda * y)^(p$k / 2) *
     besselI(p$lambda * y, p$k / 2 - 1))), status = "validated")
 
-pt_expm <- function(S, t) { e <- eigen(S); v <- e$vectors; Re(v %*% diag(exp(e$values * t), nrow(S)) %*% solve(v)) }
+# Matrix exponential by scaling and squaring (handles defective generators).
+pt_expm <- function(S, t) as.matrix(Matrix::expm(Matrix::Matrix(S * t)))
 posfam("phase_type", "Continuous phase-type", list(P("alpha", "unit_closed", role = "initial distribution", regression = FALSE),
   P("S", "any", role = "sub-generator matrix", regression = FALSE)), variate_type = "scalar_matrix_parameter",
   formula = "f(y) = alpha exp(S y) s0, s0 = -S 1",
@@ -39,7 +40,7 @@ posfam("phase_type", "Continuous phase-type", list(P("alpha", "unit_closed", rol
       repeat { r <- -S[s, s]; t <- t + stats::rexp(1, r); pr <- c(pmax(S[s, -s], 0), s0[s]) / r
         nx <- sample.int(K, 1, prob = pr); if (nx == K) return(t); s <- c(seq_len(K)[-s], 0)[nx] } }, 0) },
   mean = function(p) sum(p$alpha %*% solve(-as.matrix(p$S))),
-  numerical_notes = "Matrix exponential by eigendecomposition (S assumed diagonalizable).",
+  numerical_notes = "Matrix exponential by scaling and squaring (Matrix::expm).",
   references = "Neuts (1981), Matrix-Geometric Solutions in Stochastic Models.",
   reference = ref_impl("hypoexponential for a two phase chain", function(y, p) { S <- as.matrix(p$S); s0 <- -rowSums(S)
     vapply(y, function(t) log(sum(p$alpha %*% as.matrix(Matrix::expm(Matrix::Matrix(S * t))) * s0)), 0) }),

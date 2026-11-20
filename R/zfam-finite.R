@@ -173,9 +173,9 @@ register_family(family_def(
   references = "Fog (2008), Calculation methods for Wallenius' noncentral hypergeometric distribution. Comm. Stat. Sim. Comp., 37, 258-273.",
   reference = ref_impl("BiasedUrn", function(y, p) log(mapply(BiasedUrn::dFNCHypergeo, y, p$m1, p$m2, p$n, p$omega))),
   stan = sfun("fisher_nchg", c("m1", "m2", "n", "omega"), paste0(
-    "    int lo = max(0, to_int(n - m2));\n    int hi = min(to_int(n), to_int(m1));\n",
+    "    int lo = max(0, n - m2);\n    int hi = min(n, m1);\n",
     "    vector[hi - lo + 1] l;\n    for (x in lo:hi) l[x - lo + 1] = lchoose(m1, x) + lchoose(m2, n - x) + x * log(omega);\n",
-    "    return lchoose(m1, y) + lchoose(m2, n - y) + y * log(omega) - log_sum_exp(l);"), discrete = TRUE),
+    "    return lchoose(m1, y) + lchoose(m2, n - y) + y * log(omega) - log_sum_exp(l);"), discrete = TRUE, ints = c("m1", "m2", "n")),
   status = "validated"))
 
 wnc_pmf1 <- function(y, m1, m2, n, omega) {
@@ -252,7 +252,7 @@ register_family(family_def(
   support = function(p) list(lower = 1, upper = p$N),
   references = "Zipf (1949), Human Behavior and the Principle of Least Effort.",
   reference = ref_impl("VGAM", function(y, p) VGAM::dzipf(y, p$N, p$s, log = TRUE)),
-  stan = sfun("zipf_finite", c("N", "s"), "    real h = 0;\n    for (k in 1:to_int(N)) h += pow(k, -s);\n    return -s * log(y) - log(h);", discrete = TRUE),
+  stan = sfun("zipf_finite", c("N", "s"), "    real h = 0;\n    for (k in 1:N) h += pow(k, -s);\n    return -s * log(y) - log(h);", discrete = TRUE, ints = "N"),
   start = function(y) list(s = 1), status = "validated"))
 
 register_family(family_def(
@@ -264,7 +264,7 @@ register_family(family_def(
   support = function(p) list(lower = 1, upper = p$N),
   references = "Mandelbrot (1953), An informational theory of the statistical structure of language.",
   reference = ref_impl("definition", function(y, p) log(mapply(function(k, N, s, q) ((1:N + q)^-s / sum((1:N + q)^-s))[k], y, p$N, p$s, p$q))),
-  stan = sfun("zipf_mandelbrot", c("N", "s", "q"), "    real h = 0;\n    for (k in 1:to_int(N)) h += pow(k + q, -s);\n    return -s * log(y + q) - log(h);", discrete = TRUE),
+  stan = sfun("zipf_mandelbrot", c("N", "s", "q"), "    real h = 0;\n    for (k in 1:N) h += pow(k + q, -s);\n    return -s * log(y + q) - log(h);", discrete = TRUE, ints = "N"),
   start = function(y) list(s = 1, q = 1), status = "validated"))
 
 register_family(family_def(

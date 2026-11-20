@@ -3,9 +3,9 @@
 new_spec <- function(fit, newdata, response = FALSE) {
   if (is.null(newdata)) return(fit$spec)
   spec <- fit$spec
-  main <- spec$formulas[[primary_par(spec$fam, spec$rpars)]]
+  main <- spec$formula %||% spec$formulas[[primary_par(spec$fam, spec$rpars)]]
   ns <- build_spec(main, new_spec_dots(spec), spec$fam, as.data.frame(newdata),
-                   fixed = c(spec$fixed), env = environment(main), prev = spec, response = response)
+                   fixed = c(spec$fixed, spec$fixed_data), env = environment(main), prev = spec, response = response)
   ns$links <- spec$links
   ns
 }

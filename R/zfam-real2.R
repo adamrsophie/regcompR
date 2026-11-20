@@ -141,7 +141,7 @@ rfam("nig", "Normal inverse Gaussian", list(loc_par("mu"), shp("alpha"), P("beta
   references = "Barndorff-Nielsen (1997), Normal inverse Gaussian distributions and stochastic volatility modelling. Scand. J. Stat., 24, 1-13.",
   reference = ref_impl("GeneralizedHyperbolic", function(y, p) log(mapply(function(x, m, d, a, b) GeneralizedHyperbolic::dnig(x, m, d, a, b), y, p$mu, p$delta, p$alpha, p$beta))),
   stan = sfun("nig", c("mu", "alpha", "beta", "delta"),
-    "    real s = sqrt(square(delta) + square(y - mu));\n    return log(alpha * delta) + log_modified_bessel_second_kind_frac(1, alpha * s) - log(pi() * s) + delta * sqrt(square(alpha) - square(beta)) + beta * (y - mu);"),
+    "    real s = sqrt(square(delta) + square(y - mu));\n    return log(alpha * delta) + rc_log_besselK(1, alpha * s) - log(pi() * s) + delta * sqrt(square(alpha) - square(beta)) + beta * (y - mu);", needs = "log_besselK"),
   status = "validated")
 
 rfam("generalized_hyperbolic", "Generalized hyperbolic", list(P("lambda", "real", link = "identity"), shp("alpha"),

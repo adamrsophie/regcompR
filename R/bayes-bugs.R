@@ -35,7 +35,7 @@ bugs_code <- function(formula, ..., family, data, weights = NULL, links = NULL,
   dialect <- match.arg(dialect)
   fam <- get_family(family, parameterization)
   dots <- eval(substitute(alist(...)))
-  spec <- build_spec(formula, dots, fam, as.data.frame(data), weights = substitute(weights),
+  spec <- build_spec(formula, dots, fam, model_rows(formula, dots, as.data.frame(data), substitute(weights), parent.frame()), weights = substitute(weights),
                      links = links, fixed = fixed, env = parent.frame())
   list(code = bugs_program(spec, priors, dialect), data = bugs_data(spec))
 }

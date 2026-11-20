@@ -67,7 +67,7 @@ scoring_rule <- function(object, newdata = NULL, rule = c("log", "crps", "dss", 
 new_spec_dots <- function(spec) {
   two_sided <- function(f, k) if (length(f) == 3) f else
     stats::as.formula(call("~", as.name(k), f[[2]]), env = environment(f))
-  prim <- primary_par(spec$fam, spec$rpars)
+  prim <- if (is.null(spec$formula)) primary_par(spec$fam, spec$rpars) else primary_par(spec$fam, regression_pars(spec$fam))
   oth <- setdiff(names(spec$formulas), prim)
   c(unname(Map(two_sided, spec$formulas[oth], oth)), spec$data_args)
 }

@@ -117,7 +117,7 @@ inflate <- function(base, at = 0, names = NULL) {
   stan <- NULL
   if (!is.null(base$stan) && k == 1) {
     fn <- sprintf("rc_inflate_%s_%s", stan_ident(base$id), gsub("[^0-9a-z]", "", tolower(format(at))))
-    args <- paste(sprintf("real %s", bnames), collapse = ", ")
+    args <- stan_args(base$pars, bnames)
     pm <- stats::setNames(lapply(bnames, identity), bnames)
     yt <- if (base$discrete) "int" else "real"
     blp <- stan_fill(base$stan$lpdf, "y", pm)
@@ -235,7 +235,7 @@ hurdle <- function(base, at = 0, name = "hu") {
   stan <- NULL
   if (!is.null(base$stan)) {
     fn <- sprintf("rc_hurdle_%s", stan_ident(base$id))
-    args <- paste(sprintf("real %s", bnames), collapse = ", ")
+    args <- stan_args(base$pars, bnames)
     pm <- stats::setNames(lapply(bnames, identity), bnames)
     yt <- if (base$discrete) "int" else "real"
     blp <- stan_fill(base$stan$lpdf, "y", pm)
@@ -332,7 +332,7 @@ truncate_dist <- function(base, lower = -Inf, upper = Inf) {
   if (!is.null(base$stan) && !is.null(base$stan$lcdf)) {
     fn <- sprintf("rc_trunc_%s", stan_ident(base$id))
     pm <- stats::setNames(lapply(bn, identity), bn)
-    args <- paste(sprintf("real %s", bn), collapse = ", ")
+    args <- stan_args(base$pars, bn)
     yt <- if (base$discrete) "int" else "real"
     nrm <- if (is.finite(lower) && is.finite(upper))
       sprintf("log_diff_exp(%s, %s)", stan_fill(base$stan$lcdf, format(upper), pm), stan_fill(base$stan$lcdf, format(lo_q), pm))
@@ -446,7 +446,7 @@ mixture <- function(...) {
   if (all(vapply(comps, function(f) !is.null(f$stan), TRUE))) {
     fn <- paste0("rc_mix_", paste(vapply(comps, function(f) stan_ident(f$id), ""), collapse = "_"))
     yt <- if (disc[1]) "int" else "real"
-    args <- paste(c(sprintf("real %s", stan_ident(names(pars)))), collapse = ", ")
+    args <- stan_args(pars, names(pars), stan_ident(names(pars)))
     terms <- vapply(seq_len(K), function(k) {
       pm <- stats::setNames(as.list(stan_ident(cmap[[k]])), names(cmap[[k]]))
       sprintf("log(w[%d]) + %s", k, stan_fill(comps[[k]]$stan$lpdf, "y", pm))

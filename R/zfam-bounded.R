@@ -287,7 +287,8 @@ bfam("libby_novick", "Libby-Novick generalized beta", list(shp("alpha"), shp("be
 
 bfam("generalized_beta1", "Generalized beta of the first kind (GB1)", list(P("scale", "positive", role = "scale", data = TRUE),
   P("a", "real", role = "shape", link = "identity"), shp("p"), shp("q")),
-  support = function(r) list(lower = 0, upper = r$scale),
+  support = function(r) list(lower = ifelse(r$a > 0, 0, r$scale), upper = ifelse(r$a > 0, r$scale, Inf)),
+  check = function(r) if (any(r$a == 0)) "GB1 needs a != 0.",
   lpdf = function(y, r) log(abs(r$a)) + (r$a * r$p - 1) * log(y) + (r$q - 1) * log1p(-(y / r$scale)^r$a) - r$a * r$p * log(r$scale) - lbeta(r$p, r$q),
   cdf = function(x, r) { v <- stats::pbeta((x / r$scale)^r$a, r$p, r$q); ifelse(r$a > 0, v, 1 - v) },
   references = "McDonald (1984), Econometrica, 52, 647-663.",

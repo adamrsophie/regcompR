@@ -104,6 +104,7 @@ regcomp <- function(formula, ..., family, data, engine = c("ml", "tmb", "bayes")
   data <- as.data.frame(data)
   if (!is.null(subset)) data <- data[subset, , drop = FALSE]
   dots <- eval(substitute(alist(...)))
+  data <- model_rows(formula, dots, data, substitute(weights), parent.frame())
   spec <- build_spec(formula, dots, fam, data, weights = substitute(weights),
                      links = links, fixed = fixed, env = parent.frame())
   spec$call <- cl
@@ -159,6 +160,26 @@ regcomp_control <- function(maxit = 1000, rel_tol = 1e-10, inner_maxit = 50,
        cores = cores, adapt_delta = adapt_delta, start = start)
 }
 
+# Rows used in a fit: weights must be finite and nonnegative; rows with a
+# missing value in any variable the model uses, or with zero weight, are
+# omitted (as na.omit does for glm).
+model_rows <- function(formula, dots, data, weights, env) {
+  w <- if (is.null(weights)) NULL else eval(weights, data, env)
+  if (!is.null(w)) {
+    if (!is.numeric(w) || !length(w) %in% c(1L, nrow(data)) || any(!is.finite(w) | w < 0))
+      stop_input("weights must be finite, nonnegative and have one value per row.")
+    w <- rep_len(w, nrow(data))
+  }
+  vars <- unique(c(all.vars(formula), unlist(lapply(dots, function(d) {
+    v <- tryCatch(eval(d, env), error = function(e) NULL)
+    if (inherits(v, "formula")) all.vars(v) else all.vars(d) }))))
+  vars <- intersect(vars, names(data))
+  keep <- if (length(vars)) stats::complete.cases(data[vars]) else rep(TRUE, nrow(data))
+  if (!is.null(w)) keep <- keep & w > 0
+  if (!any(keep)) stop_input("No rows remain after removing missing values and zero weights.")
+  data[keep, , drop = FALSE]
+}
+
 # Assemble everything the engines need.
 build_spec <- function(formula, dots, fam, data, weights = NULL, links = NULL,
                        fixed = NULL, env = parent.frame(), xlev = NULL,
@@ -201,12 +222,15 @@ build_spec <- function(formula, dots, fam, data, weights = NULL, links = NULL,
   }
   preds <- list()
   for (k in rpars) {
-    preds[[k]] <- build_predictor(expand_dot(rhs_of(fl[[k]]), data, all.vars(formula[[2]])), data, k,
+    fk <- if (!is.null(prev$preds[[k]]$dot_formula)) prev$preds[[k]]$dot_formula else
+      expand_dot(rhs_of(fl[[k]]), data, c(all.vars(formula[[2]]), unlist(lapply(dargs, all.vars)), all.vars(weights)))
+    preds[[k]] <- build_predictor(fk, data, k,
       xlev = if (!is.null(prev)) prev$preds[[k]]$xlev,
       prev_pred = if (!is.null(prev)) prev$preds[[k]],
       smooth_specs = if (!is.null(prev)) prev$preds[[k]]$smooths,
       re_levels = if (!is.null(prev)) { pb <- prev$preds[[k]]$blocks; lab <- vapply(pb, `[[`, "", "label")
         c(stats::setNames(lapply(pb, `[[`, "levels"), lab), stats::setNames(lapply(pb, `[[`, "coords"), paste0(".coords.", lab))) })
+    preds[[k]]$dot_formula <- fk
     if (any(preds[[k]]$offset != 0) && !fam$pars[[k]]$offset_allowed &&
         is.null(prev))
       stop_input(sprintf("An offset is not allowed for parameter '%s' of '%s'.", k, fam$id))
@@ -222,6 +246,7 @@ build_spec <- function(formula, dots, fam, data, weights = NULL, links = NULL,
   unknown <- setdiff(names(dargs), c(data_pars(fam), ""))
   if (length(unknown)) stop_input(sprintf("Unknown argument%s: %s.",
     if (length(unknown) > 1) "s" else "", paste(unknown, collapse = ", ")))
+  fixed_data <- fixed[intersect(names(fixed), data_pars(fam))]
   fixed <- fixed[setdiff(names(fixed), data_pars(fam))]
   w <- if (is.null(weights)) rep(1, n) else {
     wv <- eval(weights, data, env)
@@ -283,7 +308,7 @@ build_spec <- function(formula, dots, fam, data, weights = NULL, links = NULL,
     y = y, cmat = cmat, n = n, weights = w, data_pars = dp, fixed = fixed,
     beta_idx = beta_idx, beta_names = beta_names, blocks = blocks,
     theta_idx = theta_idx, u_idx = u_idx, Z = Z, Q = Q, ntheta = toff,
-    data_args = dargs, response_name = paste(deparse(formula[[2]]), collapse = ""),
+    data_args = dargs, formula = formula, fixed_data = fixed_data, response_name = paste(deparse(formula[[2]]), collapse = ""),
     aux = aux, ylev = ylev
   ), class = "regcomp_spec")
   if (is.null(prev) && length(fixed) && !is.null(fam$check) && length(rpars)) {

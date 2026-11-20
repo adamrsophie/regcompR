@@ -193,30 +193,30 @@ make_penalty <- function(pen, spec) {
 # handles weighted lasso, elastic net and group lasso.
 fista <- function(spec, beta0, pen, maxit = 5000) {
   idx <- pen$idx; sc <- pen$scale; lam <- pen$lambda; al <- pen$alpha
-  ridge_part <- function(b) lam * (1 - al) / 2 * sum((b[idx] * sc)^2)
-  f <- function(b) -ml_objective(spec, b) + ridge_part(b)
-  g <- function(b) { gg <- -ml_gradient(spec, b); gg[idx] <- gg[idx] + lam * (1 - al) * b[idx] * sc^2; gg }
-  nonsmooth <- function(b) {
-    if (pen$type == "group_lasso") {
-      v <- b[idx] * sc
-      return(lam * sum(vapply(split(v, pen$group), function(z) sqrt(length(z)) * sqrt(sum(z^2)), 0)))
-    }
-    lam * al * sum(pen$w * abs(b[idx] * sc))
+  # Work in standardized coordinates c = beta * scale, where the penalty is
+  # an ordinary (group) lasso with an exact proximal step.
+  unsc <- function(c) { c[idx] <- c[idx] / sc; c }
+  ridge_part <- function(c) lam * (1 - al) / 2 * sum(c[idx]^2)
+  f <- function(c) -ml_objective(spec, unsc(c)) + ridge_part(c)
+  g <- function(c) { gg <- -ml_gradient(spec, unsc(c)); gg[idx] <- gg[idx] / sc + lam * (1 - al) * c[idx]; gg }
+  nonsmooth <- function(c) {
+    if (pen$type == "group_lasso")
+      return(lam * sum(vapply(split(c[idx], pen$group), function(z) sqrt(length(z)) * sqrt(sum(z^2)), 0)))
+    lam * al * sum(pen$w * abs(c[idx]))
   }
-  prox <- function(b, t) {
+  prox <- function(c, t) {
     if (pen$type == "group_lasso") {
       for (gname in unique(pen$group)) {
-        j <- which(pen$group == gname); v <- b[idx[j]] * sc[j]
-        nv <- sqrt(sum(v^2)); thr <- t * lam * sqrt(length(j)) * mean(sc[j])
-        b[idx[j]] <- if (nv <= thr) 0 else b[idx[j]] * (1 - thr / nv)
+        j <- idx[pen$group == gname]; nv <- sqrt(sum(c[j]^2)); thr <- t * lam * sqrt(length(j))
+        c[j] <- if (nv <= thr) 0 else c[j] * (1 - thr / nv)
       }
-      return(b)
+      return(c)
     }
-    thr <- t * lam * al * pen$w * sc
-    v <- b[idx]
-    b[idx] <- sign(v) * pmax(abs(v) - thr, 0)
-    b
+    v <- c[idx]
+    c[idx] <- sign(v) * pmax(abs(v) - t * lam * al * pen$w, 0)
+    c
   }
+  beta0[idx] <- beta0[idx] * sc
   x <- beta0; yv <- x; tk <- 1; L <- 1
   fx <- f(x); conv <- 1L
   for (it in seq_len(maxit)) {
@@ -235,7 +235,7 @@ fista <- function(spec, beta0, pen, maxit = 5000) {
     x <- xn; fx <- fn
     if (done) { conv <- 0L; break }
   }
-  list(par = x, convergence = conv, iterations = it, objective = fx + nonsmooth(x))
+  list(par = unsc(x), convergence = conv, iterations = it, objective = fx + nonsmooth(x))
 }
 
 # Derivative of the SCAD and MCP penalties, used as LLA weights.

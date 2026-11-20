@@ -45,7 +45,16 @@ pit_values <- function(fam, y, pars, cmat = NULL) {
   lo_q <- if (fam$discrete) lo - 1 else lo
   Flo <- ifelse(is.infinite(lo) & lo < 0, 0, family_cdf(fam, ifelse(is.finite(lo_q), lo_q, 0), pars))
   exact_cont <- !fam$discrete & lo == up
-  Flo[exact_cont] <- Fup[exact_cont]
+  # Continuous laws can carry atoms (censored, rectified or inflated laws):
+  # use the left limit of the distribution function and randomize over the
+  # jump when there is one.
+  if (any(exact_cont)) {
+    i <- which(exact_cont & is.finite(lo))
+    Fl <- family_cdf(fam, lo[i] - 1e-8 * (1 + abs(lo[i])), lapply(pars, function(v) if (length(v) == n) v[i] else v))
+    Flo[exact_cont] <- Fup[exact_cont]
+    jump <- Fup[i] - Fl > 1e-6
+    Flo[i[jump]] <- Fl[jump]
+  }
   if (!is.null(cmat)) {
     tl <- cmat[, "tlower"]; tu <- cmat[, "tupper"]
     Ftl <- ifelse(is.finite(tl), family_cdf(fam, ifelse(is.finite(tl), if (fam$discrete) tl - 1 else tl, 0), pars), 0)

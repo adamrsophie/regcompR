@@ -2,6 +2,14 @@
 
 P <- function(...) par_spec(...)
 
+# Stan argument list for a wrapper function: integer data arguments (such
+# as binomial trials) stay int so native lpmfs accept them.
+stan_args <- function(pars, nm, ids = nm) {
+  int <- vapply(nm, function(k) isTRUE(pars[[k]]$data) &&
+    isTRUE(pars[[k]]$domain %in% c("positive_integer", "nonneg_integer", "integer")), TRUE)
+  paste(ifelse(int, "int ", "real "), ids, sep = "", collapse = ", ")
+}
+
 # Stan template helper: native function call with {par} placeholders.
 stan_native <- function(lpdf, lcdf = NULL, lccdf = NULL, rng = NULL,
                         functions = "") {
@@ -29,10 +37,11 @@ stan_helpers <- list(
     while (x * cosh(tmax) - abs(nu) * tmax < x + 50) tmax += 1;
     acc = log(0.5) - x;
     lmax = acc;
-    for (k in 1:to_int(tmax / h)) {
-      real t = k * h;
+    real t = h;
+    while (t <= tmax) {
       real lt = -x * cosh(t) + log_sum_exp(nu * t, -nu * t) - log(2);
       acc = log_sum_exp(acc, lt);
+      t += h;
     }
     return acc + log(h);
   }",
@@ -186,11 +195,11 @@ ref_impl <- function(package, lpdf, cdf = NULL, note = "") {
 # Generated Stan functions for a scalar family. Bodies are Stan statements
 # using `y` and the parameter names; they must return a real.
 sfun <- function(id, args, lpdf, lcdf = NULL, lccdf = NULL, discrete = FALSE,
-                 rng = NULL, needs = character()) {
+                 rng = NULL, needs = character(), ints = character()) {
   sid <- paste0("rc_", gsub("[^A-Za-z0-9]", "_", id))
   yt <- if (discrete) "int" else "real"
   suf <- if (discrete) "lpmf" else "lpdf"
-  sig <- paste(sprintf("real %s", args), collapse = ", ")
+  sig <- paste(ifelse(args %in% ints, "int", "real"), args, collapse = ", ")
   call <- paste(sprintf("{%s}", args), collapse = ", ")
   f <- sprintf("\n  real %s_%s(%s y, %s) {\n%s\n  }", sid, suf, yt, sig, lpdf)
   if (!is.null(lcdf)) f <- paste0(f, sprintf("\n  real %s_lcdf(%s y, %s) {\n%s\n  }", sid, yt, sig, lcdf))

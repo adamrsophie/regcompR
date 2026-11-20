@@ -73,9 +73,12 @@ mfam("dirichlet", "Dirichlet", list(P("alpha", "positive", role = "concentration
   references = "Kotz, Balakrishnan and Johnson (2000), Continuous Multivariate Distributions, ch. 49.",
   reference = ref_impl("extraDistr", function(y, p) extraDistr::ddirichlet(as_rows(y), p$alpha, log = TRUE)), status = "validated")
 
-cc_logC <- function(eta) { K <- length(eta)
-  if (any(abs(outer(eta, eta, "-")[upper.tri(diag(K))]) < 1e-6)) eta <- eta + seq_len(K) * 1e-5
-  -log(abs(sum(vapply(seq_len(K), function(k) exp(eta[k]) / prod(eta[k] - eta[-k]), 0)))) }
+# log C(eta): 1/C is the divided difference of exp at eta, read off the
+# matrix exponential of the bidiagonal matrix with eta on the diagonal
+# (exact for tied parameters); eta is centered for stability.
+cc_logC <- function(eta) { K <- length(eta); m <- max(eta)
+  A <- diag(eta - m, K); if (K > 1) A[cbind(1:(K - 1), 2:K)] <- 1
+  -(m + log(as.matrix(Matrix::expm(Matrix::Matrix(A)))[1, K])) }
 mfam("continuous_categorical", "Continuous categorical", list(P("eta", "real", role = "natural parameters", regression = FALSE)),
   formula = "f(y) = C(eta) exp(sum eta_k y_k) on the simplex (Lebesgue on the first K - 1 coordinates), 1/C = sum_k e^eta_k / prod_{i != k} (eta_k - eta_i)",
   lpdf = function(y, p) { y <- as_rows(y); cc_logC(p$eta) + drop(y %*% p$eta) },
@@ -101,8 +104,15 @@ mfam("multivariate_t", "Multivariate t", list(P("mu", "real", regression = FALSE
   reference = ref_impl("mvtnorm", function(y, p) mvtnorm::dmvt(as_rows(y), p$mu, as.matrix(p$Sigma), df = p$nu, log = TRUE)),
   stan = stan_native("multi_student_t_lpdf({y} | {nu}, {mu}, {Sigma})"), status = "validated")
 
-mglg_lpdf <- function(y, p) { y <- as_rows(y); k <- ncol(y); n <- 0:400
+mglg_lpdf <- function(y, p) { y <- as_rows(y); k <- ncol(y)
+  # Latent count range: the negative binomial weights and the conditional
+  # gamma terms must both be covered.
+  nb <- if (p$delta >= 1) 0 else stats::qnbinom(1 - 1e-15, size = p$nu, prob = p$delta)
   apply(y, 1, function(r) { s <- sum(p$mu * r); e <- sum(exp(p$mu * r) / p$lambda)
+    nmax <- ceiling(max(400, 2 * nb, 4 * max(exp(p$mu * r) / p$lambda) + 100))
+    if (p$delta >= 1) nmax <- 0
+    if (nmax > 1e7) stop_numerical("The G-MVLG series needs more than 1e7 terms.")
+    n <- 0:nmax
     log_sum_exp(p$nu * log(p$delta) + ifelse(n == 0, 0, n * log1p(-p$delta)) + sum(log(p$mu)) -
       vapply(n, function(m) sum((p$nu + m) * log(p$lambda)), 0) - (k - 1) * lgamma(p$nu + n) - lgamma(p$nu) - lgamma(n + 1) +
       (p$nu + n) * s - e) }) }
