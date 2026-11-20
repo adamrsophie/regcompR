@@ -39,11 +39,13 @@
 <li class="nav-item dropdown">
   <button class="nav-link dropdown-toggle" type="button" id="dropdown-articles" data-bs-toggle="dropdown" aria-expanded="false" aria-haspopup="true">Articles</button>
   <ul class="dropdown-menu" aria-labelledby="dropdown-articles">
-<li><a class="dropdown-item" href="../articles/distributions.html">Distributions and operators</a></li>
+<li><a class="dropdown-item" href="../articles/distributions.html">Distributions and the registry</a></li>
+    <li><a class="dropdown-item" href="../articles/operators.html">Building new distributions with operators</a></li>
     <li><a class="dropdown-item" href="../articles/count-models.html">Count data models</a></li>
     <li><a class="dropdown-item" href="../articles/hierarchical-longitudinal.html">Hierarchical and longitudinal models</a></li>
     <li><a class="dropdown-item" href="../articles/ordinal-categorical.html">Ordinal and categorical responses</a></li>
     <li><a class="dropdown-item" href="../articles/survival.html">Censored data and survival models</a></li>
+    <li><a class="dropdown-item" href="../articles/regularization.html">Penalized and bias reduced estimation</a></li>
     <li><a class="dropdown-item" href="../articles/model-checking.html">Model checking and comparison</a></li>
     <li><a class="dropdown-item" href="../articles/bayesian.html">Bayesian distributional regression</a></li>
   </ul>
@@ -86,8 +88,9 @@
     
 <p>regcompR fits distributional regression models: every parameter of a
 response distribution can depend on covariates through its own formula.
-The same model specification can be fitted by maximum likelihood,
-through TMB, or by Bayesian inference in Stan, JAGS or OpenBUGS.</p>
+The same model specification can be fitted by maximum likelihood
+(<code>engine = "ml"</code>), through TMB (<code>"tmb"</code>), or by
+Bayesian inference in Stan, JAGS or OpenBUGS (<code>"bayes"</code>).</p>
 <div class="sourceCode" id="cb1"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://github.com/adamrsophie/regcompR" class="external-link">regcompR</a></span><span class="op">)</span></span></code></pre></div>
 <div class="section level2">
@@ -104,28 +107,13 @@ parameters, links, moments and references.</p>
 <span><span class="co">#&gt;  [5] "conway_maxwell_poisson"      "conway_maxwell_poisson_mean"</span></span>
 <span><span class="co">#&gt;  [7] "delaporte"                   "discrete_compound_poisson"  </span></span>
 <span><span class="co">#&gt;  [9] "discrete_phase_type"         "discrete_weibull"</span></span>
-<span><span class="fu"><a href="../reference/get_family.html">get_family</a></span><span class="op">(</span><span class="st">"nb2"</span><span class="op">)</span></span>
-<span><span class="co">#&gt; &lt;regcomp_family negative_binomial_nb2&gt; Negative binomial (NB2)</span></span>
-<span><span class="co">#&gt;   category: count, variate: scalar, discrete, status: validated</span></span>
-<span><span class="co">#&gt;   parameters:</span></span>
-<span><span class="co">#&gt;     mu       positive          link log       [mean]</span></span>
-<span><span class="co">#&gt;     phi      positive          link log       </span></span>
-<span><span class="co">#&gt;   formula: p(y) = C(y + phi - 1, y) (mu / (mu + phi))^y (phi / (mu + phi))^phi</span></span></code></pre></div>
-<p>A distribution object evaluates densities, distribution functions,
-quantiles, moments and random draws.</p>
-<div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">d</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/distribution.html">distribution</a></span><span class="op">(</span><span class="st">"gamma"</span>, mu <span class="op">=</span> <span class="fl">2</span>, sigma <span class="op">=</span> <span class="fl">0.5</span><span class="op">)</span></span>
+<span><span class="va">d</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/distribution.html">distribution</a></span><span class="op">(</span><span class="st">"gamma"</span>, mu <span class="op">=</span> <span class="fl">2</span>, sigma <span class="op">=</span> <span class="fl">0.5</span><span class="op">)</span></span>
 <span><span class="fu"><a href="../reference/probability-interface.html">prob</a></span><span class="op">(</span><span class="va">d</span>, <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">1</span>, <span class="fl">2</span>, <span class="fl">3</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="co">#&gt; [1] 0.3608941 0.3907336 0.1784702</span></span>
-<span><span class="fu"><a href="../reference/probability-interface.html">cdf</a></span><span class="op">(</span><span class="va">d</span>, <span class="fl">2</span><span class="op">)</span></span>
-<span><span class="co">#&gt; [1] 0.5665299</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/stats/quantile.html" class="external-link">quantile</a></span><span class="op">(</span><span class="va">d</span>, <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">0.1</span>, <span class="fl">0.5</span>, <span class="fl">0.9</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="co">#&gt; [1] 0.8723848 1.8360304 3.3403915</span></span>
-<span><span class="fu"><a href="https://rdrr.io/r/base/mean.html" class="external-link">mean</a></span><span class="op">(</span><span class="va">d</span><span class="op">)</span>; <span class="fu"><a href="../reference/moments.html">variance</a></span><span class="op">(</span><span class="va">d</span><span class="op">)</span></span>
-<span><span class="co">#&gt; [1] 2</span></span>
-<span><span class="co">#&gt; [1] 1</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">d</span><span class="op">)</span></span></code></pre></div>
-<p><img src="regcompR_files/figure-html/unnamed-chunk-4-1.png" class="r-plt" alt="" width="576"></p>
+<p><img src="regcompR_files/figure-html/unnamed-chunk-3-1.png" class="r-plt" alt="" width="576"></p>
 </div>
 <div class="section level2">
 <h2 id="a-first-regression">A first regression<a class="anchor" aria-label="anchor" href="#a-first-regression"></a>
@@ -133,9 +121,9 @@ quantiles, moments and random draws.</p>
 <p>The first formula is the main formula (it models the mean parameter,
 or the location or scale parameter where there is no mean). Further
 formulas name the parameter on their left side.</p>
-<div class="sourceCode" id="cb4"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">n</span> <span class="op">&lt;-</span> <span class="fl">400</span></span>
-<span><span class="va">dat</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span>x <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/stats/Uniform.html" class="external-link">runif</a></span><span class="op">(</span><span class="va">n</span><span class="op">)</span><span class="op">)</span></span>
+<span><span class="va">dat</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span>x <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/stats/Uniform.html" class="external-link">runif</a></span><span class="op">(</span><span class="va">n</span><span class="op">)</span>, z <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/stats/Normal.html" class="external-link">rnorm</a></span><span class="op">(</span><span class="va">n</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="va">dat</span><span class="op">$</span><span class="va">y</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/stats/GammaDist.html" class="external-link">rgamma</a></span><span class="op">(</span><span class="va">n</span>, shape <span class="op">=</span> <span class="fl">1</span> <span class="op">/</span> <span class="op">(</span><span class="fl">0.3</span> <span class="op">+</span> <span class="fl">0.4</span> <span class="op">*</span> <span class="va">dat</span><span class="op">$</span><span class="va">x</span><span class="op">)</span><span class="op">^</span><span class="fl">2</span>,</span>
 <span>                scale <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/Log.html" class="external-link">exp</a></span><span class="op">(</span><span class="fl">1</span> <span class="op">+</span> <span class="va">dat</span><span class="op">$</span><span class="va">x</span><span class="op">)</span> <span class="op">*</span> <span class="op">(</span><span class="fl">0.3</span> <span class="op">+</span> <span class="fl">0.4</span> <span class="op">*</span> <span class="va">dat</span><span class="op">$</span><span class="va">x</span><span class="op">)</span><span class="op">^</span><span class="fl">2</span><span class="op">)</span></span>
 <span><span class="va">fit</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/regcomp.html">regcomp</a></span><span class="op">(</span><span class="va">y</span> <span class="op">~</span> <span class="va">x</span>, <span class="va">sigma</span> <span class="op">~</span> <span class="va">x</span>, family <span class="op">=</span> <span class="st">"gamma"</span>, data <span class="op">=</span> <span class="va">dat</span><span class="op">)</span></span>
@@ -143,76 +131,229 @@ formulas name the parameter on their left side.</p>
 <span><span class="co">#&gt; &lt;regcomp_fit&gt; Gamma (mean and coefficient of variation, GAMLSS GA) regression, engine 'ml' (frequentist)</span></span>
 <span><span class="co">#&gt;   mu (log link): ~x</span></span>
 <span><span class="co">#&gt;   sigma (log link): ~x</span></span>
-<span><span class="co">#&gt;   log likelihood -847.334 on 4 parameters, n = 400</span></span>
+<span><span class="co">#&gt;   log likelihood -834.535 on 4 parameters, n = 400</span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; Wald estimates with 95% confidence intervals:</span></span>
 <span><span class="co">#&gt;                   estimate std_error   lower   upper        z p_value</span></span>
-<span><span class="co">#&gt; mu:(Intercept)      1.0185    0.0436  0.9330  1.1040  23.3467       0</span></span>
-<span><span class="co">#&gt; mu:x                0.9451    0.0930  0.7628  1.1273  10.1644       0</span></span>
-<span><span class="co">#&gt; sigma:(Intercept)  -1.0365    0.0704 -1.1745 -0.8985 -14.7178       0</span></span>
-<span><span class="co">#&gt; sigma:x             0.7063    0.1230  0.4652  0.9474   5.7422       0</span></span>
-<span><span class="co">#&gt; max |gradient| 4.27e-04; Hessian positive definite</span></span></code></pre></div>
+<span><span class="co">#&gt; mu:(Intercept)      0.9264    0.0409  0.8464  1.0065  22.6749       0</span></span>
+<span><span class="co">#&gt; mu:x                1.1018    0.0915  0.9225  1.2811  12.0425       0</span></span>
+<span><span class="co">#&gt; sigma:(Intercept)  -1.1440    0.0711 -1.2833 -1.0047 -16.0939       0</span></span>
+<span><span class="co">#&gt; sigma:x             0.8843    0.1240  0.6413  1.1273   7.1324       0</span></span>
+<span><span class="co">#&gt; max |gradient| 4.34e-06; Hessian positive definite</span></span></code></pre></div>
+</div>
+<div class="section level2">
+<h2 id="specifying-the-model">Specifying the model<a class="anchor" aria-label="anchor" href="#specifying-the-model"></a>
+</h2>
+<ul>
+<li>
+<code>links =</code> changes the link of a parameter
+(<code><a href="../reference/link.html">links()</a></code> lists them);</li>
+<li>
+<code>fixed =</code> holds a parameter at a known value;</li>
+<li>
+<code>weights =</code> multiplies each log likelihood
+contribution;</li>
+<li>
+<code>subset =</code> selects rows (a logical or index vector);</li>
+<li>data parameters (trial counts, known minima) are given by name, as
+<code>size = n</code> for the binomial;</li>
+<li>
+<code><a href="https://rdrr.io/r/stats/offset.html" class="external-link">offset()</a></code> enters a term with coefficient one;</li>
+<li>
+<code>parameterization =</code> chooses among parameterizations of a
+law (<code>get_family("gamma", "rate")</code>);</li>
+<li>
+<code>y ~ .</code> uses every other column.</li>
+</ul>
+<div class="sourceCode" id="cb4"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">f_link</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/regcomp.html">regcomp</a></span><span class="op">(</span><span class="va">y</span> <span class="op">~</span> <span class="va">x</span>, <span class="va">sigma</span> <span class="op">~</span> <span class="fl">1</span>, family <span class="op">=</span> <span class="st">"gamma"</span>, data <span class="op">=</span> <span class="va">dat</span>, links <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>mu <span class="op">=</span> <span class="st">"identity"</span><span class="op">)</span><span class="op">)</span></span>
+<span><span class="va">f_fix</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/regcomp.html">regcomp</a></span><span class="op">(</span><span class="va">y</span> <span class="op">~</span> <span class="va">x</span>, family <span class="op">=</span> <span class="st">"gamma"</span>, data <span class="op">=</span> <span class="va">dat</span>, fixed <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>sigma <span class="op">=</span> <span class="fl">0.5</span><span class="op">)</span><span class="op">)</span></span>
+<span><span class="va">f_sub</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/regcomp.html">regcomp</a></span><span class="op">(</span><span class="va">y</span> <span class="op">~</span> <span class="va">x</span>, family <span class="op">=</span> <span class="st">"gamma"</span>, data <span class="op">=</span> <span class="va">dat</span>, subset <span class="op">=</span> <span class="va">dat</span><span class="op">$</span><span class="va">x</span> <span class="op">&gt;</span> <span class="fl">0.2</span>, weights <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/rep.html" class="external-link">rep</a></span><span class="op">(</span><span class="fl">2</span>, <span class="va">n</span><span class="op">)</span><span class="op">)</span></span>
+<span><span class="va">f_rate</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/regcomp.html">regcomp</a></span><span class="op">(</span><span class="va">y</span> <span class="op">~</span> <span class="va">x</span>, family <span class="op">=</span> <span class="st">"gamma"</span>, parameterization <span class="op">=</span> <span class="st">"rate"</span>, data <span class="op">=</span> <span class="va">dat</span><span class="op">)</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/base/names.html" class="external-link">names</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/stats/coef.html" class="external-link">coef</a></span><span class="op">(</span><span class="va">f_rate</span><span class="op">)</span><span class="op">)</span></span>
+<span><span class="co">#&gt; [1] "shape:(Intercept)" "rate:(Intercept)"  "rate:x"</span></span>
+<span><span class="va">bd</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span>n <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/stats/Poisson.html" class="external-link">rpois</a></span><span class="op">(</span><span class="fl">50</span>, <span class="fl">10</span><span class="op">)</span> <span class="op">+</span> <span class="fl">1</span>, x <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/stats/Normal.html" class="external-link">rnorm</a></span><span class="op">(</span><span class="fl">50</span><span class="op">)</span><span class="op">)</span></span>
+<span><span class="va">bd</span><span class="op">$</span><span class="va">k</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/stats/Binomial.html" class="external-link">rbinom</a></span><span class="op">(</span><span class="fl">50</span>, <span class="va">bd</span><span class="op">$</span><span class="va">n</span>, <span class="fu"><a href="https://rdrr.io/r/stats/Logistic.html" class="external-link">plogis</a></span><span class="op">(</span><span class="fl">0.3</span> <span class="op">*</span> <span class="va">bd</span><span class="op">$</span><span class="va">x</span><span class="op">)</span><span class="op">)</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/stats/coef.html" class="external-link">coef</a></span><span class="op">(</span><span class="fu"><a href="../reference/regcomp.html">regcomp</a></span><span class="op">(</span><span class="va">k</span> <span class="op">~</span> <span class="va">x</span>, family <span class="op">=</span> <span class="st">"binomial"</span>, size <span class="op">=</span> <span class="va">n</span>, data <span class="op">=</span> <span class="va">bd</span><span class="op">)</span><span class="op">)</span></span>
+<span><span class="co">#&gt; prob:(Intercept)           prob:x </span></span>
+<span><span class="co">#&gt;       0.08711978       0.48937544</span></span></code></pre></div>
+<p>Rows with a missing or non finite value in anything the model
+evaluates (the response, a transformed covariate such as
+<code>log(x)</code>, a weight or a data parameter) are left out, as with
+<code><a href="https://rdrr.io/r/stats/glm.html" class="external-link">glm()</a></code>. The fit stores its analysis rows, and cross
+validation and clustered covariances use exactly those rows.</p>
+<div class="sourceCode" id="cb5"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">dm</span> <span class="op">&lt;-</span> <span class="va">dat</span>; <span class="va">dm</span><span class="op">$</span><span class="va">x</span><span class="op">[</span><span class="fl">3</span><span class="op">]</span> <span class="op">&lt;-</span> <span class="cn">NA</span>; <span class="va">dm</span><span class="op">$</span><span class="va">z</span><span class="op">[</span><span class="fl">5</span><span class="op">]</span> <span class="op">&lt;-</span> <span class="op">-</span><span class="fl">1</span></span>
+<span><span class="va">fm</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/regcomp.html">regcomp</a></span><span class="op">(</span><span class="va">y</span> <span class="op">~</span> <span class="va">x</span> <span class="op">+</span> <span class="fu"><a href="https://rdrr.io/r/base/Log.html" class="external-link">log</a></span><span class="op">(</span><span class="va">z</span> <span class="op">+</span> <span class="fl">1</span><span class="op">)</span>, family <span class="op">=</span> <span class="st">"gamma"</span>, data <span class="op">=</span> <span class="va">dm</span><span class="op">)</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/stats/nobs.html" class="external-link">nobs</a></span><span class="op">(</span><span class="va">fm</span><span class="op">)</span></span>
+<span><span class="co">#&gt; [1] 334</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/utils/head.html" class="external-link">head</a></span><span class="op">(</span><span class="va">fm</span><span class="op">$</span><span class="va">rows</span><span class="op">)</span></span>
+<span><span class="co">#&gt; [1] 1 2 4 6 7 8</span></span></code></pre></div>
+<p><code><a href="../reference/regcomp_control.html">regcomp_control()</a></code> sets the optimizer
+(<code>maxit</code>, <code>rel_tol</code>, <code>restarts</code>,
+<code>start</code> values), the Laplace inner problem, the proximal
+solver of lasso type penalties and the MCMC settings.</p>
+<div class="sourceCode" id="cb6"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">f_ctl</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/regcomp.html">regcomp</a></span><span class="op">(</span><span class="va">y</span> <span class="op">~</span> <span class="va">x</span>, family <span class="op">=</span> <span class="st">"gamma"</span>, data <span class="op">=</span> <span class="va">dat</span>,</span>
+<span>                 control <span class="op">=</span> <span class="fu"><a href="../reference/regcomp_control.html">regcomp_control</a></span><span class="op">(</span>restarts <span class="op">=</span> <span class="fl">2</span>, start <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>mu <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">1</span>, <span class="fl">1</span><span class="op">)</span><span class="op">)</span><span class="op">)</span><span class="op">)</span></span>
+<span><span class="va">f_ctl</span><span class="op">$</span><span class="va">diagnostics</span><span class="op">[</span><span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"converged"</span>, <span class="st">"max_abs_gradient"</span><span class="op">)</span><span class="op">]</span></span>
+<span><span class="co">#&gt; $converged</span></span>
+<span><span class="co">#&gt; [1] TRUE</span></span>
+<span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt; $max_abs_gradient</span></span>
+<span><span class="co">#&gt; [1] 0.0005456312</span></span></code></pre></div>
+</div>
+<div class="section level2">
+<h2 id="methods-for-fitted-models">Methods for fitted models<a class="anchor" aria-label="anchor" href="#methods-for-fitted-models"></a>
+</h2>
+<div class="sourceCode" id="cb7"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/stats/coef.html" class="external-link">coef</a></span><span class="op">(</span><span class="va">fit</span><span class="op">)</span></span>
+<span><span class="co">#&gt;    mu:(Intercept)              mu:x sigma:(Intercept)           sigma:x </span></span>
+<span><span class="co">#&gt;         0.9264462         1.1017963        -1.1440085         0.8843013</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/base/MathFun.html" class="external-link">sqrt</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/diag.html" class="external-link">diag</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/stats/vcov.html" class="external-link">vcov</a></span><span class="op">(</span><span class="va">fit</span><span class="op">)</span><span class="op">)</span><span class="op">)</span></span>
+<span><span class="co">#&gt;    mu:(Intercept)              mu:x sigma:(Intercept)           sigma:x </span></span>
+<span><span class="co">#&gt;        0.04085773        0.09149227        0.07108316        0.12398398</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/stats/confint.html" class="external-link">confint</a></span><span class="op">(</span><span class="va">fit</span><span class="op">)</span></span>
+<span><span class="co">#&gt;                        lower     upper</span></span>
+<span><span class="co">#&gt; mu:(Intercept)     0.8463666  1.006526</span></span>
+<span><span class="co">#&gt; mu:x               0.9224747  1.281118</span></span>
+<span><span class="co">#&gt; sigma:(Intercept) -1.2833289 -1.004688</span></span>
+<span><span class="co">#&gt; sigma:x            0.6412972  1.127305</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/stats/logLik.html" class="external-link">logLik</a></span><span class="op">(</span><span class="va">fit</span><span class="op">)</span>; <span class="fu"><a href="https://rdrr.io/r/stats/AIC.html" class="external-link">AIC</a></span><span class="op">(</span><span class="va">fit</span><span class="op">)</span>; <span class="fu"><a href="https://rdrr.io/r/stats/AIC.html" class="external-link">BIC</a></span><span class="op">(</span><span class="va">fit</span><span class="op">)</span>; <span class="fu"><a href="https://rdrr.io/r/stats/nobs.html" class="external-link">nobs</a></span><span class="op">(</span><span class="va">fit</span><span class="op">)</span></span>
+<span><span class="co">#&gt; 'log Lik.' -834.5354 (df=4)</span></span>
+<span><span class="co">#&gt; [1] 1677.071</span></span>
+<span><span class="co">#&gt; [1] 1693.037</span></span>
+<span><span class="co">#&gt; [1] 400</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/stats/formula.html" class="external-link">formula</a></span><span class="op">(</span><span class="va">fit</span><span class="op">)</span></span>
+<span><span class="co">#&gt; $mu</span></span>
+<span><span class="co">#&gt; y ~ x</span></span>
+<span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt; $sigma</span></span>
+<span><span class="co">#&gt; sigma ~ x</span></span>
+<span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt; attr(,"given")</span></span>
+<span><span class="co">#&gt; [1] "mu"    "sigma"</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/utils/head.html" class="external-link">head</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/stats/fitted.values.html" class="external-link">fitted</a></span><span class="op">(</span><span class="va">fit</span><span class="op">)</span><span class="op">)</span></span>
+<span><span class="co">#&gt;        1        2        3        4        5        6 </span></span>
+<span><span class="co">#&gt; 3.383744 3.805514 4.747480 6.869602 3.153959 6.795691</span></span></code></pre></div>
+<p><code><a href="https://rdrr.io/r/stats/residuals.html" class="external-link">residuals()</a></code> gives randomized quantile
+(<code>"quantile"</code>, the default), <code>"pit"</code>,
+<code>"response"</code> and <code>"pearson"</code> residuals.</p>
+<div class="sourceCode" id="cb8"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/base/lapply.html" class="external-link">sapply</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"quantile"</span>, <span class="st">"pit"</span>, <span class="st">"response"</span>, <span class="st">"pearson"</span><span class="op">)</span>, <span class="kw">function</span><span class="op">(</span><span class="va">t</span><span class="op">)</span> <span class="fu"><a href="https://rdrr.io/r/base/Round.html" class="external-link">round</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/utils/head.html" class="external-link">head</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/stats/residuals.html" class="external-link">residuals</a></span><span class="op">(</span><span class="va">fit</span>, type <span class="op">=</span> <span class="va">t</span><span class="op">)</span>, <span class="fl">3</span><span class="op">)</span>, <span class="fl">3</span><span class="op">)</span><span class="op">)</span></span>
+<span><span class="co">#&gt;      quantile   pit response pearson</span></span>
+<span><span class="co">#&gt; [1,]   -0.320 0.375   -0.585  -0.429</span></span>
+<span><span class="co">#&gt; [2,]    0.450 0.674    0.534   0.317</span></span>
+<span><span class="co">#&gt; [3,]    0.935 0.825    2.181   0.869</span></span></code></pre></div>
 </div>
 <div class="section level2">
 <h2 id="predictions">Predictions<a class="anchor" aria-label="anchor" href="#predictions"></a>
 </h2>
-<div class="sourceCode" id="cb5"><pre class="downlit sourceCode r">
+<p><code><a href="https://rdrr.io/r/stats/predict.html" class="external-link">predict()</a></code> returns the distribution parameters
+(<code>"parameter"</code>), the linear predictors (<code>"link"</code>),
+<code>"mean"</code>, <code>"variance"</code>, <code>"sd"</code>,
+<code>"median"</code>, <code>"quantile"</code>,
+<code>"probability"</code> (mass or density at <code>at</code>),
+<code>"density"</code>, <code>"cdf"</code> and <code>"survival"</code>,
+with optional confidence intervals.</p>
+<div class="sourceCode" id="cb9"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">nd</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span>x <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">0.1</span>, <span class="fl">0.5</span>, <span class="fl">0.9</span><span class="op">)</span><span class="op">)</span></span>
-<span><span class="fu"><a href="https://rdrr.io/r/stats/predict.html" class="external-link">predict</a></span><span class="op">(</span><span class="va">fit</span>, <span class="va">nd</span>, type <span class="op">=</span> <span class="st">"mean"</span><span class="op">)</span></span>
-<span><span class="co">#&gt;        1        2        3 </span></span>
-<span><span class="co">#&gt; 3.043440 4.441583 6.482027</span></span>
-<span><span class="fu"><a href="https://rdrr.io/r/stats/predict.html" class="external-link">predict</a></span><span class="op">(</span><span class="va">fit</span>, <span class="va">nd</span>, type <span class="op">=</span> <span class="st">"quantile"</span>, probs <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">0.05</span>, <span class="fl">0.95</span><span class="op">)</span><span class="op">)</span></span>
-<span><span class="co">#&gt;         q0.05     q0.95</span></span>
-<span><span class="co">#&gt; [1,] 1.419094  5.165008</span></span>
-<span><span class="co">#&gt; [2,] 1.496452  8.654465</span></span>
-<span><span class="co">#&gt; [3,] 1.311622 14.861855</span></span>
-<span><span class="fu"><a href="https://rdrr.io/r/stats/predict.html" class="external-link">predict</a></span><span class="op">(</span><span class="va">fit</span>, <span class="va">nd</span>, type <span class="op">=</span> <span class="st">"probability"</span>, at <span class="op">=</span> <span class="fl">5</span><span class="op">)</span></span>
-<span><span class="co">#&gt;      probability(5)</span></span>
-<span><span class="co">#&gt; [1,]     0.07538366</span></span>
-<span><span class="co">#&gt; [2,]     0.15034372</span></span>
-<span><span class="co">#&gt; [3,]     0.10713322</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/stats/predict.html" class="external-link">predict</a></span><span class="op">(</span><span class="va">fit</span>, <span class="va">nd</span>, type <span class="op">=</span> <span class="st">"parameter"</span><span class="op">)</span></span>
+<span><span class="co">#&gt;         mu     sigma</span></span>
+<span><span class="co">#&gt; 1 2.819687 0.3479911</span></span>
+<span><span class="co">#&gt; 2 4.381295 0.4956636</span></span>
+<span><span class="co">#&gt; 3 6.807758 0.7060019</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/stats/predict.html" class="external-link">predict</a></span><span class="op">(</span><span class="va">fit</span>, <span class="va">nd</span>, type <span class="op">=</span> <span class="st">"link"</span><span class="op">)</span></span>
+<span><span class="co">#&gt;         mu      sigma</span></span>
+<span><span class="co">#&gt; 1 1.036626 -1.0555783</span></span>
+<span><span class="co">#&gt; 2 1.477344 -0.7018578</span></span>
+<span><span class="co">#&gt; 3 1.918063 -0.3481373</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/stats/predict.html" class="external-link">predict</a></span><span class="op">(</span><span class="va">fit</span>, <span class="va">nd</span>, type <span class="op">=</span> <span class="st">"mean"</span>, interval <span class="op">=</span> <span class="st">"confidence"</span><span class="op">)</span></span>
 <span><span class="co">#&gt;   estimate    lower    upper</span></span>
-<span><span class="co">#&gt; 1 3.043440 2.830893 3.278969</span></span>
-<span><span class="co">#&gt; 2 4.441583 4.223428 4.672939</span></span>
-<span><span class="co">#&gt; 3 6.482027 5.820990 7.171435</span></span></code></pre></div>
+<span><span class="co">#&gt; 1 2.819687 2.630571 3.022294</span></span>
+<span><span class="co">#&gt; 2 4.381295 4.161368 4.596050</span></span>
+<span><span class="co">#&gt; 3 6.807758 6.083452 7.530586</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/stats/predict.html" class="external-link">predict</a></span><span class="op">(</span><span class="va">fit</span>, <span class="va">nd</span>, type <span class="op">=</span> <span class="st">"variance"</span><span class="op">)</span></span>
+<span><span class="co">#&gt;          1          2          3 </span></span>
+<span><span class="co">#&gt;  0.9628044  4.7160572 23.1004285</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/stats/predict.html" class="external-link">predict</a></span><span class="op">(</span><span class="va">fit</span>, <span class="va">nd</span>, type <span class="op">=</span> <span class="st">"sd"</span><span class="op">)</span></span>
+<span><span class="co">#&gt;        1        2        3 </span></span>
+<span><span class="co">#&gt; 0.981226 2.171648 4.806291</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/stats/predict.html" class="external-link">predict</a></span><span class="op">(</span><span class="va">fit</span>, <span class="va">nd</span>, type <span class="op">=</span> <span class="st">"median"</span><span class="op">)</span></span>
+<span><span class="co">#&gt; [1] 2.706721 4.028190 5.716167</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/stats/predict.html" class="external-link">predict</a></span><span class="op">(</span><span class="va">fit</span>, <span class="va">nd</span>, type <span class="op">=</span> <span class="st">"quantile"</span>, probs <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">0.05</span>, <span class="fl">0.95</span><span class="op">)</span><span class="op">)</span></span>
+<span><span class="co">#&gt;         q0.05     q0.95</span></span>
+<span><span class="co">#&gt; [1,] 1.421599  4.603350</span></span>
+<span><span class="co">#&gt; [2,] 1.514725  8.453764</span></span>
+<span><span class="co">#&gt; [3,] 1.214368 16.131578</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/stats/predict.html" class="external-link">predict</a></span><span class="op">(</span><span class="va">fit</span>, <span class="va">nd</span>, type <span class="op">=</span> <span class="st">"density"</span>, at <span class="op">=</span> <span class="fl">5</span><span class="op">)</span></span>
+<span><span class="co">#&gt;      density(5)</span></span>
+<span><span class="co">#&gt; [1,] 0.04336816</span></span>
+<span><span class="co">#&gt; [2,] 0.15196897</span></span>
+<span><span class="co">#&gt; [3,] 0.09947143</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/stats/predict.html" class="external-link">predict</a></span><span class="op">(</span><span class="va">fit</span>, <span class="va">nd</span>, type <span class="op">=</span> <span class="st">"cdf"</span>, at <span class="op">=</span> <span class="fl">5</span><span class="op">)</span></span>
+<span><span class="co">#&gt;         cdf(5)</span></span>
+<span><span class="co">#&gt; [1,] 0.9731764</span></span>
+<span><span class="co">#&gt; [2,] 0.6688594</span></span>
+<span><span class="co">#&gt; [3,] 0.4313105</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/stats/predict.html" class="external-link">predict</a></span><span class="op">(</span><span class="va">fit</span>, <span class="va">nd</span>, type <span class="op">=</span> <span class="st">"survival"</span>, at <span class="op">=</span> <span class="fl">5</span><span class="op">)</span></span>
+<span><span class="co">#&gt;      survival(5)</span></span>
+<span><span class="co">#&gt; [1,]   0.0268236</span></span>
+<span><span class="co">#&gt; [2,]   0.3311406</span></span>
+<span><span class="co">#&gt; [3,]   0.5686895</span></span></code></pre></div>
+<p><code><a href="../reference/fitted_distribution.html">fitted_distribution()</a></code> returns the fitted law of each row
+as a distribution object; <code><a href="https://rdrr.io/r/stats/simulate.html" class="external-link">simulate()</a></code> draws new responses;
+<code><a href="../reference/log_lik.html">log_lik()</a></code> gives pointwise log likelihoods.</p>
+<div class="sourceCode" id="cb10"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">fd</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/fitted_distribution.html">fitted_distribution</a></span><span class="op">(</span><span class="va">fit</span>, <span class="va">nd</span><span class="op">)</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/stats/quantile.html" class="external-link">quantile</a></span><span class="op">(</span><span class="va">fd</span>, <span class="fl">0.9</span><span class="op">)</span></span>
+<span><span class="co">#&gt; [1]  4.127447  7.291955 13.230405</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/base/dim.html" class="external-link">dim</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/stats/simulate.html" class="external-link">simulate</a></span><span class="op">(</span><span class="va">fit</span>, nsim <span class="op">=</span> <span class="fl">3</span><span class="op">)</span><span class="op">)</span></span>
+<span><span class="co">#&gt; [1] 400   3</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/utils/head.html" class="external-link">head</a></span><span class="op">(</span><span class="fu"><a href="../reference/log_lik.html">log_lik</a></span><span class="op">(</span><span class="va">fit</span><span class="op">)</span><span class="op">)</span></span>
+<span><span class="co">#&gt; [1] -1.156701 -1.634178 -2.531584 -3.150097 -1.348237 -2.713591</span></span></code></pre></div>
 </div>
 <div class="section level2">
 <h2 id="checking-the-fit">Checking the fit<a class="anchor" aria-label="anchor" href="#checking-the-fit"></a>
 </h2>
-<p>Randomized quantile residuals are standard normal under a correct
-model.</p>
-<div class="sourceCode" id="cb6"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb11"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">fit</span>, which <span class="op">=</span> <span class="st">"qq"</span><span class="op">)</span></span></code></pre></div>
-<p><img src="regcompR_files/figure-html/unnamed-chunk-7-1.png" class="r-plt" alt="" width="576"></p>
-<div class="sourceCode" id="cb7"><pre class="downlit sourceCode r">
+<p><img src="regcompR_files/figure-html/unnamed-chunk-12-1.png" class="r-plt" alt="" width="576"></p>
+<div class="sourceCode" id="cb12"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">fit</span>, which <span class="op">=</span> <span class="st">"effects"</span>, variable <span class="op">=</span> <span class="st">"x"</span>, par <span class="op">=</span> <span class="st">"sigma"</span><span class="op">)</span></span></code></pre></div>
-<p><img src="regcompR_files/figure-html/unnamed-chunk-7-2.png" class="r-plt" alt="" width="576"></p>
+<p><img src="regcompR_files/figure-html/unnamed-chunk-12-2.png" class="r-plt" alt="" width="576"></p>
 </div>
 <div class="section level2">
 <h2 id="where-to-go-next">Where to go next<a class="anchor" aria-label="anchor" href="#where-to-go-next"></a>
 </h2>
 <ul>
 <li>
-<code><a href="../articles/distributions.html">vignette("distributions")</a></code>: the registry and the
-operators that build new laws.</li>
+<code><a href="../articles/distributions.html">vignette("distributions")</a></code>: the registry and
+distribution objects.</li>
+<li>
+<code><a href="../articles/operators.html">vignette("operators")</a></code>: inflation, hurdles, mixtures,
+truncation, generated families and custom families.</li>
 <li>
 <code><a href="../articles/count-models.html">vignette("count-models")</a></code>: overdispersion, zeros and the
 count families.</li>
 <li>
 <code><a href="../articles/hierarchical-longitudinal.html">vignette("hierarchical-longitudinal")</a></code>: random effects,
-covariance structures and GEE.</li>
+covariance structures, smooth terms and GEE.</li>
 <li>
-<code><a href="../articles/ordinal-categorical.html">vignette("ordinal-categorical")</a></code>: ordinal, nominal and
-bivariate binary responses.</li>
+<code><a href="../articles/ordinal-categorical.html">vignette("ordinal-categorical")</a></code>: ordinal, nominal,
+bivariate binary and selection models.</li>
 <li>
-<code><a href="../articles/survival.html">vignette("survival")</a></code>: censoring, cure models and
-discrete time hazards.</li>
+<code><a href="../articles/survival.html">vignette("survival")</a></code>: censoring, truncation, cure
+models and discrete time hazards.</li>
 <li>
-<code><a href="../articles/model-checking.html">vignette("model-checking")</a></code>: residuals, scoring rules
-and cross validation.</li>
+<code><a href="../articles/regularization.html">vignette("regularization")</a></code>: penalized and bias reduced
+estimation.</li>
 <li>
-<code><a href="../articles/bayesian.html">vignette("bayesian")</a></code>: priors and Bayesian fitting.</li>
+<code><a href="../articles/model-checking.html">vignette("model-checking")</a></code>: residuals, scoring rules,
+cross validation and comparison.</li>
+<li>
+<code><a href="../articles/bayesian.html">vignette("bayesian")</a></code>: priors, generated Stan and BUGS
+programs and Bayesian fitting.</li>
 </ul>
 </div>
   </main><aside class="col-md-3"><nav id="toc" aria-label="Table of contents"><h2>On this page</h2>

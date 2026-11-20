@@ -86,6 +86,32 @@ plot(fit, which = "ranef")
 The estimates, standard errors and log likelihood agree with lme4 and
 glmmTMB for the families they share.
 
+### Predictions with random effects
+
+`predict(re = "conditional")` uses the estimated effects of known
+groups, `re = "zero"` sets them to zero, and `re = "marginal"` averages
+over the random effect distribution (population averaged predictions,
+`nmarginal` Monte Carlo draws). Rows with unseen levels, or new data
+without the grouping column, are new groups: their effect is zero when
+conditioning and drawn from its distribution for marginal predictions
+and for `simulate(re = "new")`.
+
+``` r
+
+nd <- data.frame(x = c(0, 1), g = factor(c(1, 99)))
+predict(fit, nd, type = "mean", re = "conditional")
+#>        1        2 
+#> 3.106313 2.901369
+predict(fit, nd, type = "mean", re = "zero")
+#>        1        2 
+#> 1.732355 2.901369
+predict(fit, data.frame(x = c(0, 1)), type = "mean", re = "marginal", nmarginal = 2000, seed = 1)
+#>        1        2 
+#> 1.847444 3.223229
+dim(simulate(fit, nsim = 2, newdata = data.frame(x = c(0, 1)), re = "new"))
+#> [1] 2 2
+```
+
 ## Random effects in other parameters
 
 A random effect in the dispersion gives a model in which the clusters
@@ -97,7 +123,7 @@ dat$z <- rnorm(G * m, 1 + dat$x + u[dat$g], exp(-0.5 + v[dat$g]))
 fit2 <- regcomp(z ~ x + (1 | g), sigma ~ 1 + (1 | g), family = "normal", data = dat)
 fit2$theta
 #>    mu:1 | g:log_sd((Intercept)) sigma:1 | g:log_sd((Intercept)) 
-#>                      -0.6444995                      -1.2631502
+#>                      -0.7109182                      -1.2369327
 ```
 
 ## Covariance structures for longitudinal data
@@ -124,16 +150,72 @@ f_ar1 <- regcomp(y ~ x + ar1(0 + time | id), family = "normal", data = long, eng
 f_ou <- regcomp(y ~ x + ou(t | id), family = "normal", data = long, engine = "tmb")
 c(ar1 = AIC(f_ar1), ou = AIC(f_ou))
 #>      ar1       ou 
-#> 665.8609 665.8609
+#> 656.3059 656.3059
 ```
 
 With equally spaced times the two models coincide
 (`rho = exp(-1 / range)`), so their AIC values agree; the OU form also
 handles irregular times.
 
+The other structures use the same syntax:
+
+``` r
+
+structs <- c("us(0 + time | id)", "diag(0 + time | id)", "homdiag(0 + time | id)",
+             "cs(0 + time | id)", "homcs(0 + time | id)", "exp(t | id)", "gau(t | id)", "matern32(t | id)")
+# Some structures put a variance or correlation on its boundary for these
+# data; the fits then warn that standard errors are unavailable.
+suppressWarnings(sapply(structs, function(s) AIC(regcomp(stats::as.formula(paste("y ~ x +", s)),
+  family = "normal", data = long, engine = "tmb"))))
+#>      us(0 + time | id)    diag(0 + time | id) homdiag(0 + time | id) 
+#>               661.0419               721.5049               720.0271 
+#>      cs(0 + time | id)   homcs(0 + time | id)            exp(t | id) 
+#>               666.5278               667.2304               656.3059 
+#>            gau(t | id)       matern32(t | id) 
+#>               656.4572               656.4204
+```
+
 The TMB engine uses automatic differentiation and is much faster for
 large multilevel models; it gives the same estimates as the default
 engine.
+
+## Smooth terms
+
+Smooth terms from mgcv enter any parameter through their mixed model
+representation: `s()` for one dimensional and thin plate smooths, `t2()`
+for tensor products, and `by =` a factor for one smooth per level. The
+smoothing parameters are variance components estimated with the other
+parameters; the fits agree with
+[`mgcv::gamm()`](https://rdrr.io/pkg/mgcv/man/gamm.html). (`te()` and
+`ti()` have no mixed model form; use `t2()`.)
+
+``` r
+
+sm <- data.frame(x = runif(300), w = runif(300), f = factor(sample(c("a", "b"), 300, TRUE)))
+sm$y <- ifelse(sm$f == "a", sin(2 * pi * sm$x), cos(2 * pi * sm$x)) + rnorm(300, 0, 0.3)
+fs <- regcomp(y ~ f + s(x, by = f, k = 8), sigma ~ s(w, k = 5), family = "normal", data = sm)
+#> Warning: The Hessian is not positive definite; standard errors are unavailable
+#> or unreliable.
+fs$theta
+#> mu:s(x, by = f, k = 8):s(x):fa:log_sd(smooth) 
+#>                                     1.0117977 
+#> mu:s(x, by = f, k = 8):s(x):fb:log_sd(smooth) 
+#>                                     0.8809964 
+#>              sigma:s(w, k = 5):log_sd(smooth) 
+#>                                   -10.2054669
+plot(fs, which = "effects", variable = "x")
+```
+
+![](hierarchical-longitudinal_files/figure-html/unnamed-chunk-8-1.png)
+
+``` r
+
+ft <- regcomp(y ~ t2(x, w, k = 4), family = "normal", data = sm)
+#> Warning: The Hessian is not positive definite; standard errors are unavailable
+#> or unreliable.
+logLik(ft)
+#> 'log Lik.' -278.2674 (df=8)
+```
 
 ## Multiple membership
 
@@ -149,7 +231,7 @@ mmd$y <- rnorm(200, 1 + mmd$x + 0.6 * eff[mmd$s1] + 0.4 * eff[mmd$s2], 1)
 fmm <- regcomp(y ~ x + (1 | mm(s1, s2, weights = cbind(w1, w2))), family = "normal", data = mmd)
 fmm$theta
 #> mu:1 | mm(s1, s2, weights = cbind(w1, w2)):log_sd((Intercept)) 
-#>                                                     -0.6498416
+#>                                                      -0.069056
 ```
 
 ## Marginal models
@@ -195,6 +277,6 @@ sd0$t <- pmin(tev, 8); sd0$d <- as.numeric(tev <= 8)
 pp <- person_period(sd0, "t", "d")
 fh <- regcomp(event ~ factor(period) + x + (1 | cl), family = "bernoulli", data = pp)
 coef(fh)["prob:x"]
-#>    prob:x 
-#> 0.5543552
+#>   prob:x 
+#> 0.583332
 ```

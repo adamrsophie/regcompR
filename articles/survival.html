@@ -39,11 +39,13 @@
 <li class="active nav-item dropdown">
   <button class="nav-link dropdown-toggle" type="button" id="dropdown-articles" data-bs-toggle="dropdown" aria-expanded="false" aria-haspopup="true">Articles</button>
   <ul class="dropdown-menu" aria-labelledby="dropdown-articles">
-<li><a class="dropdown-item" href="../articles/distributions.html">Distributions and operators</a></li>
+<li><a class="dropdown-item" href="../articles/distributions.html">Distributions and the registry</a></li>
+    <li><a class="dropdown-item" href="../articles/operators.html">Building new distributions with operators</a></li>
     <li><a class="dropdown-item" href="../articles/count-models.html">Count data models</a></li>
     <li><a class="dropdown-item" href="../articles/hierarchical-longitudinal.html">Hierarchical and longitudinal models</a></li>
     <li><a class="dropdown-item" href="../articles/ordinal-categorical.html">Ordinal and categorical responses</a></li>
     <li><a class="dropdown-item" href="../articles/survival.html">Censored data and survival models</a></li>
+    <li><a class="dropdown-item" href="../articles/regularization.html">Penalized and bias reduced estimation</a></li>
     <li><a class="dropdown-item" href="../articles/model-checking.html">Model checking and comparison</a></li>
     <li><a class="dropdown-item" href="../articles/bayesian.html">Bayesian distributional regression</a></li>
   </ul>
@@ -158,6 +160,37 @@ flexsurvcure.</p>
 <span><span class="fu"><a href="https://rdrr.io/r/stats/coef.html" class="external-link">coef</a></span><span class="op">(</span><span class="va">fi</span><span class="op">)</span></span>
 <span><span class="co">#&gt; shape:(Intercept) scale:(Intercept)           scale:x         scale:age </span></span>
 <span><span class="co">#&gt;         0.3042646         1.1021716         0.4452103        -0.2499371</span></span></code></pre></div>
+</div>
+<div class="section level2">
+<h2 id="truncation-and-delayed-entry">Truncation and delayed entry<a class="anchor" aria-label="anchor" href="#truncation-and-delayed-entry"></a>
+</h2>
+<p><code>surv(time, event, entry)</code> handles delayed entry (left
+truncation): subjects enter observation at <code>entry</code> and
+contribute the conditional likelihood given survival to that time.
+<code>cens(lower, upper, trunc_lower, trunc_upper)</code> gives
+truncation limits for any family, together with interval censoring.</p>
+<div class="sourceCode" id="cb6"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">d</span><span class="op">$</span><span class="va">entry</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/stats/Uniform.html" class="external-link">runif</a></span><span class="op">(</span><span class="va">n</span>, <span class="fl">0</span>, <span class="fl">1</span><span class="op">)</span></span>
+<span><span class="va">keep</span> <span class="op">&lt;-</span> <span class="va">d</span><span class="op">$</span><span class="va">time</span> <span class="op">&gt;</span> <span class="va">d</span><span class="op">$</span><span class="va">entry</span></span>
+<span><span class="va">fe</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/regcomp.html">regcomp</a></span><span class="op">(</span><span class="fu"><a href="../reference/cens.html">surv</a></span><span class="op">(</span><span class="va">time</span>, <span class="va">event</span>, <span class="va">entry</span><span class="op">)</span> <span class="op">~</span> <span class="va">x</span> <span class="op">+</span> <span class="va">age</span>, family <span class="op">=</span> <span class="st">"weibull"</span>, data <span class="op">=</span> <span class="va">d</span><span class="op">[</span><span class="va">keep</span>, <span class="op">]</span><span class="op">)</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/stats/coef.html" class="external-link">coef</a></span><span class="op">(</span><span class="va">fe</span><span class="op">)</span></span>
+<span><span class="co">#&gt; shape:(Intercept) scale:(Intercept)           scale:x         scale:age </span></span>
+<span><span class="co">#&gt;         0.1950867         1.0196206         0.5200054        -0.2714023</span></span>
+<span><span class="co"># Event times observed only when below 6 (right truncation).</span></span>
+<span><span class="va">tt2</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/stats/Weibull.html" class="external-link">rweibull</a></span><span class="op">(</span><span class="va">n</span>, shape <span class="op">=</span> <span class="fl">1.4</span>, scale <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/Log.html" class="external-link">exp</a></span><span class="op">(</span><span class="fl">1</span> <span class="op">+</span> <span class="fl">0.6</span> <span class="op">*</span> <span class="va">d</span><span class="op">$</span><span class="va">x</span><span class="op">)</span><span class="op">)</span></span>
+<span><span class="va">dt</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span>x <span class="op">=</span> <span class="va">d</span><span class="op">$</span><span class="va">x</span>, tr <span class="op">=</span> <span class="va">tt2</span><span class="op">)</span><span class="op">[</span><span class="va">tt2</span> <span class="op">&lt;</span> <span class="fl">6</span>, <span class="op">]</span></span>
+<span><span class="va">ft</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/regcomp.html">regcomp</a></span><span class="op">(</span><span class="fu"><a href="../reference/cens.html">cens</a></span><span class="op">(</span><span class="va">tr</span>, <span class="va">tr</span>, trunc_upper <span class="op">=</span> <span class="fl">6</span><span class="op">)</span> <span class="op">~</span> <span class="va">x</span>, family <span class="op">=</span> <span class="st">"weibull"</span>, data <span class="op">=</span> <span class="va">dt</span><span class="op">)</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/stats/coef.html" class="external-link">coef</a></span><span class="op">(</span><span class="va">ft</span><span class="op">)</span></span>
+<span><span class="co">#&gt; shape:(Intercept) scale:(Intercept)           scale:x </span></span>
+<span><span class="co">#&gt;         0.2439162         0.9628687         0.9734912</span></span></code></pre></div>
+<p>The <code><a href="../reference/censor.html">censor()</a></code> operator gives the law of a censored
+variable itself, with point masses at the censoring limits (a Tobit
+model when the base is normal):</p>
+<div class="sourceCode" id="cb7"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">tob</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span>x <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/stats/Normal.html" class="external-link">rnorm</a></span><span class="op">(</span><span class="fl">200</span><span class="op">)</span><span class="op">)</span>; <span class="va">tob</span><span class="op">$</span><span class="va">y</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/Extremes.html" class="external-link">pmax</a></span><span class="op">(</span><span class="fl">0</span>, <span class="fl">0.5</span> <span class="op">+</span> <span class="va">tob</span><span class="op">$</span><span class="va">x</span> <span class="op">+</span> <span class="fu"><a href="https://rdrr.io/r/stats/Normal.html" class="external-link">rnorm</a></span><span class="op">(</span><span class="fl">200</span><span class="op">)</span><span class="op">)</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/stats/coef.html" class="external-link">coef</a></span><span class="op">(</span><span class="fu"><a href="../reference/regcomp.html">regcomp</a></span><span class="op">(</span><span class="va">y</span> <span class="op">~</span> <span class="va">x</span>, family <span class="op">=</span> <span class="fu"><a href="../reference/censor.html">censor</a></span><span class="op">(</span><span class="st">"normal"</span>, lower <span class="op">=</span> <span class="fl">0</span><span class="op">)</span>, data <span class="op">=</span> <span class="va">tob</span><span class="op">)</span><span class="op">)</span></span>
+<span><span class="co">#&gt;    mu:(Intercept)              mu:x sigma:(Intercept) </span></span>
+<span><span class="co">#&gt;         0.4277192         0.9548162         0.1095207</span></span></code></pre></div>
 </div>
 <div class="section level2">
 <h2 id="discrete-time-and-frailty">Discrete time and frailty<a class="anchor" aria-label="anchor" href="#discrete-time-and-frailty"></a>

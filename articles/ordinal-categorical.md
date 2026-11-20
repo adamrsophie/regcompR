@@ -35,9 +35,9 @@ summary(fit)
 #>               estimate std_error   lower   upper       z p_value
 #> mu:x            0.6056    0.0998  0.4099  0.8013  6.0653       0
 #> mu:z           -0.3720    0.0863 -0.5412 -0.2028 -4.3091       0
-#> cuts:low|mid   -0.7929    0.1116 -1.0116 -0.5743 -7.1065       0
-#> cuts:mid|high   0.4777    0.1074  0.2671  0.6883  4.4462       0
-#> cuts:high|top   1.8334    0.1444  1.5505  2.1164 12.7002       0
+#> cuts:low|mid   -0.7929    0.1116 -1.0116 -0.5743 -7.1064       0
+#> cuts:mid|high   0.4777    0.1074  0.2671  0.6883  4.4460       0
+#> cuts:high|top   1.8334    0.1444  1.5505  2.1164 12.7003       0
 #> max |gradient| 1.63e-04; Hessian positive definite
 ```
 
@@ -78,7 +78,7 @@ also available, and random effects work as for any other family:
 fit_m <- regcomp(y ~ x + z + (1 | g), family = "cumulative_logit", data = d)
 exp(fit_m$theta)   # random intercept standard deviation (true value 0.7)
 #> mu:1 | g:log_sd((Intercept)) 
-#>                    0.5912804
+#>                    0.5912834
 ```
 
 ## Nominal responses
@@ -96,9 +96,50 @@ coef(fm)
 #>       -0.5299411       -0.1745779       -1.0110616        0.3332306
 ```
 
-## Bivariate binary responses and selection
+Scoring rules for categorical responses use the class probabilities:
 
-`bivariate_binary_odds_ratio` models two binary outcomes with an odds
-ratio regression (as in VGAM’s `binom2.or`), and `heckman_selection`
-fits the sample selection model with response
-`cbind(selected, outcome)`.
+``` r
+
+c(brier = mean(scoring_rule(fit, rule = "brier")), rps = mean(scoring_rule(fit, rule = "rps")))
+#>     brier       rps 
+#> 0.7037549 0.5429779
+```
+
+## Bivariate binary responses
+
+`bivariate_binary_odds_ratio` models two binary outcomes with a
+regression for each margin (`p1`, `p2`) and for their log odds ratio
+(`psi`), as in VGAM’s `binom2.or`. The response is `cbind(y1, y2)`.
+
+``` r
+
+d$y1 <- rbinom(n, 1, plogis(d$x)); d$y2 <- rbinom(n, 1, plogis(0.5 * d$x + 0.4 * d$y1))
+fb <- regcomp(cbind(y1, y2) ~ x, p2 ~ x, psi ~ 1, family = "bivariate_binary_odds_ratio", data = d)
+coef(fb)
+#>  p1:(Intercept)            p1:x  p2:(Intercept)            p2:x psi:(Intercept) 
+#>       0.0679298       0.9583180       0.3143582       0.6379752       0.3864641
+```
+
+## Sample selection
+
+`heckman_selection` fits the sample selection model by maximum
+likelihood. The response is `cbind(selected, outcome)` (the outcome
+value of unselected rows is ignored); the main formula is the outcome
+equation and `gamma ~` gives the probit selection equation; `rho` is the
+error correlation on the Fisher z scale.
+
+``` r
+
+z <- rnorm(n); e <- MASS::mvrnorm(n, c(0, 0), matrix(c(1, 0.5, 0.5, 1), 2))
+sel <- as.numeric(0.3 + z + e[, 1] > 0)
+hs <- data.frame(sel, out = ifelse(sel == 1, 1 + d$x + e[, 2], 0), x = d$x, z)
+fh <- regcomp(cbind(sel, out) ~ x, gamma ~ z, family = "heckman_selection", data = hs)
+coef(fh)
+#>    mu:(Intercept)              mu:x gamma:(Intercept)           gamma:z 
+#>        1.15521959        1.10947346        0.21387059        0.89044899 
+#> sigma:(Intercept)   rho:(Intercept) 
+#>       -0.03359496        0.33915035
+tanh(coef(fh)["rho:(Intercept)"])     # the error correlation
+#> rho:(Intercept) 
+#>       0.3267187
+```

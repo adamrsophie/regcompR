@@ -39,11 +39,13 @@
 <li class="active nav-item dropdown">
   <button class="nav-link dropdown-toggle" type="button" id="dropdown-articles" data-bs-toggle="dropdown" aria-expanded="false" aria-haspopup="true">Articles</button>
   <ul class="dropdown-menu" aria-labelledby="dropdown-articles">
-<li><a class="dropdown-item" href="../articles/distributions.html">Distributions and operators</a></li>
+<li><a class="dropdown-item" href="../articles/distributions.html">Distributions and the registry</a></li>
+    <li><a class="dropdown-item" href="../articles/operators.html">Building new distributions with operators</a></li>
     <li><a class="dropdown-item" href="../articles/count-models.html">Count data models</a></li>
     <li><a class="dropdown-item" href="../articles/hierarchical-longitudinal.html">Hierarchical and longitudinal models</a></li>
     <li><a class="dropdown-item" href="../articles/ordinal-categorical.html">Ordinal and categorical responses</a></li>
     <li><a class="dropdown-item" href="../articles/survival.html">Censored data and survival models</a></li>
+    <li><a class="dropdown-item" href="../articles/regularization.html">Penalized and bias reduced estimation</a></li>
     <li><a class="dropdown-item" href="../articles/model-checking.html">Model checking and comparison</a></li>
     <li><a class="dropdown-item" href="../articles/bayesian.html">Bayesian distributional regression</a></li>
   </ul>
@@ -87,16 +89,21 @@
 <div class="sourceCode" id="cb1"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://github.com/adamrsophie/regcompR" class="external-link">regcompR</a></span><span class="op">)</span></span></code></pre></div>
 <p><code>engine = "bayes"</code> fits the same model by MCMC. regcompR
-writes the Stan program (run by bayescompR, cmdstanr or rstan) or a BUGS
-program (run by JAGS through R2jags or by OpenBUGS through
-R2OpenBUGS).</p>
+writes a Stan program, run by bayescompR
+(<code>runner = "bayescompR"</code>), cmdstanr (<code>"cmdstanr"</code>)
+or rstan (<code>"rstan"</code>), or a BUGS program, run by JAGS
+(<code>"jags"</code>, through R2jags) or OpenBUGS
+(<code>"openbugs"</code>, through R2OpenBUGS).</p>
 <div class="section level2">
-<h2 id="the-generated-program">The generated program<a class="anchor" aria-label="anchor" href="#the-generated-program"></a>
+<h2 id="the-generated-programs">The generated programs<a class="anchor" aria-label="anchor" href="#the-generated-programs"></a>
 </h2>
+<p><code><a href="../reference/stan_code.html">stan_code()</a></code> and <code><a href="../reference/bugs_code.html">bugs_code()</a></code> return the
+program and its data without running anything.</p>
 <div class="sourceCode" id="cb2"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">d</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span>x <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/stats/Normal.html" class="external-link">rnorm</a></span><span class="op">(</span><span class="fl">100</span><span class="op">)</span>, g <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/factor.html" class="external-link">factor</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/rep.html" class="external-link">rep</a></span><span class="op">(</span><span class="fl">1</span><span class="op">:</span><span class="fl">10</span>, each <span class="op">=</span> <span class="fl">10</span><span class="op">)</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="va">d</span><span class="op">$</span><span class="va">y</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/stats/Poisson.html" class="external-link">rpois</a></span><span class="op">(</span><span class="fl">100</span>, <span class="fu"><a href="https://rdrr.io/r/base/Log.html" class="external-link">exp</a></span><span class="op">(</span><span class="fl">0.5</span> <span class="op">+</span> <span class="fl">0.3</span> <span class="op">*</span> <span class="va">d</span><span class="op">$</span><span class="va">x</span><span class="op">)</span><span class="op">)</span></span>
-<span><span class="fu"><a href="https://rdrr.io/r/base/cat.html" class="external-link">cat</a></span><span class="op">(</span><span class="fu"><a href="../reference/stan_code.html">stan_code</a></span><span class="op">(</span><span class="va">y</span> <span class="op">~</span> <span class="va">x</span> <span class="op">+</span> <span class="op">(</span><span class="fl">1</span> <span class="op">|</span> <span class="va">g</span><span class="op">)</span>, family <span class="op">=</span> <span class="st">"poisson"</span>, data <span class="op">=</span> <span class="va">d</span><span class="op">)</span><span class="op">$</span><span class="va">code</span><span class="op">)</span></span>
+<span><span class="va">sc</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/stan_code.html">stan_code</a></span><span class="op">(</span><span class="va">y</span> <span class="op">~</span> <span class="va">x</span> <span class="op">+</span> <span class="op">(</span><span class="fl">1</span> <span class="op">|</span> <span class="va">g</span><span class="op">)</span>, family <span class="op">=</span> <span class="st">"poisson"</span>, data <span class="op">=</span> <span class="va">d</span><span class="op">)</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/base/cat.html" class="external-link">cat</a></span><span class="op">(</span><span class="va">sc</span><span class="op">$</span><span class="va">code</span><span class="op">)</span></span>
 <span><span class="co">#&gt; functions {</span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; }</span></span>
@@ -129,43 +136,143 @@ R2OpenBUGS).</p>
 <span><span class="co">#&gt;   to_vector(z_1) ~ std_normal();</span></span>
 <span><span class="co">#&gt;   sd_1 ~ student_t(3, 0, 2.5);</span></span>
 <span><span class="co">#&gt;   for (i in 1:N) target += w[i] * poisson_lpmf(y[i] | lambda[i]);</span></span>
+<span><span class="co">#&gt; }</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/base/names.html" class="external-link">names</a></span><span class="op">(</span><span class="va">sc</span><span class="op">$</span><span class="va">data</span><span class="op">)</span></span>
+<span><span class="co">#&gt;  [1] "N"          "w"          "y"          "P_lambda"   "X_lambda"  </span></span>
+<span><span class="co">#&gt;  [6] "off_lambda" "L_1"        "q_1"        "g_1"        "Xr_1"</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/base/cat.html" class="external-link">cat</a></span><span class="op">(</span><span class="fu"><a href="../reference/bugs_code.html">bugs_code</a></span><span class="op">(</span><span class="va">y</span> <span class="op">~</span> <span class="va">x</span> <span class="op">+</span> <span class="op">(</span><span class="fl">1</span> <span class="op">|</span> <span class="va">g</span><span class="op">)</span>, family <span class="op">=</span> <span class="st">"poisson"</span>, data <span class="op">=</span> <span class="va">d</span><span class="op">)</span><span class="op">$</span><span class="va">code</span><span class="op">)</span></span>
+<span><span class="co">#&gt; model {</span></span>
+<span><span class="co">#&gt;   for (i in 1:N) {</span></span>
+<span><span class="co">#&gt;     eta_lambda[i] &lt;- inprod(X_lambda[i, ], b_lambda[]) + off_lambda[i] + inprod(Xr_1[i, ], r_1[g_1[i], ])</span></span>
+<span><span class="co">#&gt;     lambda[i] &lt;- exp(eta_lambda[i])</span></span>
+<span><span class="co">#&gt;     y[i] ~ dpois(lambda[i])</span></span>
+<span><span class="co">#&gt;   }</span></span>
+<span><span class="co">#&gt;   b_lambda[1] ~ dnorm(0, 0.04)</span></span>
+<span><span class="co">#&gt;   b_lambda[2] ~ dnorm(0, 0.04)</span></span>
+<span><span class="co">#&gt;   for (e in 1:q_1) {</span></span>
+<span><span class="co">#&gt;     for (l in 1:L_1) { r_1[l, e] ~ dnorm(0, 1 / pow(sd_1[e], 2)) }</span></span>
+<span><span class="co">#&gt;     sd_1[e] ~ dt(0, 0.16, 3) T(0,)</span></span>
+<span><span class="co">#&gt;   }</span></span>
 <span><span class="co">#&gt; }</span></span></code></pre></div>
+<p>Each distribution parameter has a linear predictor with its link;
+random effects use a non centered parameterization with Cholesky
+factored correlations; smooth terms enter through their mixed model
+form; censored and truncated observations use log CDF and log survival
+functions. Families whose parameters have a joint constraint that no
+link expresses (the generalized log series needs
+<code>theta * beta &lt; 1</code>, for example) reject draws outside the
+valid region:</p>
+<div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">gl</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/stan_code.html">stan_code</a></span><span class="op">(</span><span class="va">y</span> <span class="op">~</span> <span class="fl">1</span>, family <span class="op">=</span> <span class="st">"generalized_log_series"</span>, data <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span>y <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">1</span>, <span class="fl">2</span>, <span class="fl">3</span>, <span class="fl">2</span><span class="op">)</span><span class="op">)</span><span class="op">)</span><span class="op">$</span><span class="va">code</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/base/grep.html" class="external-link">grep</a></span><span class="op">(</span><span class="st">"negative_infinity"</span>, <span class="fu"><a href="https://rdrr.io/r/base/strsplit.html" class="external-link">strsplit</a></span><span class="op">(</span><span class="va">gl</span>, <span class="st">"\n"</span><span class="op">)</span><span class="op">[[</span><span class="fl">1</span><span class="op">]</span><span class="op">]</span>, value <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span>
+<span><span class="co">#&gt; [1] "  for (i in 1:N) if (!(theta[i] * beta[i] &lt; 1)) target += negative_infinity();"</span></span></code></pre></div>
+<p>Composed families get helper functions named from their full
+settings, so different truncations or hurdles in one model never
+clash:</p>
+<div class="sourceCode" id="cb4"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">mt</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/stan_code.html">stan_code</a></span><span class="op">(</span><span class="va">y</span> <span class="op">~</span> <span class="fl">1</span>, family <span class="op">=</span> <span class="fu"><a href="../reference/mixture.html">mixture</a></span><span class="op">(</span><span class="fu"><a href="../reference/truncate_dist.html">truncate_dist</a></span><span class="op">(</span><span class="st">"normal"</span>, <span class="fl">0</span>, <span class="fl">1</span><span class="op">)</span>, <span class="fu"><a href="../reference/truncate_dist.html">truncate_dist</a></span><span class="op">(</span><span class="st">"normal"</span>, <span class="fl">2</span>, <span class="fl">3</span><span class="op">)</span><span class="op">)</span>,</span>
+<span>                data <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span>y <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">0.3</span>, <span class="fl">0.7</span>, <span class="fl">2.3</span>, <span class="fl">2.7</span><span class="op">)</span><span class="op">)</span><span class="op">)</span><span class="op">$</span><span class="va">code</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/base/regmatches.html" class="external-link">regmatches</a></span><span class="op">(</span><span class="va">mt</span>, <span class="fu"><a href="https://rdrr.io/r/base/grep.html" class="external-link">gregexpr</a></span><span class="op">(</span><span class="st">"real rc_[A-Za-z0-9_]+"</span>, <span class="va">mt</span><span class="op">)</span><span class="op">)</span><span class="op">[[</span><span class="fl">1</span><span class="op">]</span><span class="op">]</span></span>
+<span><span class="co">#&gt; [1] "real rc_trunc_normal_3ee7444f_lpdf"                           </span></span>
+<span><span class="co">#&gt; [2] "real rc_trunc_normal_3ee74cd3_lpdf"                           </span></span>
+<span><span class="co">#&gt; [3] "real rc_mix_truncate_normal_0_1_truncate_normal_34b9fc20_lpdf"</span></span></code></pre></div>
 </div>
 <div class="section level2">
 <h2 id="priors">Priors<a class="anchor" aria-label="anchor" href="#priors"></a>
 </h2>
-<p>Default priors are weakly informative. <code><a href="../reference/prior.html">prior()</a></code> sets
-priors by class (<code>b</code>, <code>Intercept</code>,
-<code>sd</code>, <code>cor</code>), by distribution parameter and by
-coefficient.</p>
-<div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">pr</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fu"><a href="../reference/prior.html">prior</a></span><span class="op">(</span><span class="st">"normal(0, 1)"</span>, class <span class="op">=</span> <span class="st">"b"</span><span class="op">)</span>, <span class="fu"><a href="../reference/prior.html">prior</a></span><span class="op">(</span><span class="st">"exponential(2)"</span>, class <span class="op">=</span> <span class="st">"sd"</span><span class="op">)</span><span class="op">)</span></span>
+<p>Default priors are weakly informative: <code>normal(0, 5)</code> for
+intercepts and coefficients, <code>student_t(3, 0, 2.5)</code> for
+standard deviations and <code>lkj(2)</code> for correlation matrices.
+<code><a href="../reference/prior.html">prior()</a></code> sets priors by class (<code>b</code>,
+<code>Intercept</code>, <code>sd</code>, <code>cor</code>), by
+distribution parameter (<code>par =</code>, using the parameter names of
+the family, such as <code>mu.1</code> for a mixture) and by coefficient
+or random effect term (<code>coef =</code>). The most specific matching
+prior wins.</p>
+<div class="sourceCode" id="cb5"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">pr</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fu"><a href="../reference/prior.html">prior</a></span><span class="op">(</span><span class="st">"normal(0, 1)"</span>, class <span class="op">=</span> <span class="st">"b"</span><span class="op">)</span>, <span class="fu"><a href="../reference/prior.html">prior</a></span><span class="op">(</span><span class="st">"exponential(2)"</span>, class <span class="op">=</span> <span class="st">"sd"</span><span class="op">)</span>,</span>
+<span>        <span class="fu"><a href="../reference/prior.html">prior</a></span><span class="op">(</span><span class="st">"normal(1, 0.5)"</span>, class <span class="op">=</span> <span class="st">"b"</span>, coef <span class="op">=</span> <span class="st">"x"</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="va">pr</span></span>
 <span><span class="co">#&gt; normal(0, 1)                 class b         par (all)  coef (all)</span></span>
-<span><span class="co">#&gt; exponential(2)               class sd        par (all)  coef (all)</span></span></code></pre></div>
+<span><span class="co">#&gt; exponential(2)               class sd        par (all)  coef (all)</span></span>
+<span><span class="co">#&gt; normal(1, 0.5)               class b         par (all)  coef x</span></span>
+<span><span class="va">code</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/stan_code.html">stan_code</a></span><span class="op">(</span><span class="va">y</span> <span class="op">~</span> <span class="va">x</span> <span class="op">+</span> <span class="op">(</span><span class="fl">1</span> <span class="op">|</span> <span class="va">g</span><span class="op">)</span>, family <span class="op">=</span> <span class="st">"poisson"</span>, data <span class="op">=</span> <span class="va">d</span>, priors <span class="op">=</span> <span class="va">pr</span><span class="op">)</span><span class="op">$</span><span class="va">code</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/base/grep.html" class="external-link">grep</a></span><span class="op">(</span><span class="st">"~ (normal|exponential)"</span>, <span class="fu"><a href="https://rdrr.io/r/base/strsplit.html" class="external-link">strsplit</a></span><span class="op">(</span><span class="va">code</span>, <span class="st">"\n"</span><span class="op">)</span><span class="op">[[</span><span class="fl">1</span><span class="op">]</span><span class="op">]</span>, value <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span>
+<span><span class="co">#&gt; [1] "  b_lambda[1] ~ normal(0, 5);"   "  b_lambda[2] ~ normal(1, 0.5);"</span></span>
+<span><span class="co">#&gt; [3] "  sd_1 ~ exponential(2);"</span></span>
+<span><span class="va">m</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/stan_code.html">stan_code</a></span><span class="op">(</span><span class="va">y</span> <span class="op">~</span> <span class="fl">1</span>, family <span class="op">=</span> <span class="fu"><a href="../reference/mixture.html">mixture</a></span><span class="op">(</span><span class="st">"normal"</span>, <span class="st">"normal"</span><span class="op">)</span>, data <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span>y <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="op">-</span><span class="fl">1</span>, <span class="fl">0.2</span>, <span class="fl">3</span>, <span class="fl">4</span><span class="op">)</span><span class="op">)</span>,</span>
+<span>               priors <span class="op">=</span> <span class="fu"><a href="../reference/prior.html">prior</a></span><span class="op">(</span><span class="st">"normal(-1, 1)"</span>, par <span class="op">=</span> <span class="st">"mu.1"</span>, class <span class="op">=</span> <span class="st">"Intercept"</span><span class="op">)</span><span class="op">)</span><span class="op">$</span><span class="va">code</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/base/grep.html" class="external-link">grep</a></span><span class="op">(</span><span class="st">"b_mu_1"</span>, <span class="fu"><a href="https://rdrr.io/r/base/strsplit.html" class="external-link">strsplit</a></span><span class="op">(</span><span class="va">m</span>, <span class="st">"\n"</span><span class="op">)</span><span class="op">[[</span><span class="fl">1</span><span class="op">]</span><span class="op">]</span>, value <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span>
+<span><span class="co">#&gt; [1] "  vector[P_mu_1] b_mu_1;"                          </span></span>
+<span><span class="co">#&gt; [2] "  vector[N] eta_mu_1 = X_mu_1 * b_mu_1 + off_mu_1;"</span></span>
+<span><span class="co">#&gt; [3] "  b_mu_1[1] ~ normal(-1, 1);"</span></span></code></pre></div>
+<p>A prior that matches nothing in the model (a misspelled parameter or
+coefficient, or a class the model does not have) is an error, so a prior
+is never silently replaced by the default:</p>
+<div class="sourceCode" id="cb6"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="kw"><a href="https://rdrr.io/r/base/try.html" class="external-link">try</a></span><span class="op">(</span><span class="fu"><a href="../reference/stan_code.html">stan_code</a></span><span class="op">(</span><span class="va">y</span> <span class="op">~</span> <span class="va">x</span>, family <span class="op">=</span> <span class="st">"poisson"</span>, data <span class="op">=</span> <span class="va">d</span>, priors <span class="op">=</span> <span class="fu"><a href="../reference/prior.html">prior</a></span><span class="op">(</span><span class="st">"normal(0, 1)"</span>, par <span class="op">=</span> <span class="st">"lambd"</span><span class="op">)</span><span class="op">)</span><span class="op">)</span></span>
+<span><span class="co">#&gt; Error in check_priors_used(priors) : </span></span>
+<span><span class="co">#&gt;   These priors match nothing in the model: normal(0, 1) (class b, par lambd). Check par, class and coef.</span></span></code></pre></div>
+<p>For <code>ar1()</code> and <code>cs()</code> random effects, a
+<code>cor</code> prior applies to the scalar correlation
+<code>rho</code>; <code>lkj</code> priors are for correlation matrices
+of <code>us()</code> blocks.</p>
+<div class="sourceCode" id="cb7"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">lg</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span>y <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/stats/Normal.html" class="external-link">rnorm</a></span><span class="op">(</span><span class="fl">60</span><span class="op">)</span>, t <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/factor.html" class="external-link">factor</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/rep.html" class="external-link">rep</a></span><span class="op">(</span><span class="fl">1</span><span class="op">:</span><span class="fl">3</span>, <span class="fl">20</span><span class="op">)</span><span class="op">)</span>, id <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/factor.html" class="external-link">factor</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/rep.html" class="external-link">rep</a></span><span class="op">(</span><span class="fl">1</span><span class="op">:</span><span class="fl">20</span>, each <span class="op">=</span> <span class="fl">3</span><span class="op">)</span><span class="op">)</span><span class="op">)</span></span>
+<span><span class="va">ar</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/stan_code.html">stan_code</a></span><span class="op">(</span><span class="va">y</span> <span class="op">~</span> <span class="fl">1</span> <span class="op">+</span> <span class="fu">ar1</span><span class="op">(</span><span class="fl">0</span> <span class="op">+</span> <span class="va">t</span> <span class="op">|</span> <span class="va">id</span><span class="op">)</span>, family <span class="op">=</span> <span class="st">"normal"</span>, data <span class="op">=</span> <span class="va">lg</span>,</span>
+<span>                priors <span class="op">=</span> <span class="fu"><a href="../reference/prior.html">prior</a></span><span class="op">(</span><span class="st">"uniform(0, 0.9)"</span>, class <span class="op">=</span> <span class="st">"cor"</span><span class="op">)</span><span class="op">)</span><span class="op">$</span><span class="va">code</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/base/grep.html" class="external-link">grep</a></span><span class="op">(</span><span class="st">"rho"</span>, <span class="fu"><a href="https://rdrr.io/r/base/strsplit.html" class="external-link">strsplit</a></span><span class="op">(</span><span class="va">ar</span>, <span class="st">"\n"</span><span class="op">)</span><span class="op">[[</span><span class="fl">1</span><span class="op">]</span><span class="op">]</span>, value <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span>
+<span><span class="co">#&gt; [1] "  real&lt;lower=-1, upper=1&gt; rho_1;"                                                      </span></span>
+<span><span class="co">#&gt; [2] "  for (a in 1:q_1) for (c in 1:q_1) Rc_1[a, c] = a == c ? 1 + 1e-9 : rho_1^abs(a - c);"</span></span>
+<span><span class="co">#&gt; [3] "  rho_1 ~ uniform(0, 0.9);"</span></span></code></pre></div>
 </div>
 <div class="section level2">
 <h2 id="fitting">Fitting<a class="anchor" aria-label="anchor" href="#fitting"></a>
 </h2>
 <p>The examples below need a working Stan or JAGS installation.</p>
-<div class="sourceCode" id="cb4"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb8"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">fit</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/regcomp.html">regcomp</a></span><span class="op">(</span><span class="va">y</span> <span class="op">~</span> <span class="va">x</span> <span class="op">+</span> <span class="op">(</span><span class="fl">1</span> <span class="op">|</span> <span class="va">g</span><span class="op">)</span>, family <span class="op">=</span> <span class="st">"poisson"</span>, data <span class="op">=</span> <span class="va">d</span>, engine <span class="op">=</span> <span class="st">"bayes"</span>,</span>
-<span>               priors <span class="op">=</span> <span class="va">pr</span>, control <span class="op">=</span> <span class="fu"><a href="../reference/regcomp_control.html">regcomp_control</a></span><span class="op">(</span>runner <span class="op">=</span> <span class="st">"cmdstanr"</span>, chains <span class="op">=</span> <span class="fl">4</span><span class="op">)</span><span class="op">)</span></span>
-<span><span class="fu"><a href="https://rdrr.io/r/base/summary.html" class="external-link">summary</a></span><span class="op">(</span><span class="va">fit</span><span class="op">)</span></span>
+<span>               priors <span class="op">=</span> <span class="va">pr</span>, control <span class="op">=</span> <span class="fu"><a href="../reference/regcomp_control.html">regcomp_control</a></span><span class="op">(</span>runner <span class="op">=</span> <span class="st">"cmdstanr"</span>, chains <span class="op">=</span> <span class="fl">4</span>,</span>
+<span>                                                      iter_warmup <span class="op">=</span> <span class="fl">1000</span>, iter_sampling <span class="op">=</span> <span class="fl">1000</span><span class="op">)</span><span class="op">)</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/base/summary.html" class="external-link">summary</a></span><span class="op">(</span><span class="va">fit</span><span class="op">)</span>                      <span class="co"># posterior means, credible intervals, R-hat, ESS</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">fit</span>, which <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"trace"</span>, <span class="st">"ppc"</span><span class="op">)</span><span class="op">)</span></span>
-<span><span class="fu"><a href="https://rdrr.io/r/stats/predict.html" class="external-link">predict</a></span><span class="op">(</span><span class="va">fit</span>, type <span class="op">=</span> <span class="st">"mean"</span>, interval <span class="op">=</span> <span class="st">"confidence"</span><span class="op">)</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/stats/predict.html" class="external-link">predict</a></span><span class="op">(</span><span class="va">fit</span>, type <span class="op">=</span> <span class="st">"mean"</span>, interval <span class="op">=</span> <span class="st">"confidence"</span><span class="op">)</span>    <span class="co"># credible intervals</span></span>
+<span><span class="fu"><a href="../reference/scoring_rule.html">scoring_rule</a></span><span class="op">(</span><span class="va">fit</span>, rule <span class="op">=</span> <span class="st">"crps"</span><span class="op">)</span>  <span class="co"># posterior predictive CRPS</span></span>
+<span><span class="va">ll</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/log_lik.html">log_lik</a></span><span class="op">(</span><span class="va">fit</span><span class="op">)</span>                <span class="co"># draws by observations, for loo::loo()</span></span>
 <span></span>
+<span><span class="va">fit_rstan</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/stats/update.html" class="external-link">update</a></span><span class="op">(</span><span class="va">fit</span>, control <span class="op">=</span> <span class="fu"><a href="../reference/regcomp_control.html">regcomp_control</a></span><span class="op">(</span>runner <span class="op">=</span> <span class="st">"rstan"</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="va">fit_jags</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/regcomp.html">regcomp</a></span><span class="op">(</span><span class="va">y</span> <span class="op">~</span> <span class="va">x</span> <span class="op">+</span> <span class="op">(</span><span class="fl">1</span> <span class="op">|</span> <span class="va">g</span><span class="op">)</span>, family <span class="op">=</span> <span class="st">"poisson"</span>, data <span class="op">=</span> <span class="va">d</span>, engine <span class="op">=</span> <span class="st">"bayes"</span>,</span>
-<span>                    control <span class="op">=</span> <span class="fu"><a href="../reference/regcomp_control.html">regcomp_control</a></span><span class="op">(</span>runner <span class="op">=</span> <span class="st">"jags"</span><span class="op">)</span><span class="op">)</span></span></code></pre></div>
-<p>Every family with a Stan density, every operator built from such
-families, ordinal and nominal models, all random effect covariance
-structures and multiple membership terms are supported by the Stan
-backends. The BUGS backends support the families with BUGS densities and
-unstructured random effects; <code><a href="https://rdrr.io/r/base/capabilities.html" class="external-link">capabilities()</a></code> reports what is
-available for a family.</p>
-<div class="sourceCode" id="cb5"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/base/capabilities.html" class="external-link">capabilities</a></span><span class="op">(</span><span class="st">"generalized_poisson"</span><span class="op">)</span></span>
-<span><span class="co">#&gt; named logical(0)</span></span></code></pre></div>
+<span>                    control <span class="op">=</span> <span class="fu"><a href="../reference/regcomp_control.html">regcomp_control</a></span><span class="op">(</span>runner <span class="op">=</span> <span class="st">"jags"</span><span class="op">)</span><span class="op">)</span></span>
+<span><span class="va">fit_ob</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/regcomp.html">regcomp</a></span><span class="op">(</span><span class="va">y</span> <span class="op">~</span> <span class="va">x</span> <span class="op">+</span> <span class="op">(</span><span class="fl">1</span> <span class="op">|</span> <span class="va">g</span><span class="op">)</span>, family <span class="op">=</span> <span class="st">"poisson"</span>, data <span class="op">=</span> <span class="va">d</span>, engine <span class="op">=</span> <span class="st">"bayes"</span>,</span>
+<span>                  control <span class="op">=</span> <span class="fu"><a href="../reference/regcomp_control.html">regcomp_control</a></span><span class="op">(</span>runner <span class="op">=</span> <span class="st">"openbugs"</span><span class="op">)</span><span class="op">)</span></span></code></pre></div>
+<p><code><a href="https://rdrr.io/r/stats/predict.html" class="external-link">predict()</a></code> for a Bayesian fit summarizes the posterior of
+the conditional quantity (for <code>"variance"</code>, the posterior
+mean of the conditional variance); <code><a href="../reference/scoring_rule.html">scoring_rule()</a></code> uses the
+posterior predictive law.</p>
+</div>
+<div class="section level2">
+<h2 id="what-each-backend-supports">What each backend supports<a class="anchor" aria-label="anchor" href="#what-each-backend-supports"></a>
+</h2>
+<p>Families with a Stan density, operators built from them, ordinal and
+nominal models, all random effect covariance structures and multiple
+membership terms are supported by the Stan backends. Continuous laws
+with point masses inside their density (an inflated or hurdle continuous
+law) are fitted by the <code>"ml"</code> and <code>"tmb"</code> engines
+only. The BUGS backends support families with BUGS densities and
+unstructured random effects. <code><a href="../reference/family_capabilities.html">family_capabilities()</a></code> reports
+what is available for a family.</p>
+<div class="sourceCode" id="cb9"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="fu"><a href="../reference/family_capabilities.html">family_capabilities</a></span><span class="op">(</span><span class="st">"generalized_poisson"</span><span class="op">)</span><span class="op">[</span><span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"stan"</span>, <span class="st">"tmb"</span>, <span class="st">"bugs"</span><span class="op">)</span><span class="op">]</span></span>
+<span><span class="co">#&gt; $stan</span></span>
+<span><span class="co">#&gt; [1] "generated"</span></span>
+<span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt; $tmb</span></span>
+<span><span class="co">#&gt; [1] "unavailable"</span></span>
+<span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt; $bugs</span></span>
+<span><span class="co">#&gt; [1] "unavailable"</span></span>
+<span><span class="fu"><a href="../reference/family_capabilities.html">supports</a></span><span class="op">(</span><span class="fu"><a href="../reference/hurdle.html">hurdle</a></span><span class="op">(</span><span class="st">"gamma"</span><span class="op">)</span>, backend <span class="op">=</span> <span class="st">"stan"</span><span class="op">)</span></span>
+<span><span class="co">#&gt; [1] TRUE</span></span></code></pre></div>
 </div>
   </main><aside class="col-md-3"><nav id="toc" aria-label="Table of contents"><h2>On this page</h2>
     </nav></aside>

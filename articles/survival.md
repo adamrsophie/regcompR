@@ -88,6 +88,44 @@ coef(fi)
 #>         0.3042646         1.1021716         0.4452103        -0.2499371
 ```
 
+## Truncation and delayed entry
+
+`surv(time, event, entry)` handles delayed entry (left truncation):
+subjects enter observation at `entry` and contribute the conditional
+likelihood given survival to that time.
+`cens(lower, upper, trunc_lower, trunc_upper)` gives truncation limits
+for any family, together with interval censoring.
+
+``` r
+
+d$entry <- runif(n, 0, 1)
+keep <- d$time > d$entry
+fe <- regcomp(surv(time, event, entry) ~ x + age, family = "weibull", data = d[keep, ])
+coef(fe)
+#> shape:(Intercept) scale:(Intercept)           scale:x         scale:age 
+#>         0.1950867         1.0196206         0.5200054        -0.2714023
+# Event times observed only when below 6 (right truncation).
+tt2 <- rweibull(n, shape = 1.4, scale = exp(1 + 0.6 * d$x))
+dt <- data.frame(x = d$x, tr = tt2)[tt2 < 6, ]
+ft <- regcomp(cens(tr, tr, trunc_upper = 6) ~ x, family = "weibull", data = dt)
+coef(ft)
+#> shape:(Intercept) scale:(Intercept)           scale:x 
+#>         0.2439162         0.9628687         0.9734912
+```
+
+The
+[`censor()`](https://adamrsophie.github.io/regcompR/reference/censor.md)
+operator gives the law of a censored variable itself, with point masses
+at the censoring limits (a Tobit model when the base is normal):
+
+``` r
+
+tob <- data.frame(x = rnorm(200)); tob$y <- pmax(0, 0.5 + tob$x + rnorm(200))
+coef(regcomp(y ~ x, family = censor("normal", lower = 0), data = tob))
+#>    mu:(Intercept)              mu:x sigma:(Intercept) 
+#>         0.4277192         0.9548162         0.1095207
+```
+
 ## Discrete time and frailty
 
 See

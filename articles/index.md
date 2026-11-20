@@ -2,8 +2,10 @@
 
 ### Guides
 
-- [Distributions and
-  operators](https://adamrsophie.github.io/regcompR/articles/distributions.md):
+- [Distributions and the
+  registry](https://adamrsophie.github.io/regcompR/articles/distributions.md):
+- [Building new distributions with
+  operators](https://adamrsophie.github.io/regcompR/articles/operators.md):
 - [Count data
   models](https://adamrsophie.github.io/regcompR/articles/count-models.md):
 - [Hierarchical and longitudinal
@@ -12,6 +14,8 @@
   responses](https://adamrsophie.github.io/regcompR/articles/ordinal-categorical.md):
 - [Censored data and survival
   models](https://adamrsophie.github.io/regcompR/articles/survival.md):
+- [Penalized and bias reduced
+  estimation](https://adamrsophie.github.io/regcompR/articles/regularization.md):
 - [Model checking and
   comparison](https://adamrsophie.github.io/regcompR/articles/model-checking.md):
 - [Bayesian distributional
