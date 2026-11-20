@@ -40,7 +40,7 @@ ols <- function(X, y) {
   q <- qr(X)
   if (q$rank < ncol(X)) stop_input(sprintf("The design is rank deficient; aliased columns: %s.",
                                            paste(colnames(X)[q$pivot[-seq_len(q$rank)]], collapse = ", ")))
-  b <- qr.coef(q, y); list(b = b, res = drop(y - X %*% b), XtXi = chol2inv(qr.R(q))[order(q$pivot), order(q$pivot)])
+  b <- qr.coef(q, y); list(b = b, res = drop(y - X %*% b), XtXi = chol2inv(qr.R(q))[order(q$pivot), order(q$pivot), drop = FALSE])
 }
 
 f_test <- function(rss0, rss1, df1, df2) {
