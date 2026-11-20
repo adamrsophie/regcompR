@@ -102,11 +102,27 @@ unequally spaced numeric times; \code{gau(x + y | g)} and
 \code{matern32(x + y | g)} give Gaussian and Matern (smoothness 3/2)
 correlation in the coordinates on the left of the bar, for spatial
 effects. One random effect is created per distinct coordinate.
+\item \code{relmat(id | 1, K)}: effects over the levels of \code{id} with a known
+relatedness (kinship, genomic or phylogenetic) matrix \code{K} whose rows
+are the levels (by row name, else in level order).
+\item \code{car(region | 1, W)}, \code{leroux(region | 1, W)} and \code{icar(region | 1, W)}:
+areal effects from a symmetric adjacency matrix \code{W}: the proper CAR
+model (precision \verb{D - rho W}), the Leroux model (precision
+\verb{(1 - rho) I + rho (D - W)}) and the intrinsic CAR (sum to zero,
+scaled to unit geometric mean variance). \code{icar()} plus \code{(1 | region)}
+is the BYM model.
+\item \code{spacetime(region + time | 1, W)}: a separable space time effect, the
+Kronecker product of a Leroux spatial and an AR(1) temporal
+correlation (time a factor of equally spaced periods).
 }
+
+A group other than \code{1} on the right of the bar gives independent
+replicates of the field (one per year, say).
 
 Structured random effects are available in every parameter and for every
 family, so a latent autoregressive process can enter a count, survival or
-ordinal model. The Bayesian engine supports \code{us} and \code{diag} structures.
+ordinal model. The TMB engine does not support \code{car()}, \code{leroux()} and
+\code{spacetime()}; Stan does not support \code{spacetime()}.
 }
 
 \section{Engines}{

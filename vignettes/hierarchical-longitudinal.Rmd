@@ -107,6 +107,27 @@ suppressWarnings(sapply(structs, function(s) AIC(regcomp(stats::as.formula(paste
 The TMB engine uses automatic differentiation and is much faster for large
 multilevel models; it gives the same estimates as the default engine.
 
+## Areal, relatedness and space time effects
+
+`car()`, `leroux()` and `icar()` give areal random effects from an
+adjacency matrix (`icar()` plus `(1 | region)` is the BYM model);
+`relmat()` takes a known relatedness matrix (kinship, genomic or
+phylogenetic); `spacetime()` crosses a Leroux spatial with an AR(1)
+temporal correlation. They work in every parameter and family.
+
+```{r}
+gr <- expand.grid(i = 1:5, j = 1:5)
+Wg <- outer(1:25, 1:25, function(a, b) as.numeric(abs(gr$i[a] - gr$i[b]) + abs(gr$j[a] - gr$j[b]) == 1))
+dimnames(Wg) <- list(paste0("a", 1:25), paste0("a", 1:25))
+ar <- data.frame(area = factor(rep(rownames(Wg), 4), levels = rownames(Wg)), x = rnorm(100))
+sp <- as.vector(t(chol(solve(diag(rowSums(Wg)) - 0.9 * Wg))) %*% rnorm(25))
+ar$y <- rpois(100, exp(0.3 + 0.5 * ar$x + sp[ar$area]))
+fl <- regcomp(y ~ x + leroux(area | 1, Wg), family = "poisson", data = ar)
+fb <- regcomp(y ~ x + icar(area | 1, Wg) + (1 | area), family = "poisson", data = ar)
+c(leroux = AIC(fl), bym = AIC(fb))
+plogis(fl$theta[2])   # Leroux spatial dependence
+```
+
 ## Smooth terms
 
 Smooth terms from mgcv enter any parameter through their mixed model

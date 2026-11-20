@@ -304,6 +304,8 @@ stan_data <- function(spec) {
         out[[paste0("g_", j)]] <- as.integer(b$gi)
       }
       out[[paste0("Xr_", j)]] <- unname(b$Xr)
+      if (b$struct %in% c("relmat", "icar")) out[[paste0("Kch_", j)]] <- t(chol(b$M$K + diag(1e-9, b$q)))
+      if (b$struct %in% c("car", "leroux")) { out[[paste0("Wa_", j)]] <- b$M$W; out[[paste0("Dn_", j)]] <- b$M$d }
       if (!is.null(b$coords)) {
         D <- as.matrix(stats::dist(b$coords))
         out[[paste0("D_", j)]] <- unname(D)
@@ -316,11 +318,12 @@ stan_data <- function(spec) {
 
 # Stan code of a structured random effect block: r_j = diag(sd) chol(R) z_j.
 stan_struct_block <- function(b, j, priors) {
+  if (b$struct == "spacetime") stop_unsupported("spacetime() random effects in Stan (use engine = \"ml\")")
   q <- sprintf("q_%d", j); L <- sprintf("L_%d", j)
   data <- c(sprintf("  int<lower=1> L_%d;", j), sprintf("  int<lower=1> q_%d;", j),
             if (is.null(b$W)) sprintf("  array[N] int<lower=1, upper=L_%d> g_%d;", j, j) else sprintf("  matrix[N, L_%d] W_%d;", j, j),
             sprintf("  matrix[N, q_%d] Xr_%d;", j, j))
-  hom <- b$struct %in% c("homdiag", "homcs", "ar1", "ou", "exp", "gau", "matern32")
+  hom <- b$struct %in% c("homdiag", "homcs", "ar1", "ou", "exp", "gau", "matern32", "relmat", "icar", "car", "leroux")
   par <- c(if (hom) sprintf("  real<lower=0> sdh_%d;", j) else sprintf("  vector<lower=0>[%s] sd_%d;", q, j),
            sprintf("  matrix[%s, %s] z_%d;", q, L, j))
   tpar <- if (hom) sprintf("  vector[%s] sd_%d = rep_vector(sdh_%d, %s);", q, j, j, q)
@@ -342,6 +345,18 @@ stan_struct_block <- function(b, j, priors) {
   } else if (b$struct == "ar1") {
     par <- c(par, sprintf("  real<lower=-1, upper=1> rho_%d;", j))
     tpar <- c(tpar, fill(sprintf("rho_%d^abs(a - c)", j))); pri <- c(pri, rho_prior())
+  } else if (b$struct %in% c("relmat", "icar")) {
+    # Known correlation: r = sd * chol(K) z.
+    data <- c(data, sprintf("  matrix[%s, %s] Kch_%d;", q, q, j))
+    return(list(data = data, par = par, pri = pri,
+                tpar = c(tpar, sprintf("  matrix[%s, %s] r_%d = sdh_%d * Kch_%d * z_%d;", q, L, j, j, j, j))))
+  } else if (b$struct %in% c("car", "leroux")) {
+    data <- c(data, sprintf("  matrix[%s, %s] Wa_%d;", q, q, j), sprintf("  vector[%s] Dn_%d;", q, j))
+    par <- c(par, sprintf("  real<lower=0, upper=1> rho_%d;", j))
+    P <- if (b$struct == "car") sprintf("diag_matrix(Dn_%d) - rho_%d * Wa_%d", j, j, j) else
+      sprintf("(1 - rho_%d) * identity_matrix(%s) + rho_%d * (diag_matrix(Dn_%d) - Wa_%d)", j, q, j, j, j)
+    tpar <- c(tpar, sprintf("  matrix[%s, %s] Rc_%d = inverse_spd(%s);", q, q, j, P))
+    pri <- c(pri, rho_prior())
   } else if (b$struct == "homdiag") {
     tpar <- c(tpar, fill("0"))
   } else {

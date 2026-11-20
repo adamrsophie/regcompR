@@ -71,6 +71,7 @@ find_bars <- function(term) {
 
 drop_bars <- function(term) {
   if (is.name(term) || !is.language(term)) return(term)
+  if (is_struct_call(term)) return(NULL)
   if (term[[1]] == as.name("(") && is.call(term[[2]]) &&
       (term[[2]][[1]] == as.name("|") || term[[2]][[1]] == as.name("||"))) return(NULL)
   if (term[[1]] == as.name("|") || term[[1]] == as.name("||")) return(NULL)
@@ -100,10 +101,14 @@ drop_bars <- function(term) {
 # homcs, ar1 (homogeneous first order autoregressive over the columns), and
 # the distance based ou / exp (exponential), gau (Gaussian) and Matern
 # with smoothness fixed at 3/2, matern32) whose left side gives the coordinates.
-re_structs <- c("us", "diag", "homdiag", "cs", "homcs", "ar1", "ou", "exp", "gau", "matern32")
+re_structs <- c("us", "diag", "homdiag", "cs", "homcs", "ar1", "ou", "exp", "gau", "matern32",
+                "relmat", "car", "leroux", "icar", "spacetime")
 coord_structs <- c("ou", "exp", "gau", "matern32")
+# Structures over the levels of a factor with a user given matrix: a known
+# relatedness (covariance) matrix, or an adjacency matrix for areal models.
+mat_structs <- c("relmat", "car", "leroux", "icar", "spacetime")
 is_struct_call <- function(x) is.call(x) && is.name(x[[1]]) && as.character(x[[1]]) %in% re_structs &&
-  length(x) == 2 && length(find_bars_plain(x[[2]])) == 1
+  (length(x) == 2 || length(x) == 3 && as.character(x[[1]]) %in% mat_structs) && length(find_bars_plain(x[[2]])) == 1
 find_bars_plain <- function(x) {
   while (is.call(x) && identical(x[[1]], as.name("("))) x <- x[[2]]
   if (is.call(x) && (identical(x[[1]], as.name("|")) || identical(x[[1]], as.name("||")))) list(x) else NULL
@@ -125,6 +130,7 @@ eval_group <- function(gexpr, data, env) {
     return(interaction(eval_group(gexpr[[2]], data, env), eval_group(gexpr[[3]], data, env), drop = TRUE, sep = ":"))
   g <- eval(gexpr, data, env)
   if (is.list(g)) g <- interaction(g, drop = TRUE)
+  if (length(g) == 1 && nrow(data) > 1) g <- rep(g, nrow(data))   # (x | 1): one group
   g
 }
 
@@ -198,14 +204,41 @@ build_predictor <- function(rhs, data, par, xlev = NULL, smooth_specs = NULL,
     st <- if (is_struct_call(b)) as.character(b[[1]]) else NULL
     inner <- if (is.null(st)) b else find_bars_plain(b[[2]])[[1]]
     lapply(expand_nested(list(inner)), function(x) list(bar = x, struct = st,
-      key = if (is.null(st)) x else call(st, x)))
+      key = if (is.null(st)) x else call(st, x), mat = if (!is.null(st) && length(b) > 2) b[[3]]))
   }), recursive = FALSE)
   blocks <- list()
   for (bb in bars) {
     b <- bb$bar
     struct <- if (!is.null(bb$struct)) bb$struct else if (b[[1]] == as.name("|")) "us" else "diag"
     coords <- NULL
-    if (struct %in% coord_structs) {
+    M <- NULL
+    if (struct %in% mat_structs) {
+      if (is.null(bb$mat)) stop_input(sprintf("%s() needs a matrix, as in %s(region | 1, W).", struct, struct))
+      M <- as.matrix(eval(bb$mat, data, env))
+      lhs <- b[[2]]; tm <- NULL
+      if (struct == "spacetime") {
+        if (!is.call(lhs) || !identical(lhs[[1]], as.name("+")) || length(lhs) != 3)
+          stop_input("spacetime() needs an area and a time variable, as in spacetime(region + time | 1, W).")
+        tm <- factor(eval(lhs[[3]], data, env)); lhs <- lhs[[2]]
+      }
+      v <- as.character(eval(lhs, data, env))
+      lv <- rownames(M) %||% levels(factor(v))
+      if (nrow(M) != ncol(M) || nrow(M) != length(lv))
+        stop_input(sprintf("The %s() matrix must be square with one row per level of %s.", struct, deparse(b[[2]])))
+      if (any(is.na(match(v[!is.na(v)], lv)))) stop_input(sprintf("Some levels of %s are not rows of the %s() matrix.", deparse(b[[2]]), struct))
+      if (is.null(tm)) {
+        Xr <- outer(match(v, lv), seq_along(lv), `==`) * 1
+        colnames(Xr) <- lv
+        M <- mat_struct_matrix(struct, M)
+      } else {
+        # Area major, time minor: the order of kronecker(S_area, R_time).
+        nt <- nlevels(tm)
+        Xr <- outer((match(v, lv) - 1) * nt + as.integer(tm), seq_len(length(lv) * nt), `==`) * 1
+        colnames(Xr) <- paste(rep(lv, each = nt), rep(levels(tm), length(lv)), sep = ":")
+        M <- c(mat_struct_matrix("leroux", M), list(nt = nt))
+      }
+      rterms <- rxlev <- rcontr <- NULL
+    } else if (struct %in% coord_structs) {
       vars <- all.vars(b[[2]])
       C <- do.call(cbind, lapply(vars, function(v) as.numeric(eval(as.name(v), data, env))))
       ck <- do.call(paste, c(lapply(seq_len(ncol(C)), function(k) C[, k]), sep = "\r"))
@@ -263,10 +296,10 @@ build_predictor <- function(rhs, data, par, xlev = NULL, smooth_specs = NULL,
       label = key, group = paste(deparse(gexpr), collapse = ""),
       terms = colnames(Xr), Xr = Xr, gi = gi, levels = lev,
       q = ncol(Xr), L = length(lev), corr = corr && ncol(Xr) > 1,
-      struct = struct, coords = coords, W = W, type = "re", par = par,
+      struct = struct, coords = coords, W = W, type = "re", par = par, M = M,
       n_old = if (is.null(W) && is.null(coords)) n_old,
-      rterms = if (is.null(coords)) rterms, rxlev = if (is.null(coords)) rxlev,
-      rcontr = if (is.null(coords)) rcontr)
+      rterms = if (is.null(coords) && is.null(M)) rterms, rxlev = if (is.null(coords) && is.null(M)) rxlev,
+      rcontr = if (is.null(coords) && is.null(M)) rcontr)
   }
   # Smooth terms through mgcv's mixed model representation.
   sm <- find_smooths(rhs[[length(rhs)]])
@@ -326,6 +359,29 @@ build_predictor <- function(rhs, data, par, xlev = NULL, smooth_specs = NULL,
   list(X = X, offset = off, terms = tt, contrasts = contr, aliased = if (is.null(prev_pred)) aliased,
        xlev = if (!is.null(prev_pred)) xlev else stats::.getXlevels(tt, mf),
        blocks = blocks, smooths = smooth_info, formula = rhs)
+}
+
+# The matrix a structure needs: the relatedness matrix; the adjacency
+# matrix W and the neighbor counts for proper and Leroux CAR models; for the
+# intrinsic CAR, the generalized inverse of D - W scaled to a geometric mean
+# marginal variance of one (Sorbye and Rue 2014), which imposes the sum to
+# zero constraint.
+mat_struct_matrix <- function(struct, M) {
+  dimnames(M) <- NULL
+  if (struct == "relmat") {
+    if (max(abs(M - t(M))) > 1e-8 || min(eigen(M, symmetric = TRUE, only.values = TRUE)$values) <= 0)
+      stop_input("The relmat() matrix must be symmetric and positive definite.")
+    return(list(K = M))
+  }
+  if (max(abs(M - t(M))) > 0 || any(diag(M) != 0) || any(M < 0)) stop_input(sprintf("The %s() matrix must be a symmetric adjacency matrix with a zero diagonal.", struct))
+  d <- rowSums(M)
+  if (any(d == 0)) stop_input(sprintf("Every area needs a neighbor in the %s() adjacency matrix.", struct))
+  if (struct != "icar") return(list(W = M, d = d))
+  e <- eigen(diag(d) - M, symmetric = TRUE)
+  keep <- e$values > 1e-8 * max(e$values)
+  if (sum(!keep) > 1) stop_input("The icar() adjacency matrix must describe one connected graph.")
+  K <- e$vectors[, keep] %*% (t(e$vectors[, keep]) / e$values[keep])
+  list(K = K / exp(mean(log(diag(K)))))
 }
 
 # Sparse Z matrix of one block: n x (q * L), columns ordered level major

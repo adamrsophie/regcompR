@@ -174,7 +174,8 @@ map_draws <- function(spec, arr, language) {
       last <- ti[length(ti)]
       if (b$struct %in% c("cs", "homcs")) { a <- 1 / (b$q - 1); fixed[, last] <- stats::qlogis((get(sprintf("rho_%d", j)) + a) / (1 + a)) }
       else if (b$struct == "ar1") fixed[, last] <- atanh(get(sprintf("rho_%d", j)))
-      else if (b$struct != "homdiag") fixed[, last] <- log(get(sprintf("range_%d", j)))
+      else if (b$struct %in% c("car", "leroux")) fixed[, last] <- stats::qlogis(get(sprintf("rho_%d", j)))
+      else if (!b$struct %in% c("homdiag", "relmat", "icar")) fixed[, last] <- log(get(sprintf("range_%d", j)))
     } else if (language == "bugs" && b$corr) {
       Sig <- array(NA_real_, c(S, b$q, b$q))
       for (a in seq_len(b$q)) for (c2 in seq_len(b$q)) Sig[, a, c2] <- get(sprintf("Sigma_%d[%d,%d]", j, a, c2))

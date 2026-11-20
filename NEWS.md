@@ -1,6 +1,10 @@
 # regcompR 0.1.0
 
 * First release.
+* Random effect structures `relmat()` (known relatedness matrix),
+  `car()`, `leroux()` and `icar()` (areal models; `icar()` plus an iid term
+  is BYM) and `spacetime()` (separable Leroux by AR(1)); exact normal
+  marginal likelihoods checked against direct computation.
 * Econometrics: `iv_regcomp()` (two stage least squares with weak
   instrument, Wu-Hausman and Sargan tests; equal to ivreg),
   `panel_within()` (fixed effects within estimator; equal to plm) and

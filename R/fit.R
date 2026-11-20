@@ -34,10 +34,26 @@
 #'   `matern32(x + y | g)` give Gaussian and Matern (smoothness 3/2)
 #'   correlation in the coordinates on the left of the bar, for spatial
 #'   effects. One random effect is created per distinct coordinate.
+#' * `relmat(id | 1, K)`: effects over the levels of `id` with a known
+#'   relatedness (kinship, genomic or phylogenetic) matrix `K` whose rows
+#'   are the levels (by row name, else in level order).
+#' * `car(region | 1, W)`, `leroux(region | 1, W)` and `icar(region | 1, W)`:
+#'   areal effects from a symmetric adjacency matrix `W`: the proper CAR
+#'   model (precision `D - rho W`), the Leroux model (precision
+#'   `(1 - rho) I + rho (D - W)`) and the intrinsic CAR (sum to zero,
+#'   scaled to unit geometric mean variance). `icar()` plus `(1 | region)`
+#'   is the BYM model.
+#' * `spacetime(region + time | 1, W)`: a separable space time effect, the
+#'   Kronecker product of a Leroux spatial and an AR(1) temporal
+#'   correlation (time a factor of equally spaced periods).
+#'
+#' A group other than `1` on the right of the bar gives independent
+#' replicates of the field (one per year, say).
 #'
 #' Structured random effects are available in every parameter and for every
 #' family, so a latent autoregressive process can enter a count, survival or
-#' ordinal model. The Bayesian engine supports `us` and `diag` structures.
+#' ordinal model. The TMB engine does not support `car()`, `leroux()` and
+#' `spacetime()`; Stan does not support `spacetime()`.
 #'
 #' @section Engines:
 #' * `"ml"`: maximum likelihood in R. Without random effects or smooths the
@@ -453,11 +469,12 @@ build_spec <- function(formula, dots, fam, data, weights = NULL, links = NULL,
 
 # Number of covariance parameters of a block, starting values and names.
 block_ntheta <- function(b) switch(b$struct, us = b$q + b$q * (b$q - 1) / 2, diag = b$q,
-  homdiag = 1, cs = b$q + 1, homcs = 2, 2)
+  homdiag = 1, cs = b$q + 1, homcs = 2, relmat = 1, icar = 1, spacetime = 3, 2)
 block_theta_start <- function(b) {
   rng <- if (!is.null(b$coords) && nrow(b$coords) > 1) log(stats::median(stats::dist(b$coords))) else 0
   switch(b$struct, us = c(rep(log(0.5), b$q), rep(0, b$q * (b$q - 1) / 2)), diag = rep(log(0.5), b$q),
     homdiag = log(0.5), cs = c(rep(log(0.5), b$q), 0), homcs = c(log(0.5), 0), ar1 = c(log(0.5), 0),
+    relmat = log(0.5), icar = log(0.5), car = c(log(0.5), 0), leroux = c(log(0.5), 0), spacetime = c(log(0.5), 0, 0),
     c(log(0.5), rng))
 }
 block_theta_names <- function(b) {
@@ -468,6 +485,8 @@ block_theta_names <- function(b) {
            c(sdn, paste0(pre, "chol(", b$terms[idx[, 1]], ",", b$terms[idx[, 2]], ")")) },
     diag = sdn, homdiag = paste0(pre, "log_sd"), cs = c(sdn, paste0(pre, "rho_raw")),
     homcs = paste0(pre, c("log_sd", "rho_raw")), ar1 = paste0(pre, c("log_sd", "atanh_rho")),
+    relmat = , icar = paste0(pre, "log_sd"), car = , leroux = paste0(pre, c("log_sd", "logit_rho")),
+    spacetime = paste0(pre, c("log_sd", "logit_rho", "atanh_rho_time")),
     paste0(pre, c("log_sd", "log_range")))
 }
 
@@ -499,6 +518,21 @@ block_cov <- function(b, th) {
     ar1 = {
       R <- tanh(th[2])^abs(outer(seq_len(q), seq_len(q), `-`))
       return(exp(2 * th[1]) * R)
+    },
+    relmat = return(exp(2 * th[1]) * b$M$K),
+    # A fixed tiny variance along the constant direction, removed by the
+    # Laplace step, which leaves the sum to zero constrained field.
+    icar = return(exp(2 * th[1]) * b$M$K + 1e-6 / q),
+    spacetime = {
+      rho <- 1 / (1 + exp(-th[2])); A <- length(b$M$d)
+      Ss <- solve((1 - rho) * diag(A) + rho * (diag(b$M$d) - b$M$W))
+      Rt <- tanh(th[3])^abs(outer(seq_len(b$M$nt), seq_len(b$M$nt), `-`))
+      return(exp(2 * th[1]) * kronecker(Ss, Rt))
+    },
+    car = , leroux = {
+      rho <- 1 / (1 + exp(-th[2]))
+      P <- if (b$struct == "car") diag(b$M$d) - rho * b$M$W else (1 - rho) * diag(q) + rho * (diag(b$M$d) - b$M$W)
+      return(exp(2 * th[1]) * solve(ad_like(P, th)))
     })
   d <- as.matrix(stats::dist(b$coords)) / exp(th[2])
   R <- switch(b$struct, ou = , exp = exp(-d), gau = exp(-d^2),
