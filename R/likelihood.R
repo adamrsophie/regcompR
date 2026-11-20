@@ -13,45 +13,21 @@ obs_loglik <- function(fam, y, pars, cmat = NULL) {
   exact <- !is.na(lo) & lo == up
   sub <- function(idx) lapply(pars, `[`, idx)
   if (any(exact)) out[exact] <- eval_lpdf(fam, lo[exact], sub(exact))
-  lcdf <- function(q, idx) {
-    if (!any(idx)) return(numeric())
-    v <- family_cdf(fam, q, sub(idx))
-    log(pmax(v, 0))
-  }
-  # P(Y <= q) and P(Y < q) for the interval bounds.
-  below <- function(q, idx, strict) {
-    qq <- if (fam$discrete && strict) ceiling(q) - 1 else q
-    res <- rep(0, sum(idx))
-    fin <- is.finite(qq[idx])
-    res[!fin & qq[idx] > 0] <- 1
-    if (any(fin)) {
-      ii <- which(idx)[fin]
-      res[fin] <- family_cdf(fam, qq[ii], sub(ii))
-    }
-    res
-  }
   ce <- !exact & !is.na(lo)
-  if (any(ce)) {
-    # Interval [lo, up] for discrete; (lo, up] for continuous.
-    Fu <- below(up, ce, FALSE)
-    Fl <- below(lo, ce, fam$discrete)
-    right <- is.infinite(up[ce]) & up[ce] > 0
-    v <- log(pmax(Fu - Fl, 0))
-    if (any(right) && !is.null(fam$lccdf)) {
-      ii <- which(ce)[right]
-      qq <- if (fam$discrete) ceiling(lo[ii]) - 1 else lo[ii]
-      v[right] <- fam$lccdf(qq, sub(ii))
-    }
-    out[ce] <- v
-  }
+  # A censoring interval only counts where it meets the truncation region.
+  lo[ce] <- pmax(lo[ce], tl[ce]); up[ce] <- pmin(up[ce], tu[ce])
+  empty <- ce & (if (fam$discrete) lo > up else lo >= up)
+  # Interval [lo, up] for discrete laws and (lo, up] for continuous ones,
+  # as log P(a < Y <= b) with a = lo - 1 for discrete laws.
+  lower_q <- function(q) if (fam$discrete) ceiling(q) - 1 else q
+  if (any(ce)) out[ce] <- family_log_interval(fam, lower_q(lo[ce]), up[ce], sub(ce))
   tr <- (is.finite(tl) | is.finite(tu)) & !is.na(out)
   if (any(tr)) {
-    Ftu <- below(tu, tr, FALSE)
-    Ftl <- below(tl, tr, fam$discrete)
-    out[tr] <- out[tr] - log(pmax(Ftu - Ftl, 0))
+    out[tr] <- out[tr] - family_log_interval(fam, lower_q(tl[tr]), tu[tr], sub(tr))
     outside <- (exact & tr) & ((if (fam$discrete) lo < tl else lo <= tl) | lo > tu)
     out[outside] <- -Inf
   }
+  out[empty] <- -Inf
   out
 }
 
@@ -67,8 +43,14 @@ eta_to_pars <- function(spec, eta) {
 
 # Weighted per observation log likelihood from linear predictors.
 loglik_eta <- function(spec, eta) {
-  ll <- obs_loglik(spec$fam, spec$y, eta_to_pars(spec, eta), spec$cmat)
-  ll
+  pars <- eta_to_pars(spec, eta)
+  # Family wide constraints (beyond each parameter's own domain): a
+  # violation means the law is not a probability distribution.
+  if (!is.null(spec$fam$check)) {
+    msg <- tryCatch(spec$fam$check(pars), error = function(e) conditionMessage(e))
+    if (is.character(msg) && length(msg) && nzchar(msg[1])) return(rep(-Inf, spec$n))
+  }
+  obs_loglik(spec$fam, spec$y, pars, spec$cmat)
 }
 
 # First and second derivatives of per observation log likelihood with

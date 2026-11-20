@@ -112,6 +112,7 @@ run_bugs <- function(spec, priors, control, runner) {
 # Convert a draws array (iterations x chains x variables) to coefficient,
 # variance parameter and random effect draws in the package's naming.
 map_draws <- function(spec, arr, language) {
+  if (language == "stan") spec <- stan_spec(spec)
   vn <- dimnames(arr)[[3]]
   get <- function(name) {
     i <- match(name, vn)

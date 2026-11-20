@@ -25,11 +25,21 @@ ord_stan_fun <- "
     if (lk == 4) return exp(-exp(-x));
     return atan(x) / pi() + 0.5;
   }
+  real rc_loginvlink(real x, int lk, int lw) {
+    if (lk == 1) return lw ? log_inv_logit(x) : log1m_inv_logit(x);
+    if (lk == 2) return lw ? std_normal_lcdf(x) : std_normal_lccdf(x);
+    if (lk == 3) return lw ? log1m_exp(-exp(x)) : -exp(x);
+    if (lk == 4) return lw ? -exp(-x) : log1m_exp(-exp(-x));
+    return lw ? cauchy_lcdf(x | 0, 1) : cauchy_lccdf(x | 0, 1);
+  }
   real rc_cumulative_lpmf(int y, real mu, vector cuts, real s, int lk) {
     int K = num_elements(cuts) + 1;
-    real up = y == K ? 1 : rc_invlink((cuts[y] - mu) / s, lk);
-    real lo = y == 1 ? 0 : rc_invlink((cuts[y - 1] - mu) / s, lk);
-    return log(fmax(up - lo, 1e-300));
+    if (y == 1) return rc_loginvlink((cuts[1] - mu) / s, lk, 1);
+    if (y == K) return rc_loginvlink((cuts[K - 1] - mu) / s, lk, 0);
+    real b = (cuts[y] - mu) / s;
+    real a = (cuts[y - 1] - mu) / s;
+    if (a + b > 0) return log_diff_exp(rc_loginvlink(a, lk, 0), rc_loginvlink(b, lk, 0));
+    return log_diff_exp(rc_loginvlink(b, lk, 1), rc_loginvlink(a, lk, 1));
   }
   real rc_contratio_lpmf(int y, real mu, vector cuts, real s, int lk) {
     int K = num_elements(cuts) + 1;
@@ -47,10 +57,27 @@ ord_stan_fun <- "
   }"
 ord_link_code <- c(logit = 1, probit = 2, cloglog = 3, loglog = 4, cauchit = 5)
 
-cum_lpmf <- function(F) function(y, p) { o <- ord_obs(y, p)
-  up <- ifelse(y >= o$K, 1, F((p$cuts[pmin(y, o$K - 1)] - o$mu) / o$s))
-  lo <- ifelse(y <= 1, 0, F((p$cuts[pmax(y - 1, 1)] - o$mu) / o$s))
-  ifelse(y >= 1 & y <= o$K & y == round(y), log(pmax(up - lo, 0)), -Inf) }
+# Log distribution and survival functions of each inverse link, stable in
+# both tails.
+ord_logF <- list(
+  logit = function(x, lower = TRUE) stats::plogis(x, lower.tail = lower, log.p = TRUE),
+  probit = function(x, lower = TRUE) stats::pnorm(x, lower.tail = lower, log.p = TRUE),
+  cauchit = function(x, lower = TRUE) stats::pcauchy(x, lower.tail = lower, log.p = TRUE),
+  cloglog = function(x, lower = TRUE) if (lower) log1mexp(exp(x)) else -exp(x),
+  loglog = function(x, lower = TRUE) if (lower) -exp(-x) else log1mexp(exp(-x)))
+
+# Category log masses log(F(b) - F(a)) computed in log space: from the
+# distribution function in the lower half and the survival function in the
+# upper half.
+cum_lpmf <- function(lk) { lF <- ord_logF[[lk]]; function(y, p) { o <- ord_obs(y, p)
+  ok <- y >= 1 & y <= o$K & y == round(y)
+  yy <- ifelse(ok, y, 1)
+  b <- ifelse(yy >= o$K, Inf, (p$cuts[pmin(yy, o$K - 1)] - o$mu) / o$s)
+  a <- ifelse(yy <= 1, -Inf, (p$cuts[pmax(yy - 1, 1)] - o$mu) / o$s)
+  upper <- a + b > 0
+  out <- ifelse(upper, log_diff_exp(lF(a, FALSE), lF(b, FALSE)), log_diff_exp(lF(b), lF(a)))
+  out[!(b > a)] <- -Inf
+  ifelse(ok, out, -Inf) } }
 
 #' Cumulative link ordinal families
 #'
@@ -63,8 +90,7 @@ cum_lpmf <- function(F) function(y, p) { o <- ord_obs(y, p)
 #' @references McCullagh (1980), Regression models for ordinal data. JRSS B, 42, 109-142.
 NULL
 for (lk in c("logit", "probit", "cloglog", "loglog", "cauchit")) local({
-  F <- link(lk)$linkinv
-  ord_reg(paste0("cumulative_", lk), sprintf("Cumulative %s (ordinal)", lk), cum_lpmf(F),
+  ord_reg(paste0("cumulative_", lk), sprintf("Cumulative %s (ordinal)", lk), cum_lpmf(lk),
     formula = sprintf("P(Y <= k) = %s^-1((theta_k - mu) / scale)", lk),
     stan = stan_generated(ord_stan_fun, sprintf("rc_cumulative_lpmf({y} | {mu}, {cuts}, {scale}, %d)", ord_link_code[[lk]])),
     refs = c("McCullagh (1980), Regression models for ordinal data. JRSS B, 42, 109-142.", "McCullagh and Nelder (1989), Generalized Linear Models, 2nd ed., ch. 5."),

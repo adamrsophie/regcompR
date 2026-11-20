@@ -50,7 +50,29 @@ stan_code <- function(formula, ..., family, data, weights = NULL, links = NULL,
   list(code = stan_program(spec, priors), data = stan_data(spec))
 }
 
+# Stan identifiers cannot hold dots (operator families name parameters
+# mu.1, w.2 and so on): rename parameters in a copy of the specification
+# used for Stan code, data and draw mapping. Coefficient names are kept.
+stan_spec <- function(spec) {
+  old <- names(spec$fam$pars)
+  if (!any(grepl(".", old, fixed = TRUE))) return(spec)
+  rn <- function(x) if (is.null(x)) x else gsub(".", "_", x, fixed = TRUE)
+  fam <- spec$fam
+  names(fam$pars) <- rn(old)
+  for (k in names(fam$pars)) fam$pars[[k]]$name <- k
+  sub_t <- function(t) { if (is.null(t)) return(t)
+    for (k in old[grepl(".", old, fixed = TRUE)]) t <- gsub(paste0("{", k, "}"), paste0("{", rn(k), "}"), t, fixed = TRUE); t }
+  for (f in c("lpdf", "lcdf", "lccdf", "rng")) if (!is.null(fam$stan[[f]])) fam$stan[[f]] <- sub_t(fam$stan[[f]])
+  spec$fam <- fam
+  spec$rpars <- rn(spec$rpars)
+  for (f in c("preds", "links", "beta_idx", "fixed", "data_pars", "aux", "formulas", "Z"))
+    if (length(spec[[f]])) names(spec[[f]]) <- rn(names(spec[[f]]))
+  spec$blocks <- lapply(spec$blocks, function(b) { b$par <- rn(b$par); b })
+  spec
+}
+
 stan_program <- function(spec, priors = NULL) {
+  spec <- stan_spec(spec)
   fam <- spec$fam
   if (is.null(fam$stan)) stop_unsupported("A Stan implementation", fam$id)
   if (!fam$variate_type %in% c("scalar", "categorical") && is.null(fam$stan$vector))
@@ -77,7 +99,7 @@ stan_program <- function(spec, priors = NULL) {
   pri <- character()
   for (k in spec$rpars) {
     P <- ncol(spec$preds[[k]]$X)
-    d <- c(d, sprintf("  int<lower=1> P_%s;", k), sprintf("  matrix[N, P_%s] X_%s;", k, k),
+    d <- c(d, sprintf("  int<lower=0> P_%s;", k), sprintf("  matrix[N, P_%s] X_%s;", k, k),
            sprintf("  vector[N] off_%s;", k))
     par <- c(par, sprintf("  vector[P_%s] b_%s;", k, k))
     cn <- colnames(spec$preds[[k]]$X)
@@ -170,30 +192,52 @@ stan_program <- function(spec, priors = NULL) {
 `%+%` <- function(a, b) paste0(a, b)
 
 stan_data <- function(spec) {
+  spec <- stan_spec(spec)
   fam <- spec$fam
   out <- list(N = spec$n, w = spec$weights)
   y <- spec$y
+  if (!is.null(spec$cmat)) {
+    # Intersect censoring intervals with the truncation region, as the R
+    # likelihood does; an observation outside the region is impossible.
+    cm <- spec$cmat
+    lo <- cm[, "lower"]; up <- cm[, "upper"]; tl <- cm[, "tlower"]; tu <- cm[, "tupper"]
+    exact <- !is.na(lo) & lo == up
+    bad <- exact & ((if (fam$discrete) lo < tl else lo <= tl) | lo > tu)
+    cm[!exact, "lower"] <- pmax(lo[!exact], tl[!exact]); cm[!exact, "upper"] <- pmin(up[!exact], tu[!exact])
+    bad <- bad | (!exact & (if (fam$discrete) cm[, "lower"] > cm[, "upper"] else cm[, "lower"] >= cm[, "upper"]))
+    if (any(bad, na.rm = TRUE))
+      stop_input(sprintf("Observation %d lies outside its truncation region; its likelihood is zero.", which(bad)[1]))
+    spec$cmat <- cm; y <- cm[, "lower"]
+  }
   ct <- cens_type(spec$cmat)
   big <- 2147483647
-  toint <- function(v) { v[is.infinite(v)] <- ifelse(v[is.infinite(v)] > 0, big - 1, -big + 1); as.integer(round(v)) }
+  toint <- function(v, how = round) { v[is.infinite(v)] <- ifelse(v[is.infinite(v)] > 0, big - 1, -big + 1); as.integer(how(v)) }
+  if (fam$discrete) {
+    ex <- if (is.null(spec$cmat)) rep(TRUE, length(y)) else spec$cmat[, "lower"] == spec$cmat[, "upper"]
+    if (any(ex & is.finite(y) & abs(y - round(y)) > 1e-8, na.rm = TRUE))
+      stop_input("A discrete family needs integer responses; found non integer values.")
+  }
   out$y <- if (fam$discrete) toint(y) else as.numeric(y)
   if (!is.null(ct) && (any(ct > 0) || any(is.finite(spec$cmat[, c("tlower", "tupper")])))) {
     cm <- spec$cmat
     out$cens <- as.integer(ct)
     yu <- cm[, "upper"]; yu[!is.finite(yu)] <- 0
-    out$y_upper <- if (fam$discrete) toint(yu) else yu
+    out$y_upper <- if (fam$discrete) toint(yu, floor) else yu
     out$has_tl <- as.integer(is.finite(cm[, "tlower"]))
     out$has_tu <- as.integer(is.finite(cm[, "tupper"]))
     tl <- cm[, "tlower"]; tl[!is.finite(tl)] <- 0
     tu <- cm[, "tupper"]; tu[!is.finite(tu)] <- 0
-    out$tl <- if (fam$discrete) toint(tl) else tl
-    out$tu <- if (fam$discrete) toint(tu) else tu
+    out$tl <- if (fam$discrete) toint(tl, ceiling) else tl
+    out$tu <- if (fam$discrete) toint(tu, floor) else tu
     y2 <- y; y2[!is.finite(y2)] <- 0
-    out$y <- if (fam$discrete) toint(y2) else y2
+    out$y <- if (fam$discrete) toint(y2, ceiling) else y2
   }
   for (k in names(spec$data_pars)) {
     intd <- fam$pars[[k]]$domain %in% c("positive_integer", "nonneg_integer", "integer")
-    out[[k]] <- if (intd) as.integer(spec$data_pars[[k]]) else as.numeric(spec$data_pars[[k]])
+    v <- spec$data_pars[[k]]
+    if (intd && any(abs(v - round(v)) > 1e-8, na.rm = TRUE))
+      stop_input(sprintf("The data argument '%s' must be integer valued.", k))
+    out[[k]] <- if (intd) as.integer(round(v)) else as.numeric(v)
   }
   for (k in names(spec$fixed)) out[[paste0("fix_", k)]] <- spec$fixed[[k]]
   for (k in spec$rpars) {

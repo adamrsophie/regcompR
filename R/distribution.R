@@ -203,6 +203,35 @@ cat_probs <- function(fam, p, n) {
   matrix(vapply(seq_len(K), function(k) exp(eval_lpdf(fam, rep(k, n), p)), numeric(n)), n, K)
 }
 
+# Log distribution and survival functions, exact in the tails when the
+# family supplies them, and the log probability of an interval
+# P(a < Y <= b) chosen from the tail with usable precision.
+family_lcdf <- function(fam, q, p) {
+  if (!is.null(fam$lcdf)) return(fam$lcdf(q, p))
+  log(family_cdf(fam, q, p))
+}
+family_lccdf <- function(fam, q, p) {
+  if (!is.null(fam$lccdf)) return(fam$lccdf(q, p))
+  log1p(-family_cdf(fam, q, p))
+}
+family_log_interval <- function(fam, a, b, p) {
+  n <- length(a); out <- rep(-Inf, n)
+  pos <- !is.na(a) & !is.na(b) & b > a
+  out[is.na(a) | is.na(b)] <- NA
+  if (!any(pos)) return(out)
+  i <- which(pos); pp <- lapply(p, function(v) if (length(v) == n) v[i] else v)
+  ai <- a[i]; bi <- b[i]
+  lFb <- ifelse(is.infinite(bi) & bi > 0, 0, family_lcdf(fam, ifelse(is.finite(bi), bi, 0), pp))
+  lFa <- ifelse(is.infinite(ai) & ai < 0, -Inf, family_lcdf(fam, ifelse(is.finite(ai), ai, 0), pp))
+  lSa <- ifelse(is.infinite(ai) & ai < 0, 0, family_lccdf(fam, ifelse(is.finite(ai), ai, 0), pp))
+  lSb <- ifelse(is.infinite(bi) & bi > 0, -Inf, family_lccdf(fam, ifelse(is.finite(bi), bi, 0), pp))
+  upper <- lFa > log(0.5)
+  v <- ifelse(upper, log_diff_exp(lSa, lSb), log_diff_exp(lFb, lFa))
+  v[is.nan(v)] <- -Inf
+  out[i] <- v
+  out
+}
+
 family_cdf <- function(fam, q, p) {
   if (fam$variate_type == "categorical") {
     P <- cat_probs(fam, p, length(q))

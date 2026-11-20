@@ -12,8 +12,22 @@ new_spec <- function(fit, newdata, response = FALSE) {
 
 # Linear predictors for a coefficient vector and random effects.
 pred_eta <- function(spec, beta, u, re) {
-  uu <- if (re == "conditional" && length(u)) u else NULL
+  uu <- if (re == "conditional" && length(u)) pad_u(spec, u) else NULL
   compute_eta(spec, beta, uu)
+}
+
+# Fitted random effects placed in a prediction specification whose blocks
+# may carry extra (new) levels after the fitted ones; new levels get zero.
+pad_u <- function(spec, u) {
+  if (length(u) == spec$Q) return(u)
+  out <- numeric(spec$Q); off <- 0
+  for (j in seq_along(spec$blocks)) {
+    b <- spec$blocks[[j]]
+    m <- b$q * (b$n_old %||% b$L)
+    out[spec$u_idx[[j]][seq_len(m)]] <- u[off + seq_len(m)]
+    off <- off + m
+  }
+  out
 }
 
 pars_from <- function(spec, beta, u, re) eta_to_pars(spec, pred_eta(spec, beta, u, re))
@@ -122,12 +136,8 @@ predict.regcomp_fit <- function(object, newdata = NULL,
     if (type == "link") return(do.call(cbind, pred_eta(spec, beta, u, if (re == "marginal") "zero" else re)))
     if (type == "parameter") return(do.call(cbind, pars_from(spec, beta, u, if (re == "marginal") "zero" else re)))
     if (re == "marginal" && spec$Q > 0) {
-      acc <- 0
-      for (m in seq_len(nmarginal)) {
-        ur <- draw_re(spec, theta)
-        acc <- acc + quantity_from_pars(fam, pars_from(spec, beta, ur, "conditional"), type, probs, at)
-      }
-      return(acc / nmarginal)
+      P <- lapply(seq_len(nmarginal), function(m) pars_from(spec, beta, draw_re(spec, theta), "conditional"))
+      return(marginal_quantity(fam, P, type, probs, at))
     }
     quantity_from_pars(fam, pars_from(spec, beta, u, re), type, probs, at)
   }
@@ -247,3 +257,35 @@ log_lik <- function(object, newdata = NULL, ...) {
 
 #' @export
 fitted.regcomp_fit <- function(object, ...) predict(object, type = "mean")
+
+# Summaries of the marginal predictive law, a mixture of the conditional laws
+# over random effect draws `P` (a list of parameter lists).
+marginal_quantity <- function(fam, P, type, probs, at) {
+  avg <- function(tp) Reduce(`+`, lapply(P, function(p) quantity_from_pars(fam, p, tp, probs, at))) / length(P)
+  if (type %in% c("mean", "probability", "density", "cdf", "survival")) return(avg(type))
+  if (type %in% c("variance", "sd")) {
+    m <- sapply(P, function(p) quantity_from_pars(fam, p, "mean", probs, at))
+    m <- matrix(m, ncol = length(P))
+    v <- avg("variance") + rowMeans(m^2) - rowMeans(m)^2
+    return(if (type == "sd") sqrt(v) else v)
+  }
+  # Quantiles: invert the mixture distribution function row by row.
+  pr <- if (type == "median") 0.5 else probs
+  Q <- lapply(P, function(p) quantity_from_pars(fam, p, "quantile", pr, at))
+  Q <- array(unlist(Q), c(length(Q[[1]]) / length(pr), length(pr), length(P)))
+  n <- dim(Q)[1]
+  out <- matrix(NA_real_, n, length(pr))
+  for (i in seq_len(n)) {
+    Pi <- lapply(P, function(p) lapply(p, function(v) if (length(v) == n) v[i] else v))
+    Fm <- function(q) mean(vapply(Pi, function(p) family_cdf(fam, q, p), 0))
+    for (k in seq_along(pr)) {
+      lo <- min(Q[i, k, ]); hi <- max(Q[i, k, ])
+      if (!is.finite(lo) || !is.finite(hi) || lo == hi) { out[i, k] <- lo; next }
+      if (fam$discrete) {
+        while (hi - lo > 1) { mid <- floor((lo + hi) / 2); if (Fm(mid) >= pr[k]) hi <- mid else lo <- mid }
+        out[i, k] <- if (Fm(lo) >= pr[k]) lo else hi
+      } else out[i, k] <- stats::uniroot(function(q) Fm(q) - pr[k], c(lo, hi), tol = 1e-10)$root
+    }
+  }
+  if (type == "median") drop(out) else out
+}

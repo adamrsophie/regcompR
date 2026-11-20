@@ -286,24 +286,43 @@ truncate_dist <- function(base, lower = -Inf, upper = Inf) {
   if (base$variate_type != "scalar") stop_unsupported("Truncation of a vector valued law", base$id)
   if (lower >= upper) stop_input("lower must be smaller than upper.")
   bn <- names(base$pars)
+  if (base$discrete) { lower <- ceiling(lower); upper <- floor(upper) }
   lo_q <- if (base$discrete) lower - 1 else lower
-  lnorm <- function(p) {
-    Fu <- if (is.finite(upper)) family_cdf(base, rep(upper, max(lengths(p))), p) else 1
-    Fl <- if (is.finite(lo_q)) family_cdf(base, rep(lo_q, max(lengths(p))), p) else 0
-    log(pmax(Fu - Fl, 0))
-  }
+  # Log normalizer and conditional probabilities in log space, so a region
+  # far in a tail keeps its mass.
+  lnorm <- function(p) { n <- max(lengths(p))
+    family_log_interval(base, rep(lo_q, n), rep(upper, n), recycle_pars(p, n)) }
   lpdf <- function(y, p) eval_lpdf(base, y, p) - lnorm(p)
   cdf <- function(q, p) {
-    Fl <- if (is.finite(lo_q)) family_cdf(base, rep(lo_q, length(q)), p) else 0
-    Fq <- family_cdf(base, pmin(pmax(q, lower), upper), p)
-    out <- (Fq - Fl) / exp(lnorm(p))
+    n <- length(q); pp <- recycle_pars(p, n)
+    qq <- pmin(pmax(q, lower), upper)
+    out <- exp(family_log_interval(base, rep(lo_q, n), qq, pp) - lnorm(pp))
     out[q < lower] <- 0; out[q >= upper] <- 1
     pmin(pmax(out, 0), 1)
   }
   quantile <- function(pr, p) {
-    Fl <- if (is.finite(lo_q)) family_cdf(base, rep(lo_q, length(pr)), p) else 0
-    Fu <- if (is.finite(upper)) family_cdf(base, rep(upper, length(pr)), p) else 1
-    family_quantile(base, Fl + pr * (Fu - Fl), p)
+    n <- length(pr); pp <- recycle_pars(p, n)
+    Fl <- if (is.finite(lo_q)) family_cdf(base, rep(lo_q, n), pp) else rep(0, n)
+    Fu <- if (is.finite(upper)) family_cdf(base, rep(upper, n), pp) else rep(1, n)
+    out <- family_quantile(base, Fl + pr * (Fu - Fl), pp)
+    # Where the region is too far in a tail for that, solve on the log scale.
+    bad <- which(!(Fu - Fl > 1e-10) | !is.finite(out) | out < lower | out > upper)
+    for (i in bad) {
+      pi <- lapply(pp, `[`, i)
+      g <- function(q) family_log_interval(base, lo_q, q, pi) - lnorm(pi) - log(pr[i])
+      if (pr[i] <= 0) { out[i] <- lower; next }
+      if (pr[i] >= 1) { out[i] <- upper; next }
+      hi <- if (is.finite(upper)) upper else lower + 1
+      while (!is.finite(upper) && g(hi) < 0) hi <- lower + 2 * (hi - lower)
+      lo <- if (is.finite(lower)) lower else hi - 1
+      while (!is.finite(lower) && g(lo) > 0) lo <- hi - 2 * (hi - lo)
+      if (base$discrete) {
+        lo <- floor(lo); hi <- ceiling(hi)
+        while (hi - lo > 1) { mid <- floor((lo + hi) / 2); if (g(mid) >= 0) hi <- mid else lo <- mid }
+        out[i] <- if (g(lo) >= 0) lo else hi
+      } else out[i] <- stats::uniroot(g, c(lo, hi), tol = 1e-12)$root
+    }
+    out
   }
   support <- function(p) {
     s <- base$support(p)
@@ -319,11 +338,14 @@ truncate_dist <- function(base, lower = -Inf, upper = Inf) {
       sprintf("log_diff_exp(%s, %s)", stan_fill(base$stan$lcdf, format(upper), pm), stan_fill(base$stan$lcdf, format(lo_q), pm))
       else if (is.finite(lower)) stan_fill(base$stan$lccdf, format(lo_q), pm)
       else stan_fill(base$stan$lcdf, format(upper), pm)
+    guard <- paste(c(if (is.finite(lower)) sprintf("y < %s", format(lower)),
+                     if (is.finite(upper)) sprintf("y > %s", format(upper))), collapse = " || ")
     stan <- list(native = FALSE, needs = base$stan$needs,
       functions = paste0(base$stan$functions, sprintf("
   real %s_%s(%s y, %s) {
+    if (%s) return negative_infinity();
     return %s - %s;
-  }", fn, if (base$discrete) "lpmf" else "lpdf", yt, args, stan_fill(base$stan$lpdf, "y", pm), nrm)),
+  }", fn, if (base$discrete) "lpmf" else "lpdf", yt, args, guard, stan_fill(base$stan$lpdf, "y", pm), nrm)),
       lpdf = sprintf("%s_%s({y} | %s)", fn, if (base$discrete) "lpmf" else "lpdf",
                      paste(sprintf("{%s}", bn), collapse = ", ")))
   }

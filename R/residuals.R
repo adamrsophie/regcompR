@@ -38,7 +38,9 @@ pit_values <- function(fam, y, pars, cmat = NULL) {
   if (!fam$variate_type %in% c("scalar", "categorical")) stop_unsupported("PIT values for a vector valued response", fam$id)
   if (fam$variate_type == "scalar") pars <- recycle_pars(pars, n)
   lo <- y; up <- y
-  if (!is.null(cmat)) { lo <- cmat[, "lower"]; up <- cmat[, "upper"] }
+  if (!is.null(cmat)) {
+    lo <- pmax(cmat[, "lower"], cmat[, "tlower"]); up <- pmin(cmat[, "upper"], cmat[, "tupper"])
+  }
   Fup <- ifelse(is.infinite(up) & up > 0, 1, family_cdf(fam, ifelse(is.finite(up), up, 0), pars))
   lo_q <- if (fam$discrete) lo - 1 else lo
   Flo <- ifelse(is.infinite(lo) & lo < 0, 0, family_cdf(fam, ifelse(is.finite(lo_q), lo_q, 0), pars))

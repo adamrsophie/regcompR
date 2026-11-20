@@ -87,14 +87,21 @@ register_family(family_def("mie", "Mie phase function (scattering angle law)", "
   status = "validated"))
 
 register_family(family_def("truncated_normal", "Truncated normal", "real",
-  list(loc_par("mu"), scale_par("sigma"), P("a", "real", role = "lower bound", link = "identity", data = TRUE, default = -Inf),
-       P("b", "real", role = "upper bound", link = "identity", data = TRUE, default = Inf)),
+  list(loc_par("mu"), scale_par("sigma"), P("a", "any", role = "lower bound", link = "identity", data = TRUE, default = -Inf),
+       P("b", "any", role = "upper bound", link = "identity", data = TRUE, default = Inf)),
   support = function(p) list(lower = p$a, upper = p$b),
+  check = function(p) if (any(p$a >= p$b, na.rm = TRUE)) "truncated_normal needs a < b.",
   lpdf = function(y, p) ifelse(y < p$a | y > p$b, -Inf, stats::dnorm(y, p$mu, p$sigma, log = TRUE) -
-    log(stats::pnorm(p$b, p$mu, p$sigma) - stats::pnorm(p$a, p$mu, p$sigma))),
-  cdf = function(q, p) { lo <- stats::pnorm(p$a, p$mu, p$sigma)
-    pmin(pmax((stats::pnorm(q, p$mu, p$sigma) - lo) / (stats::pnorm(p$b, p$mu, p$sigma) - lo), 0), 1) },
-  quantile = function(pr, p) { lo <- stats::pnorm(p$a, p$mu, p$sigma); stats::qnorm(lo + pr * (stats::pnorm(p$b, p$mu, p$sigma) - lo), p$mu, p$sigma) },
+    family_log_interval(get_family("normal"), p$a, p$b, p[c("mu", "sigma")])),
+  cdf = function(q, p) { N <- get_family("normal"); pn <- p[c("mu", "sigma")]
+    out <- exp(family_log_interval(N, p$a, pmin(pmax(q, p$a), p$b), pn) - family_log_interval(N, p$a, p$b, pn))
+    out[q <= p$a] <- 0; out[q >= p$b] <- 1; out },
+  quantile = function(pr, p) { la <- stats::pnorm(p$a, p$mu, p$sigma, log.p = TRUE)
+    upper <- la > log(0.5)
+    sa <- stats::pnorm(p$a, p$mu, p$sigma, lower.tail = FALSE); sb <- stats::pnorm(p$b, p$mu, p$sigma, lower.tail = FALSE)
+    fa <- stats::pnorm(p$a, p$mu, p$sigma); fb <- stats::pnorm(p$b, p$mu, p$sigma)
+    ifelse(upper, stats::qnorm(sa - pr * (sa - sb), p$mu, p$sigma, lower.tail = FALSE),
+           stats::qnorm(fa + pr * (fb - fa), p$mu, p$sigma)) },
   references = "Johnson, Kotz and Balakrishnan (1994), Continuous Univariate Distributions, vol. 1, sec. 13.10.",
   reference = ref_impl("truncnorm", function(y, p) log(truncnorm::dtruncnorm(y, p$a, p$b, p$mu, p$sigma))),
   stan = sfun("truncated_normal", c("mu", "sigma", "a", "b"),

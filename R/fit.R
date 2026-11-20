@@ -173,6 +173,12 @@ build_spec <- function(formula, dots, fam, data, weights = NULL, links = NULL,
   fl <- parse_formulas(formula, forms, fam)
   for (k in setdiff(fam$extra$fixed_unless_formula, attr(fl, "given")))
     if (is.null(fixed[[k]])) fixed[[k]] <- fam$pars[[k]]$default
+  # Parameters that take no formula, no data and are not estimated keep
+  # their family default.
+  for (k in setdiff(names(fam$pars), c(names(fl), names(fixed), data_pars(fam)))) {
+    pk <- fam$pars[[k]]
+    if (is.null(pk$estimate) && !is.null(pk$default)) fixed[[k]] <- pk$default
+  }
   for (k in names(fixed)) {
     if (!k %in% names(fam$pars)) stop_input(sprintf("Unknown fixed parameter '%s'.", k))
     fl[[k]] <- NULL
@@ -197,6 +203,7 @@ build_spec <- function(formula, dots, fam, data, weights = NULL, links = NULL,
   for (k in rpars) {
     preds[[k]] <- build_predictor(expand_dot(rhs_of(fl[[k]]), data, all.vars(formula[[2]])), data, k,
       xlev = if (!is.null(prev)) prev$preds[[k]]$xlev,
+      prev_pred = if (!is.null(prev)) prev$preds[[k]],
       smooth_specs = if (!is.null(prev)) prev$preds[[k]]$smooths,
       re_levels = if (!is.null(prev)) { pb <- prev$preds[[k]]$blocks; lab <- vapply(pb, `[[`, "", "label")
         c(stats::setNames(lapply(pb, `[[`, "levels"), lab), stats::setNames(lapply(pb, `[[`, "coords"), paste0(".coords.", lab))) })
@@ -265,7 +272,13 @@ build_spec <- function(formula, dots, fam, data, weights = NULL, links = NULL,
     for (j in js) Zk[, u_idx[[j]]] <- block_Z(blocks[[j]], n)
     Z[[k]] <- Zk
   }
-  structure(list(
+  if (is.null(prev) && length(fixed)) {
+    # Fixed values must satisfy the parameter domains and the family constraint.
+    fx <- fixed[!vapply(fixed, is.null, TRUE)]
+    for (k in names(fx)) if (!is.null(fam$pars[[k]]) && !all(check_par_domain(fam$pars[[k]], fx[[k]]), na.rm = TRUE))
+      stop_domain(sprintf("Fixed parameter '%s' of '%s' is outside its %s domain.", k, fam$id, fam$pars[[k]]$domain))
+  }
+  spec <- structure(list(
     fam = fam, formulas = fl, rpars = rpars, links = lk, preds = preds,
     y = y, cmat = cmat, n = n, weights = w, data_pars = dp, fixed = fixed,
     beta_idx = beta_idx, beta_names = beta_names, blocks = blocks,
@@ -273,6 +286,16 @@ build_spec <- function(formula, dots, fam, data, weights = NULL, links = NULL,
     data_args = dargs, response_name = paste(deparse(formula[[2]]), collapse = ""),
     aux = aux, ylev = ylev
   ), class = "regcomp_spec")
+  if (is.null(prev) && length(fixed) && !is.null(fam$check) && length(rpars)) {
+    # The family constraint with the fixed values and the starting values of
+    # the free parameters (the check needs every parameter).
+    pr <- tryCatch(eta_to_pars(spec, compute_eta(spec, start_values(spec, regcomp_control()))),
+                   error = function(e) NULL)
+    msg <- if (!is.null(pr)) tryCatch(fam$check(pr), error = function(e) NULL)
+    if (is.character(msg) && length(msg) && nzchar(msg[1]))
+      stop_domain(paste("With the fixed parameter values:", msg[1]))
+  }
+  spec
 }
 
 # Number of covariance parameters of a block, starting values and names.
@@ -374,7 +397,7 @@ ml_gradient <- function(spec, beta, u = NULL) {
 }
 
 # Inner Laplace problem: mode of the random effects for given beta, theta.
-laplace_inner <- function(spec, beta, theta, u0, control) {
+laplace_inner <- function(spec, beta, theta, u0, control, retry = TRUE) {
   Lam <- re_precision(spec, theta)
   u <- if (is.null(u0)) rep(0, spec$Q) else u0
   rk <- spec$rpars[!vapply(spec$rpars, function(k) is.null(spec$Z[[k]]), TRUE)]
@@ -409,6 +432,7 @@ laplace_inner <- function(spec, beta, theta, u0, control) {
   f <- fval(u)
   for (it in seq_len(control$inner_maxit)) {
     dd <- derivs(u)
+    if (max(abs(dd$grad)) < control$inner_tol) break
     fc <- factor(dd$negH)
     step <- as.vector(Matrix::solve(fc$ch, dd$grad))
     if (max(abs(step)) < 1e-9) break
@@ -424,9 +448,17 @@ laplace_inner <- function(spec, beta, theta, u0, control) {
     u <- un; f <- fn
     if (moved == 0) break
   }
-  ld <- if (fc$lam == 0 && !is.null(fc$ch)) 2 * as.numeric(Matrix::determinant(fc$ch, logarithm = TRUE, sqrt = TRUE)$modulus) else
-    tryCatch(as.numeric(Matrix::determinant(dd$negH, logarithm = TRUE)$modulus), error = function(e) NA_real_)
-  list(u = u, f = f, logdet = ld, negH = dd$negH)
+  # Curvature at the accepted point. The Laplace approximation needs a
+  # maximum: a positive definite negative Hessian without damping and a
+  # small score. Otherwise retry once from zero, then give up.
+  dd <- derivs(u)
+  fc <- factor(dd$negH)
+  ok <- fc$lam == 0 && !is.null(fc$ch) && is.finite(f) &&
+    max(abs(dd$grad)) < sqrt(control$inner_tol) * (1 + max(abs(u)))
+  if (!ok && retry && !is.null(u0) && any(u0 != 0))
+    return(laplace_inner(spec, beta, theta, NULL, control, retry = FALSE))
+  ld <- if (ok) 2 * as.numeric(Matrix::determinant(fc$ch, logarithm = TRUE, sqrt = TRUE)$modulus) else NA_real_
+  list(u = u, f = f, logdet = ld, negH = dd$negH, converged = ok)
 }
 
 # Laplace approximation of the marginal log likelihood.
@@ -538,6 +570,9 @@ fit_ml <- function(spec, control, penalty = NULL) {
     opt <- robust_nlminb(c(b1, theta0), obj_re, NULL, control)
     beta <- opt$par[seq_len(np)]; theta <- opt$par[-seq_len(np)]
     inner <- laplace_inner(spec, beta, theta, state$u, control)
+    if (!isTRUE(inner$converged))
+      warning("The random effects mode at the estimate is not a well defined maximum; ",
+              "the Laplace approximation is unreliable.", call. = FALSE)
     u <- inner$u
     cov <- NULL
     if (control$hessian) {

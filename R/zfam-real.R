@@ -11,6 +11,7 @@ register_family(family_def(
   lpdf = function(y, p) stats::dnorm(y, p$mu, p$sigma, log = TRUE),
   cdf = function(q, p) stats::pnorm(q, p$mu, p$sigma),
   lccdf = function(q, p) stats::pnorm(q, p$mu, p$sigma, lower.tail = FALSE, log.p = TRUE),
+  lcdf = function(q, p) stats::pnorm(q, p$mu, p$sigma, log.p = TRUE),
   quantile = function(pr, p) stats::qnorm(pr, p$mu, p$sigma),
   rng = function(n, p) stats::rnorm(n, p$mu, p$sigma),
   mean = function(p) p$mu, variance = function(p) p$sigma^2,

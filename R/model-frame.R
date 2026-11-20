@@ -156,15 +156,24 @@ drop_smooths <- function(term) {
 # Build the design of one parameter: fixed matrix, offset, random blocks.
 # `rhs` is a one sided formula.
 build_predictor <- function(rhs, data, par, xlev = NULL, smooth_specs = NULL,
-                            re_levels = NULL) {
+                            re_levels = NULL, prev_pred = NULL) {
   env <- environment(rhs)
-  f_fixed <- drop_smooths(drop_bars(rhs))
-  if (is.null(f_fixed)) f_fixed <- ~1
-  f_fixed <- stats::as.formula(f_fixed, env = env)
-  mf <- stats::model.frame(f_fixed, data, na.action = stats::na.pass,
-                           xlev = xlev, drop.unused.levels = is.null(xlev))
-  tt <- stats::terms(mf)
-  X <- stats::model.matrix(tt, mf)
+  if (!is.null(prev_pred)) {
+    # Prediction: replay the fitted terms (data dependent bases such as
+    # poly() and scale() through predvars) and contrasts.
+    tt <- prev_pred$terms
+    mf <- stats::model.frame(tt, data, na.action = stats::na.pass, xlev = xlev)
+    X <- stats::model.matrix(tt, mf, contrasts.arg = prev_pred$contrasts)
+  } else {
+    f_fixed <- drop_smooths(drop_bars(rhs))
+    if (is.null(f_fixed)) f_fixed <- ~1
+    f_fixed <- stats::as.formula(f_fixed, env = env)
+    mf <- stats::model.frame(f_fixed, data, na.action = stats::na.pass,
+                             xlev = xlev, drop.unused.levels = is.null(xlev))
+    tt <- stats::terms(mf)
+    X <- stats::model.matrix(tt, mf)
+  }
+  contr <- attr(X, "contrasts")
   off <- stats::model.offset(mf)
   if (is.null(off)) off <- rep(0, nrow(X))
   # Random effects.
@@ -191,8 +200,17 @@ build_predictor <- function(rhs, data, par, xlev = NULL, smooth_specs = NULL,
       Xr <- outer(match(ck, uk), seq_along(uk), `==`) * 1
       colnames(Xr) <- paste0("(", apply(coords, 1, paste, collapse = ","), ")")
     } else {
-      lhs <- stats::as.formula(call("~", b[[2]]), env = env)
-      Xr <- stats::model.matrix(lhs, stats::model.frame(lhs, data, na.action = stats::na.pass))
+      key0 <- paste(deparse(bb$key, width.cutoff = 500L), collapse = "")
+      pb <- if (!is.null(prev_pred)) Filter(function(x) identical(x$label, key0), prev_pred$blocks)
+      if (length(pb) && !is.null(pb[[1]]$rterms)) {
+        rmf <- stats::model.frame(pb[[1]]$rterms, data, na.action = stats::na.pass, xlev = pb[[1]]$rxlev)
+        Xr <- stats::model.matrix(pb[[1]]$rterms, rmf, contrasts.arg = pb[[1]]$rcontr)
+      } else {
+        lhs <- stats::as.formula(call("~", b[[2]]), env = env)
+        rmf <- stats::model.frame(lhs, data, na.action = stats::na.pass)
+        Xr <- stats::model.matrix(lhs, rmf)
+      }
+      rterms <- stats::terms(rmf); rxlev <- stats::.getXlevels(rterms, rmf); rcontr <- attr(Xr, "contrasts")
     }
     if (ncol(Xr) == 1 && struct %in% c("us", "cs", "homcs")) struct <- "diag"
     corr <- struct == "us"
@@ -217,13 +235,21 @@ build_predictor <- function(rhs, data, par, xlev = NULL, smooth_specs = NULL,
         tryCatch(eval_group(gexpr, data, env), error = function(e) rep(NA, nrow(data)))
       lev <- if (!is.null(re_levels[[key]])) re_levels[[key]] else
         levels(droplevels(as.factor(g)))
+      n_old <- length(lev)
+      # Prediction: levels not seen in fitting become new groups after the
+      # fitted ones (their effects are zero when conditioning, and drawn
+      # independently for marginal predictions and simulation).
+      if (!is.null(re_levels[[key]])) lev <- c(lev, setdiff(unique(stats::na.omit(as.character(g))), lev))
       gi <- match(as.character(g), lev)
     }
     blocks[[length(blocks) + 1L]] <- list(
       label = key, group = paste(deparse(gexpr), collapse = ""),
       terms = colnames(Xr), Xr = Xr, gi = gi, levels = lev,
       q = ncol(Xr), L = length(lev), corr = corr && ncol(Xr) > 1,
-      struct = struct, coords = coords, W = W, type = "re", par = par)
+      struct = struct, coords = coords, W = W, type = "re", par = par,
+      n_old = if (is.null(W) && is.null(coords)) n_old,
+      rterms = if (is.null(coords)) rterms, rxlev = if (is.null(coords)) rxlev,
+      rcontr = if (is.null(coords)) rcontr)
   }
   # Smooth terms through mgcv's mixed model representation.
   sm <- find_smooths(rhs[[length(rhs)]])
@@ -259,7 +285,8 @@ build_predictor <- function(rhs, data, par, xlev = NULL, smooth_specs = NULL,
     }
     smooth_info[[key]] <- spec
   }
-  list(X = X, offset = off, terms = tt, xlev = stats::.getXlevels(tt, mf),
+  list(X = X, offset = off, terms = tt, contrasts = contr,
+       xlev = if (!is.null(prev_pred)) xlev else stats::.getXlevels(tt, mf),
        blocks = blocks, smooths = smooth_info, formula = rhs)
 }
 

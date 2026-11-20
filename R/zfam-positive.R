@@ -111,6 +111,7 @@ posfam("weibull", "Weibull", list(shp("shape"), P("scale", "positive", role = "s
   mean_formula = "scale Gamma(1 + 1/shape)", variance_formula = "scale^2 (Gamma(1 + 2/shape) - Gamma(1 + 1/shape)^2)",
   lpdf = function(y, p) stats::dweibull(y, p$shape, p$scale, log = TRUE), cdf = function(q, p) stats::pweibull(q, p$shape, p$scale),
   lccdf = function(q, p) -(q / p$scale)^p$shape,
+  lcdf = function(q, p) stats::pweibull(q, p$shape, p$scale, log.p = TRUE),
   quantile = function(pr, p) stats::qweibull(pr, p$shape, p$scale), rng = function(n, p) stats::rweibull(n, p$shape, p$scale),
   mean = function(p) p$scale * gamma(1 + 1 / p$shape),
   variance = function(p) p$scale^2 * (gamma(1 + 2 / p$shape) - gamma(1 + 1 / p$shape)^2),
