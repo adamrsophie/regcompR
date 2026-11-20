@@ -35,7 +35,7 @@ fit <- regcomp(y ~ x + (1 | g), family = "poisson", data = d)
 ranef_regcomp(fit)$varcorr
 #> $`lambda:1 | g`
 #> $`lambda:1 | g`$sd
-#> [1] 0.5321327
+#> [1] 0.5321735
 #> 
 #> $`lambda:1 | g`$cor
 #>      [,1]

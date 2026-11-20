@@ -150,7 +150,7 @@ available, and random effects work as for any other family:</p>
 <code class="sourceCode R"><span><span class="va">fit_m</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/regcomp.html">regcomp</a></span><span class="op">(</span><span class="va">y</span> <span class="op">~</span> <span class="va">x</span> <span class="op">+</span> <span class="va">z</span> <span class="op">+</span> <span class="op">(</span><span class="fl">1</span> <span class="op">|</span> <span class="va">g</span><span class="op">)</span>, family <span class="op">=</span> <span class="st">"cumulative_logit"</span>, data <span class="op">=</span> <span class="va">d</span><span class="op">)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/Log.html" class="external-link">exp</a></span><span class="op">(</span><span class="va">fit_m</span><span class="op">$</span><span class="va">theta</span><span class="op">)</span>   <span class="co"># random intercept standard deviation (true value 0.7)</span></span>
 <span><span class="co">#&gt; mu:1 | g:log_sd((Intercept)) </span></span>
-<span><span class="co">#&gt;                    0.5912711</span></span></code></pre></div>
+<span><span class="co">#&gt;                    0.5912834</span></span></code></pre></div>
 </div>
 <div class="section level2">
 <h2 id="nominal-responses">Nominal responses<a class="anchor" aria-label="anchor" href="#nominal-responses"></a>

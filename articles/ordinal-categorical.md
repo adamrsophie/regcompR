@@ -83,7 +83,7 @@ also available, and random effects work as for any other family:
 fit_m <- regcomp(y ~ x + z + (1 | g), family = "cumulative_logit", data = d)
 exp(fit_m$theta)   # random intercept standard deviation (true value 0.7)
 #> mu:1 | g:log_sd((Intercept)) 
-#>                    0.5912711
+#>                    0.5912834
 ```
 
 ## Nominal responses
