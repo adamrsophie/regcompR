@@ -267,12 +267,14 @@ posterior predictive law.</p>
 </h2>
 <p>Families with a Stan density, operators built from them, ordinal and
 nominal models, all random effect covariance structures and multiple
-membership terms are supported by the Stan backends. Continuous laws
-with point masses inside their density (an inflated or hurdle continuous
-law) are fitted by the <code>"ml"</code> and <code>"tmb"</code> engines
-only. The BUGS backends support families with BUGS densities and
-unstructured random effects. <code><a href="../reference/family_capabilities.html">family_capabilities()</a></code> reports
-what is available for a family.</p>
+membership terms are supported by the Stan backends, as are a single
+inflation or hurdle point on a continuous law (zero inflated or zero
+adjusted gamma, say). Other operators applied to a law that already has
+point masses (truncation, censoring, copulas, several inflation points)
+are fitted by the <code>"ml"</code> and <code>"tmb"</code> engines only.
+The BUGS backends support families with BUGS densities and unstructured
+random effects. <code><a href="../reference/family_capabilities.html">family_capabilities()</a></code> reports what is
+available for a family.</p>
 <div class="sourceCode" id="cb10"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="../reference/family_capabilities.html">family_capabilities</a></span><span class="op">(</span><span class="st">"generalized_poisson"</span><span class="op">)</span><span class="op">[</span><span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"stan"</span>, <span class="st">"tmb"</span>, <span class="st">"bugs"</span><span class="op">)</span><span class="op">]</span></span>
 <span><span class="co">#&gt; $stan</span></span>

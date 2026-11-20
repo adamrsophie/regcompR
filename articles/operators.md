@@ -330,10 +330,11 @@ of returning a wrong answer:
 - inflation or hurdle points that are not on the lattice of a discrete
   base.
 
-Stan code is generated for operators whose parts have Stan code; laws
-with point masses inside a continuous density (an inflated or hurdle
-continuous law, for example) are fitted by the `"ml"` and `"tmb"`
-engines only.
+Stan code is generated for operators whose parts have Stan code,
+including a single inflation or hurdle point on a continuous law; an
+operator applied to a law that already has point masses (truncation,
+censoring or a copula of a zero inflated gamma, for example) is fitted
+by the `"ml"` and `"tmb"` engines only.
 [`family_capabilities()`](https://adamrsophie.github.io/regcompR/reference/family_capabilities.md)
 reports what is available for a given family.
 
@@ -343,4 +344,6 @@ family_capabilities(hurdle("poisson"))$stan
 #> [1] "generated"
 family_capabilities(inflate("gamma"))$stan
 #> [1] "generated"
+family_capabilities(truncate_dist(inflate("gamma"), 0, 5))$stan
+#> [1] "unavailable"
 ```

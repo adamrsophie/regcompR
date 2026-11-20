@@ -170,7 +170,7 @@ try(compare_models(fp, regcomp(log1p(y) ~ x, family = "normal", data = d)))
 
 identifiability_check(fnb)
 #> $condition_number
-#> [1] 8.593197
+#> [1] 8.593194
 #> 
 #> $weak_directions
 #> list()
