@@ -61,16 +61,23 @@ parse_prior <- function(s) {
   args <- vapply(as.list(e)[-1], function(a) as.numeric(eval(a, baseenv())), 0)
   if (length(args) != prior_dists[[nm]])
     stop_input(sprintf("The prior %s needs %d arguments.", nm, prior_dists[[nm]]))
+  bad <- !all(is.finite(args)) || switch(nm,
+    normal = , cauchy = , logistic = args[2] <= 0, student_t = args[1] <= 0 || args[3] <= 0,
+    exponential = , lkj = args[1] <= 0, gamma = any(args <= 0), uniform = args[1] >= args[2], FALSE)
+  if (bad) stop_input(sprintf("The prior '%s' has invalid parameters.", s))
   list(name = nm, args = args)
 }
 
 find_prior <- function(priors, class, par, coef = NULL) {
-  hit <- NULL
+  # The most specific matching entry wins (coefficient, then parameter,
+  # then class); among equally specific entries the last one wins.
+  hit <- NULL; best <- -1
   for (p in priors) {
     if (p$class != class) next
     if (!is.null(p$par) && !identical(p$par, par)) next
     if (!is.null(p$coef) && !identical(p$coef, coef)) next
-    hit <- p   # later, more specific entries win
+    sp <- 2 * (!is.null(p$coef)) + (!is.null(p$par))
+    if (sp >= best) { hit <- p; best <- sp }
   }
   if (is.null(hit)) {
     hit <- switch(class,

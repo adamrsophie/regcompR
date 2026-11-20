@@ -273,7 +273,17 @@ numeric_moment_cont <- function(lpdf, pars, fun, lower, upper) {
   vapply(seq_len(n), function(i) {
     pi_ <- lapply(pars, `[`, i)
     f <- function(t) fun(t) * exp(lpdf(t, lapply(pi_, rep_len, length(t))))
-    tryCatch(integrate_safe(f, lower[i], upper[i], rel_tol = 1e-8),
-             regcomp_numerical_failure = function(e) NA_real_)
+    # Integrate the two tails separately so that divergent tails cannot
+    # cancel into a principal value.
+    c0 <- if (is.finite(lower[i]) && is.finite(upper[i])) (lower[i] + upper[i]) / 2 else
+      if (is.finite(lower[i])) lower[i] + 1 else if (is.finite(upper[i])) upper[i] - 1 else 0
+    part <- function(a, b) tryCatch(integrate_safe(f, a, b, rel_tol = 1e-8),
+      regcomp_numerical_failure = function(e) NA_real_, error = function(e) NA_real_)
+    # stats::integrate can report success on a divergent tail: require
+    # t |f(t)| to decay along each infinite end.
+    diverges <- function(sgn) { t <- c0 + sgn * c(1e6, 1e12) * (1 + abs(c0))
+      g <- abs(t * f(t)); is.finite(g[1]) && g[1] > 0 && !(g[2] < 1e-3 * g[1]) }
+    if ((!is.finite(upper[i]) && diverges(1)) || (!is.finite(lower[i]) && diverges(-1))) return(NA_real_)
+    part(lower[i], c0) + part(c0, upper[i])
   }, 0)
 }

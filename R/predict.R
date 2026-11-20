@@ -250,8 +250,10 @@ log_lik <- function(object, newdata = NULL, ...) {
   }
   f <- function(beta, u) obs_loglik(spec$fam, spec$y, pars_from(spec, beta, u, "conditional"), spec$cmat)
   if (object$inference == "bayesian") {
-    t(sapply(seq_len(nrow(object$draws)), function(s)
-      f(object$draws[s, spec$beta_names], if (length(object$u_draws)) object$u_draws[s, ] else NULL)))
+    S <- nrow(object$draws)
+    out <- matrix(NA_real_, S, spec$n)
+    for (s in seq_len(S)) out[s, ] <- f(object$draws[s, spec$beta_names], if (length(object$u_draws)) object$u_draws[s, ] else NULL)
+    out
   } else f(object$coefficients, object$u)
 }
 

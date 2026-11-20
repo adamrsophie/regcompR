@@ -48,6 +48,10 @@ bugs_program <- function(spec, priors = NULL, dialect = "jags") {
   useweights <- any(spec$weights != 1)
   if (useweights && is.null(bg$loglik))
     stop_unsupported("Weights with this family in the BUGS engines", fam$id)
+  # The zeros trick needs a known bound on the weighted log likelihood:
+  # log masses are at most 0, continuous log densities have no bound.
+  if ((useweights || is.null(bg$native)) && !fam$discrete)
+    stop_unsupported("Weights or a non native likelihood for a continuous family in the BUGS engines (use a Stan runner)", fam$id)
   L <- c("model {", "  for (i in 1:N) {")
   for (k in spec$rpars) {
     e <- sprintf("inprod(X_%s[i, ], b_%s[]) + off_%s[i]", k, k, k)
@@ -65,7 +69,7 @@ bugs_program <- function(spec, priors = NULL, dialect = "jags") {
     L <- c(L, sprintf("    y[i] ~ %s", stan_fill(bg$native, "y[i]", pm)))
   } else {
     L <- c(L, sprintf("    ll[i] <- %s", stan_fill(bg$loglik, "y[i]", pm)),
-           "    zeros[i] ~ dpois(10000 - w[i] * ll[i])")
+           "    zeros[i] ~ dpois(1.0E-10 - w[i] * ll[i])")
   }
   L <- c(L, "  }")
   for (k in spec$rpars) {

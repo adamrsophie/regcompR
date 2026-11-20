@@ -115,7 +115,11 @@ gee <- function(formula, data, id, family = stats::gaussian(),
   X <- stats::model.matrix(stats::terms(mf), mf)
   off <- stats::model.offset(mf); if (is.null(off)) off <- rep(0, nrow(X))
   if (is.matrix(y)) { w0 <- rowSums(y); y <- y[, 1] / w0 } else w0 <- rep(1, length(y))
+  # Binomial factor responses: first level is failure, as in glm().
+  if (is.factor(y)) y <- as.numeric(y != levels(y)[1])
+  if (is.logical(y)) y <- as.numeric(y)
   idv <- eval(substitute(id), data, parent.frame())
+  if (length(idv) != length(y) || anyNA(idv)) stop_input("id must give a cluster for every row (no missing values).")
   wv <- eval(substitute(waves), data, parent.frame())
   pw <- eval(substitute(weights), data, parent.frame())
   pw <- w0 * if (is.null(pw)) 1 else pw
@@ -142,15 +146,22 @@ gee <- function(formula, data, id, family = stats::gaussian(),
     phi <- sum(r^2) / (n - p)
     # Working correlation by least squares on the pairwise products of
     # standardized residuals (the second estimating equation of geepack).
-    if (corstr %in% c("exchangeable", "ar1")) {
+    if (corstr == "exchangeable") {
+      # Sum of pair products per cluster: ((sum r)^2 - sum r^2) / 2.
+      sp <- 0; np <- 0
+      for (i in cl) if (length(i) > 1) { ri <- r[i]; sp <- sp + (sum(ri)^2 - sum(ri^2)) / 2; np <- np + length(i) * (length(i) - 1) / 2 }
+      mmax <- max(lengths(cl))
+      alpha <- if (np > 0) sp / np / (sum(r^2) / n) else 0
+      # Keep the working correlation positive definite for every cluster.
+      if (mmax > 1) alpha <- min(max(alpha, -1 / (mmax - 1) + 1e-6), 1 - 1e-6)
+    } else if (corstr == "ar1") {
       z <- NULL; lag <- NULL
       for (i in cl) if (length(i) > 1) {
         pr <- utils::combn(length(i), 2)
         z <- c(z, r[i][pr[1, ]] * r[i][pr[2, ]]); lag <- c(lag, abs(wv[i][pr[1, ]] - wv[i][pr[2, ]]))
       }
       z <- z / (sum(r^2) / n)
-      alpha <- if (corstr == "exchangeable") mean(z) else
-        stats::optimize(function(a) sum((z - sign(a)^lag * abs(a)^lag)^2), c(-0.999, 0.999), tol = 1e-10)$minimum
+      alpha <- stats::optimize(function(a) sum((z - sign(a)^lag * abs(a)^lag)^2), c(-0.999, 0.999), tol = 1e-10)$minimum
     } else if (corstr == "unstructured") {
       S <- matrix(0, Tmax, Tmax); N <- matrix(0, Tmax, Tmax)
       for (i in cl) { t <- wv[i]; S[t, t] <- S[t, t] + tcrossprod(r[i]); N[t, t] <- N[t, t] + 1 }

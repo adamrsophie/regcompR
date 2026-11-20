@@ -4,6 +4,7 @@
 
 gen_family <- function(base, tag, display, newpars, T, logt, Tinv = NULL, formula = "", refs = character()) {
   base <- get_family(base)
+  reject_atoms(base, "A CDF generator")
   if (base$variate_type != "scalar") stop_unsupported("A generator on a vector valued law", base$id)
   wanted <- vapply(newpars, `[[`, "", "name")
   actual <- character(0)
@@ -308,12 +309,17 @@ power_series_min <- function(base, series = c("geometric", "poisson", "logarithm
 #' cg <- contaminated("gamma", par = "sigma")
 weighted <- function(base, k = 1) {
   base <- get_family(base)
+  if (k == 0) return(base)
+  if (k < 0) stop_input("k must be nonnegative.")
   logm <- function(p) {
     n <- max(lengths(p))
     vapply(seq_len(n), function(i) {
       pi_ <- lapply(p, function(v) v[(i - 1) %% length(v) + 1])
       m <- if (base$discrete) {
-        ks <- 0:20000; sum(ks^k * exp(eval_lpdf(base, ks, lapply(pi_, rep, length(ks)))))
+        s <- base$support(pi_)
+        hi <- if (is.finite(s$upper)) s$upper else family_quantile(base, 1 - 1e-16, pi_) * 2 + 100
+        if (hi > 1e7) stop_numerical("The weighted normalizer needs more than 1e7 terms.")
+        ks <- max(s$lower, 0):hi; sum(ks^k * exp(eval_lpdf(base, ks, lapply(pi_, rep, length(ks)))))
       } else {
         s <- base$support(pi_)
         stats::integrate(function(y) y^k * exp(eval_lpdf(base, y, lapply(pi_, rep, length(y)))),
@@ -344,6 +350,9 @@ contaminated <- function(base, par) {
     p[[dn]] * family_cdf(base, q, p[bn]) + (1 - p[[dn]]) * family_cdf(base, q, p2) } else NULL
   op_family(base, sprintf("contaminated(%s, %s)", base$id, par), sprintf("Contaminated %s", base$display_name),
             pars, lpdf, cdf = cdf, operator = list(type = "contaminated", base = base, par = par),
+            support = function(p) { p2 <- p[bn]; p2[[par]] <- p2[[par]] * p[[en]]
+              s1 <- base$support(p[bn]); s2 <- base$support(p2)
+              list(lower = pmin(s1$lower, s2$lower), upper = pmax(s1$upper, s2$upper)) },
             formula = sprintf("delta f(y) + (1 - delta) f(y; %s * eta)", par))
 }
 

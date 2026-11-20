@@ -30,9 +30,9 @@ tmb_family_key <- function(fam) {
 
 tmb_linkinv <- function(name) switch(name,
   identity = function(x) x, log = function(x) exp(x),
-  logit = function(x) 1 / (1 + exp(-x)), probit = function(x) RTMB::pnorm(x),
-  cloglog = function(x) 1 - exp(-exp(x)), inverse = function(x) 1 / x,
-  sqrt = function(x) x^2, softplus = function(x) log(1 + exp(x)),
+  logit = function(x) exp(-RTMB::logspace_add(0 * x, -x)), probit = function(x) RTMB::pnorm(x),
+  cloglog = function(x) -expm1(-exp(x)), inverse = function(x) 1 / x,
+  sqrt = function(x) x^2, softplus = function(x) RTMB::logspace_add(0 * x, x),
   fisherz = function(x) tanh(x), stop_unsupported(sprintf("The '%s' link in the TMB engine", name)))
 
 fit_tmb <- function(spec, control) {

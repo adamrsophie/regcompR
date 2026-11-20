@@ -37,6 +37,8 @@ cure <- function(base) {
   lccdf <- function(q, p) log(p$cure + (1 - p$cure) * (1 - family_cdf(base, q, bp(p))))
   op_family(base, sprintf("cure(%s)", base$id), sprintf("Mixture cure %s", base$display_name), pars, lpdf,
     cdf = cdf, lccdf = lccdf, numeric_moments = FALSE,
+    quantile = function(pr, p) { r <- pr / (1 - p$cure); out <- rep(Inf, length(pr)); ok <- r < 1
+      if (any(ok)) out[ok] <- family_quantile(base, r[ok], lapply(bp(p), function(v) if (length(v) == length(pr)) v[ok] else v)); out },
     rng = function(n, p) ifelse(stats::runif(n) < p$cure, Inf, family_rng(base, n, bp(p))),
     operator = list(type = "cure", base = base),
     formula = "S(t) = cure + (1 - cure) S0(t); f(t) = (1 - cure) f0(t)",
@@ -104,8 +106,11 @@ convolve_dist <- function(a, b) {
   pa <- function(p) suffix_pars(p, a, ".1"); pb <- function(p) suffix_pars(p, b, ".2")
   one <- function(y, p) {
     if (a$discrete) {
-      sb <- b$support(pb(p)); lo <- max(sb$lower, 0)
-      x <- seq(lo, max(lo, y - a$support(pa(p))$lower))
+      sb <- b$support(pb(p)); sa <- a$support(pa(p))
+      lo <- max(sb$lower, y - sa$upper); hi <- min(sb$upper, y - sa$lower)
+      if (!is.finite(lo) || !is.finite(hi)) stop_unsupported("Convolution of two laws unbounded on the same side")
+      if (hi < lo) return(-Inf)
+      x <- seq(lo, hi)
       return(log_sum_exp(eval_lpdf(a, y - x, lapply(pa(p), rep, length(x))) + eval_lpdf(b, x, lapply(pb(p), rep, length(x)))))
     }
     sb <- b$support(pb(p))
@@ -158,13 +163,15 @@ copula_dist <- function(m1, m2, copula = c("gaussian", "clayton", "gumbel", "fra
       gaussian = vapply(seq_along(u), function(i) mvtnorm::pmvnorm(upper = stats::qnorm(c(u[i], v[i])), corr = matrix(c(1, th[i], th[i], 1), 2))[1], 0),
       clayton = pmax(u^-th + v^-th - 1, 0)^(-1 / th),
       gumbel = exp(-((-log(u))^th + (-log(v))^th)^(1 / th)),
-      frank = -log1p(expm1(-th * u) * expm1(-th * v) / expm1(-th)) / th) }
+      frank = ifelse(th == 0, u * v, -log1p(expm1(-th * u) * expm1(-th * v) / expm1(-th)) / th)) }
   logc <- function(u, v, th) switch(copula,
     gaussian = { a <- stats::qnorm(u); b <- stats::qnorm(v); -0.5 * log1p(-th^2) - (th^2 * (a^2 + b^2) - 2 * th * a * b) / (2 * (1 - th^2)) },
     clayton = log1p(th) - (1 + th) * (log(u) + log(v)) - (2 + 1 / th) * log(u^-th + v^-th - 1),
     gumbel = { x <- -log(u); y <- -log(v); A <- (x^th + y^th)^(1 / th)
       -A - log(u) - log(v) + (th - 1) * (log(x) + log(y)) + (1 / th - 2) * log(x^th + y^th) + log(A + th - 1) },
-    frank = log(th) + log(-expm1(-th)) - th * (u + v) - 2 * log(abs(-expm1(-th) - expm1(-th * u) * expm1(-th * v))))
+    # theta and 1 - exp(-theta) share their sign, so take absolute values;
+    # theta = 0 is independence.
+    frank = ifelse(th == 0, 0, log(abs(th)) + log(abs(expm1(-th))) - th * (u + v) - 2 * log(abs(-expm1(-th) - expm1(-th * u) * expm1(-th * v)))))
   lpdf <- function(y, p) { y <- if (is.matrix(y)) y else matrix(y, nrow = 1); n <- nrow(y)
     pp <- lapply(p, rep_len, n); a <- p1(pp); b <- p2(pp); th <- pp[[dep$name]]
     if (!m1$discrete) {
@@ -173,7 +180,8 @@ copula_dist <- function(m1, m2, copula = c("gaussian", "clayton", "gumbel", "fra
     }
     u1 <- family_cdf(m1, y[, 1], a); u0 <- family_cdf(m1, y[, 1] - 1, a)
     v1 <- family_cdf(m2, y[, 2], b); v0 <- family_cdf(m2, y[, 2] - 1, b)
-    log(pmax(Cfun(u1, v1, th) - Cfun(u0, v1, th) - Cfun(u1, v0, th) + Cfun(u0, v0, th), 1e-300)) }
+    valid <- is.finite(eval_lpdf(m1, y[, 1], a)) & is.finite(eval_lpdf(m2, y[, 2], b))
+    ifelse(valid, log(pmax(Cfun(u1, v1, th) - Cfun(u0, v1, th) - Cfun(u1, v0, th) + Cfun(u0, v0, th), 1e-300)), -Inf) }
   f <- family_def(sprintf("copula_%s(%s, %s)", copula, m1$id, m2$id), sprintf("%s copula of %s and %s", copula, m1$display_name, m2$display_name),
     "multivariate", pars, lpdf = lpdf, discrete = m1$discrete, variate_type = "vector", numeric_cdf = FALSE, numeric_moments = FALSE,
     status = "implemented", formula = "log c(F1(y1), F2(y2)) + log f1(y1) + log f2(y2); rectangle probabilities for discrete margins",

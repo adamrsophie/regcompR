@@ -262,8 +262,8 @@ build_spec <- function(formula, dots, fam, data, weights = NULL, links = NULL,
     p <- ncol(preds[[k]]$X)
     beta_idx[[k]] <- off + seq_len(p); off <- off + p
   }
-  beta_names <- unlist(lapply(rpars, function(k)
-    paste0(k, ":", colnames(preds[[k]]$X))))
+  beta_names <- unlist(lapply(rpars, function(k) { cn <- colnames(preds[[k]]$X)
+    if (length(cn)) paste0(k, ":", cn) else character() }))
   # Estimated vector parameters that are not regression parameters (ordinal
   # thresholds and similar); their size comes from the response.
   aux <- if (!is.null(prev)) prev$aux else {
@@ -668,15 +668,14 @@ num_hessian <- function(f, x, rel = 1e-2) {
   (4 * hess_h(h / 2) - hess_h(h)) / 3
 }
 
+# Inverse of an information matrix, which must be positive definite (to a
+# relative tolerance); otherwise an NA matrix flagged as singular.
 safe_inverse <- function(A) {
-  out <- tryCatch(solve(A), error = function(e) NULL)
-  if (is.null(out)) {
-    ev <- eigen((A + t(A)) / 2, symmetric = TRUE)
-    if (any(ev$values <= 0)) return(structure(matrix(NA_real_, nrow(A), ncol(A)),
-                                              singular = TRUE))
-    out <- ev$vectors %*% diag(1 / ev$values, length(ev$values)) %*% t(ev$vectors)
-  }
-  out
+  A <- (A + t(A)) / 2
+  ev <- tryCatch(eigen(A, symmetric = TRUE), error = function(e) NULL)
+  if (is.null(ev) || any(!is.finite(ev$values)) || min(ev$values) <= 1e-10 * max(abs(ev$values), 1e-300))
+    return(structure(matrix(NA_real_, nrow(A), ncol(A)), singular = TRUE))
+  ev$vectors %*% diag(1 / ev$values, length(ev$values)) %*% t(ev$vectors)
 }
 
 new_fit <- function(spec, beta, theta, u, cov, ll, opt, approx, pen = NULL,

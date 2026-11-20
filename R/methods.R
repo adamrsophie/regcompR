@@ -90,7 +90,7 @@ summary.regcomp_fit <- function(object, level = 0.95, ...) {
   } else {
     est <- c(object$coefficients, object$theta)
     se <- rep(NA_real_, length(est))
-    if (!is.null(object$vcov)) se <- sqrt(pmax(diag(object$vcov), 0))[seq_along(est)]
+    if (!is.null(object$vcov)) { dv <- diag(object$vcov); dv[dv < 0] <- NA; se <- sqrt(dv)[seq_along(est)] }
     z <- est / se
     q <- stats::qnorm(1 - (1 - level) / 2)
     tab <- data.frame(estimate = est, std_error = se, lower = est - q * se, upper = est + q * se,

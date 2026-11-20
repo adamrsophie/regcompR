@@ -7,10 +7,20 @@ new_par_name <- function(base, nm) {
 
 sub_pars <- function(p, names) p[intersect(names(p), names)]
 
+# Continuous laws with point masses (inflated, hurdle or censored
+# continuous laws). Operators whose formulas assume a density reject them.
+has_atoms <- function(f) {
+  if (f$discrete || is.null(f$operator)) return(FALSE)
+  if (f$operator$type %in% c("inflate", "hurdle", "censor")) return(TRUE)
+  !is.null(f$operator$base) && inherits(f$operator$base, "regcomp_family") && has_atoms(f$operator$base)
+}
+reject_atoms <- function(f, what) if (has_atoms(f))
+  stop_unsupported(sprintf("%s of a continuous law with point masses", what), f$id)
+
 op_family <- function(base, id, display, pars, lpdf, cdf = NULL, lccdf = NULL,
                       quantile = NULL, rng = NULL, mean = NULL, variance = NULL,
                       support = NULL, discrete = base$discrete, stan = NULL, bugs = NULL,
-                      operator, formula = "", extra = list(), numeric_moments = TRUE) {
+                      operator, formula = "", extra = list(), numeric_moments = TRUE, check = NULL) {
   f <- family_def(
     id, display, base$category, pars, lpdf = lpdf, cdf = cdf, lccdf = lccdf,
     quantile = quantile, rng = rng, mean = mean, variance = variance,
@@ -18,7 +28,7 @@ op_family <- function(base, id, display, pars, lpdf, cdf = NULL, lccdf = NULL,
     discrete = discrete, variate_type = base$variate_type, formula = formula,
     references = base$references, stan = stan, bugs = bugs,
     status = if (base$status %in% c("validated", "production")) "implemented" else base$status,
-    numeric_moments = numeric_moments, extra = extra)
+    numeric_moments = numeric_moments, extra = extra, check = check)
   f$operator <- operator
   f
 }
@@ -30,10 +40,10 @@ op_family <- function(base, id, display, pars, lpdf, cdf = NULL, lccdf = NULL,
 #' is scaled by `1 - sum(pi)`. For a continuous base law the result is a
 #' mixed distribution whose log likelihood uses the point mass at `c_j` and
 #' the scaled density elsewhere. One inflation parameter per point is added
-#' (named `zi`, `oi` or `pi1`, `pi2`, ...), each in (0, 1) with a logit link;
-#' with several points the parameters are mapped to weights through a
-#' multinomial logit (stick breaking is not used), so
-#' `pi_j = exp(eta_j) / (1 + sum(exp(eta)))`.
+#' (named `zi`, `oi` or `pi1`, `pi2`, ...), each in (0, 1) with a logit link.
+#' The parameters are the point mass weights themselves; with several points
+#' their sum must stay below one. Points must be distinct, and for a discrete
+#' base law they must lie on its integer support.
 #'
 #' Zero inflation can only add zeros; compare [hurdle()].
 #'
@@ -53,16 +63,16 @@ inflate <- function(base, at = 0, names = NULL) {
   base <- get_family(base)
   if (base$variate_type != "scalar") stop_unsupported("Inflation of a vector valued law", base$id)
   k <- length(at)
+  if (anyDuplicated(at)) stop_input("Inflation points must be distinct.")
+  if (base$discrete && any(abs(at - round(at)) > 1e-12))
+    stop_input("Inflation points of a discrete law must be integers.")
   if (is.null(names)) names <- if (k == 1 && at == 0) "zi" else if (k == 1 && at == 1) "oi" else paste0("pi", seq_len(k))
   names <- vapply(names, function(n) new_par_name(base, n), "")
   bnames <- names(base$pars)
   wts <- function(p) {
     if (k == 1) return(matrix(p[[names]], ncol = 1))
     W <- sapply(names, function(n) p[[n]])
-    W <- matrix(W, ncol = k)
-    s <- rowSums(W)
-    if (any(s >= 1, na.rm = TRUE)) W[s >= 1, ] <- NA
-    W
+    matrix(W, ncol = k)
   }
   lpdf <- function(y, p) {
     W <- wts(p); bp <- sub_pars(p, bnames)
@@ -160,6 +170,9 @@ inflate <- function(base, at = 0, names = NULL) {
             newpars, lpdf, cdf = cdf, rng = rng, mean = mean, variance = variance,
             support = support, discrete = base$discrete, stan = stan, bugs = bugs,
             operator = list(type = "inflate", base = base, at = at, pars = names),
+            check = function(p) { m <- if (is.null(base$check)) NULL else base$check(sub_pars(p, bnames))
+              if (!is.null(m)) return(m)
+              if (k > 1 && any(Reduce(`+`, p[names]) >= 1, na.rm = TRUE)) "Inflation weights must sum to less than 1." },
             formula = sprintf("P(Y = c) = pi + (1 - pi) P0(Y = c); elsewhere (1 - pi) f0(y)"))
 }
 
@@ -197,9 +210,12 @@ hurdle <- function(base, at = 0, name = "hu") {
   }
   cdf <- function(q, p) {
     bp <- sub_pars(p, bnames); pi <- p[[name]]
-    F0 <- family_cdf(base, q, bp); pa <- exp(lp_at(bp))
-    cond <- (F0 - pa * (q >= at)) / (1 - pa)
-    pi * (q >= at) + (1 - pi) * cond
+    lpa <- lp_at(bp); l1 <- log1mexp(-lpa)
+    # Conditional law off the hurdle point; above it use the survival
+    # function so a base law concentrated near the point keeps precision.
+    above <- q >= at
+    cond <- ifelse(above, 1 - exp(family_lccdf(base, q, bp) - l1), exp(log(family_cdf(base, q, bp)) - l1))
+    pi * above + (1 - pi) * pmin(pmax(cond, 0), 1)
   }
   support <- function(p) {
     s <- base$support(sub_pars(p, bnames))
@@ -208,8 +224,10 @@ hurdle <- function(base, at = 0, name = "hu") {
   rng <- function(n, p) {
     bp <- sub_pars(p, bnames); pi <- p[[name]]
     y <- rep(at, n)
-    todo <- which(stats::runif(n) >= pi)
+    todo <- which(stats::runif(n) >= pi); tries <- 0
     while (length(todo)) {
+      tries <- tries + 1
+      if (tries > 1000) stop_numerical("Hurdle sampling: the base law has almost no mass away from the hurdle point.")
       d <- family_rng(base, length(todo), lapply(bp, `[`, todo))
       ok <- d != at
       y[todo[ok]] <- d[ok]
@@ -230,6 +248,10 @@ hurdle <- function(base, at = 0, name = "hu") {
     ey <- pi * at + (1 - pi) * m1; ey2 <- pi * at^2 + (1 - pi) * m2
     ey2 - ey^2
   }
+  hcheck <- function(p) { bp <- sub_pars(p, bnames)
+    m <- if (is.null(base$check)) NULL else base$check(bp)
+    if (!is.null(m)) return(m)
+    if (any(lp_at(bp) >= 0, na.rm = TRUE)) "The base law has no mass away from the hurdle point." }
   newpars <- c(base$pars, stats::setNames(list(P(name, "unit", role = "hurdle",
     interpretation = "Probability of the hurdle value")), name))
   stan <- NULL
@@ -261,7 +283,7 @@ hurdle <- function(base, at = 0, name = "hu") {
             sprintf("%s hurdle at %s", base$display_name, format(at)),
             newpars, lpdf, cdf = cdf, rng = rng, mean = mean, variance = variance,
             support = support, stan = stan, bugs = bugs,
-            operator = list(type = "hurdle", base = base, at = at, pars = name),
+            operator = list(type = "hurdle", base = base, at = at, pars = name), check = hcheck,
             formula = "P(Y = c) = pi; P(Y = y) = (1 - pi) f0(y) / (1 - P0(c)) otherwise")
 }
 
@@ -283,6 +305,8 @@ hurdle <- function(base, at = 0, name = "hu") {
 #' tn <- truncate_dist("normal", lower = 0)
 truncate_dist <- function(base, lower = -Inf, upper = Inf) {
   base <- get_family(base)
+  reject_atoms(base, "Truncation")
+  if (lower == -Inf && upper == Inf) return(base)
   if (base$variate_type != "scalar") stop_unsupported("Truncation of a vector valued law", base$id)
   if (lower >= upper) stop_input("lower must be smaller than upper.")
   bn <- names(base$pars)
@@ -504,6 +528,7 @@ transform_dist <- function(base, transform = c("log", "exp", "logit", "inv_logit
                            increasing = TRUE, support = NULL) {
   base <- get_family(base)
   if (base$discrete) stop_unsupported("Monotone transformation of a discrete law (use discretize())", base$id)
+  reject_atoms(base, "Monotone transformation")
   label <- "custom"
   if (is.null(forward)) {
     transform <- match.arg(transform)
@@ -519,8 +544,9 @@ transform_dist <- function(base, transform = c("log", "exp", "logit", "inv_logit
   }
   sup <- if (!is.null(support)) support else function(p) {
     s <- base$support(p)
-    b <- sort(c(suppressWarnings(forward(s$lower)), suppressWarnings(forward(s$upper))))
-    list(lower = b[1], upper = b[2])
+    a <- suppressWarnings(forward(s$lower)); b <- suppressWarnings(forward(s$upper))
+    if (anyNA(c(a, b))) stop_domain("The transformation is not defined on the whole support of the base law.")
+    list(lower = pmin(a, b), upper = pmax(a, b))
   }
   lpdf <- function(y, p) eval_lpdf(base, inverse(y), p) + log_jacobian(y)
   cdf <- function(q, p) {
@@ -564,7 +590,7 @@ discretize <- function(base, offset = 0) {
   cdf <- function(q, p) family_cdf(base, floor(q) + 1 - offset, p)
   support <- function(p) {
     s <- base$support(p)
-    list(lower = floor(s$lower + offset), upper = if (is.finite(s$upper)) floor(s$upper + offset) else Inf)
+    list(lower = floor(s$lower + offset), upper = ifelse(is.finite(s$upper), floor(s$upper + offset), Inf))
   }
   rng <- function(n, p) floor(family_rng(base, n, p) + offset)
   op_family(base, sprintf("discretize(%s)", base$id), sprintf("Discretized %s", base$display_name),
@@ -586,7 +612,9 @@ round_dist <- function(base, digits = 0) {
     cdf = function(q, p) family_cdf(base, floor(q / h + 1e-9) * h + h / 2, p),
     quantile = function(pr, p) ceiling((family_quantile(base, pr, p) - h / 2) / h - 1e-9) * h,
     rng = function(n, p) round(family_rng(base, n, p) / h) * h,
-    support = base$support, status = "implemented", numeric_moments = FALSE,
+    support = function(p) { s <- base$support(p); g <- function(x) ifelse(is.finite(x), ceiling((x - h / 2) / h - 1e-9) * h, x)
+      list(lower = g(s$lower), upper = g(s$upper)) },
+    status = "implemented", numeric_moments = FALSE,
     numeric_cdf = FALSE,
     formula = "P(Y = y) = F(y + h/2) - F(y - h/2), y on the grid of multiples of h")
   f$extra$grid <- h

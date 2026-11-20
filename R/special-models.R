@@ -100,6 +100,8 @@ exact_poisson <- function(y, x, strata = NULL, exposure = NULL, level = 0.95) {
   ti <- which(support == tobs)
   pval <- { lp <- cond(0); min(1, sum(exp(lp[lp <= lp[ti] + 1e-7]))) }
   a <- (1 - level) / 2
+  if (length(support) == 1) return(list(estimate = NA_real_, type = "none", p_value = 1, conf_int = c(-Inf, Inf),
+    level = level, statistic = tobs + xmin * sum(y), support = support + xmin * sum(y), log_weights = lw))
   upper_tail <- function(b) sum(exp(cond(b)[support >= tobs]))
   lower_tail <- function(b) sum(exp(cond(b)[support <= tobs]))
   rng <- c(-50, 50)
@@ -109,7 +111,9 @@ exact_poisson <- function(y, x, strata = NULL, exposure = NULL, level = 0.95) {
     est <- stats::uniroot(function(b) sum(exp(cond(b)) * support) - tobs, rng, extendInt = "upX", tol = 1e-12)$root
     type <- "CMLE"
   } else {
-    est <- stats::uniroot(function(b) upper_tail(b) - lower_tail(b), rng, extendInt = "yes", tol = 1e-12)$root
+    # Endpoint median unbiased estimate: the nontrivial inclusive tail at 1/2.
+    est <- if (tobs == min(support)) stats::uniroot(function(b) lower_tail(b) - 0.5, rng, extendInt = "downX", tol = 1e-12)$root
+      else stats::uniroot(function(b) upper_tail(b) - 0.5, rng, extendInt = "upX", tol = 1e-12)$root
     type <- "MUE"
   }
   list(estimate = est, type = type, p_value = pval, conf_int = c(lo, hi), level = level,

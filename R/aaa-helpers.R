@@ -86,6 +86,16 @@ series_lognorm <- function(lterm, pars, k0 = 0, rel_tol = 1e-15,
                            max_k = 2e6, cap = NULL) {
   n <- max(vapply(pars, length, 1L))
   pars <- lapply(pars, rep_len, n)
+  # One normalizer per distinct parameter tuple.
+  if (n > 1) {
+    key <- do.call(paste, c(lapply(pars, function(v) sprintf("%.17g", v)), sep = "\r"))
+    first <- !duplicated(key)
+    if (!all(first)) {
+      v <- series_lognorm(lterm, lapply(pars, `[`, first), k0, rel_tol, max_k,
+                          cap = if (is.null(cap)) NULL else cap)
+      return(v[match(key, key[first])])
+    }
+  }
   out <- rep(NA_real_, n)
   todo <- seq_len(n)
   K <- 64

@@ -39,11 +39,14 @@ scoring_rule <- function(object, newdata = NULL, rule = c("log", "crps", "dss", 
   if (rule == "log") return(-obs_loglik(fam, y, pars, spec$cmat))
   if (!is.null(spec$cmat) && any(spec$cmat[, "lower"] != spec$cmat[, "upper"], na.rm = TRUE))
     stop_unsupported(sprintf("The '%s' score for censored observations", rule))
+  if (rule %in% c("crps", "dss") && !is.null(spec$cmat) && any(is.finite(spec$cmat[, c("tlower", "tupper")])))
+    stop_unsupported(sprintf("The '%s' score for truncated observations", rule))
   if (rule %in% c("brier", "rps")) {
     if (fam$variate_type != "categorical") stop_input("Brier and ranked probability scores need an ordinal or nominal family.")
-    K <- length(spec$ylev %||% seq_len(max(y)))
-    P <- sapply(seq_len(K), function(k) exp(eval_lpdf(fam, rep(k, length(y)), pars)))
-    P <- matrix(P, ncol = K); O <- outer(y, seq_len(K), `==`) * 1
+    # All fitted classes, whatever occurs in the assessment set.
+    P <- cat_probs(fam, pars, length(y)); K <- ncol(P)
+    if (any(!y %in% seq_len(K))) stop_input("Responses must be fitted categories 1, ..., K.")
+    O <- outer(y, seq_len(K), `==`) * 1
     if (rule == "brier") return(rowSums((P - O)^2))
     return(rowSums((t(apply(P, 1, cumsum)) - t(apply(O, 1, cumsum)))^2)[, drop = TRUE])
   }
@@ -95,8 +98,13 @@ new_spec_dots <- function(spec) {
 #' fit <- regcomp(y ~ x, family = "poisson", data = d)
 #' cv_regcomp(fit, K = 5)$estimate
 cv_regcomp <- function(object, K = 10, rule = "log", group = NULL, folds = NULL, seed = 1) {
-  data <- as.data.frame(eval(object$call$data, environment(object$spec$formulas[[1]])))
+  env <- environment(object$spec$formula %||% object$spec$formulas[[1]])
+  data <- as.data.frame(eval(object$call$data, env))
+  # Apply the fitted subset once; folds split the analysis rows.
+  if (!is.null(object$call$subset)) data <- data[eval(object$call$subset, data, env), , drop = FALSE]
+  ctrl <- if (is.null(object$call$control)) regcomp_control() else eval(object$call$control, env)
   n <- nrow(data)
+  if (!is.null(folds) && length(folds) != n) stop_input(sprintf("folds must have %d entries, one per analysis row.", n))
   if (is.null(folds)) {
     old <- if (exists(".Random.seed", globalenv())) get(".Random.seed", globalenv())
     on.exit(if (is.null(old)) rm(".Random.seed", envir = globalenv()) else assign(".Random.seed", old, globalenv()))
@@ -107,9 +115,9 @@ cv_regcomp <- function(object, K = 10, rule = "log", group = NULL, folds = NULL,
   sc <- rep(NA_real_, n)
   for (k in sort(unique(folds))) {
     test <- folds == k
-    cl <- object$call; cl$data <- data[!test, , drop = FALSE]
-    cl$control <- utils::modifyList(object$call$control %||% regcomp_control(), list(hessian = FALSE))
-    f <- eval(cl, environment(object$spec$formulas[[1]]))
+    cl <- object$call; cl$data <- data[!test, , drop = FALSE]; cl$subset <- NULL
+    cl$control <- utils::modifyList(ctrl, list(hessian = FALSE))
+    f <- eval(cl, env)
     sc[test] <- scoring_rule(f, data[test, , drop = FALSE], rule = rule, re = if (is.null(group)) "conditional" else "zero")
   }
   list(scores = sc, estimate = mean(sc), se = stats::sd(sc) / sqrt(n), folds = folds, rule = rule)

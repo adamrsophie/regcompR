@@ -216,30 +216,40 @@ rhat_basic <- function(a) {
   max(rh(z), rh(zf))
 }
 
-# Bulk effective sample size from autocorrelations (Geyer initial
-# monotone sequence) of rank normalized draws.
+# Bulk effective sample size (Vehtari et al. 2021): split chains, rank
+# normalize, Geyer initial positive and monotone sequence estimators.
 ess_basic <- function(a) {
   a <- as.matrix(a)
   if (any(!is.finite(a))) return(NA_real_)
-  n <- nrow(a); m <- ncol(a)
+  n <- nrow(a)
   if (n < 4) return(NA_real_)
-  z <- matrix(stats::qnorm((rank(a) - 3 / 8) / (length(a) + 1 / 4)), n)
-  ac <- sapply(seq_len(m), function(c2) {
-    x <- z[, c2] - mean(z[, c2])
-    v <- stats::acf(x, lag.max = n - 1, plot = FALSE, demean = FALSE)$acf[, 1, 1]
-    v
-  })
-  rho <- rowMeans(as.matrix(ac))
-  W <- mean(apply(z, 2, stats::var)); B <- n * stats::var(colMeans(z))
-  vp <- (n - 1) / n * W + if (m > 1) B / n else 0
-  rho_hat <- 1 - (W - rowMeans(as.matrix(ac)) * W) / vp
-  rho_hat[1] <- 1
-  s <- 0; k <- 1
-  while (k + 1 <= length(rho_hat)) {
-    pr <- rho_hat[k] + rho_hat[k + 1]
-    if (pr < 0) break
-    s <- s + pr; k <- k + 2
+  h <- floor(n / 2)
+  sp <- cbind(a[seq_len(h), , drop = FALSE], a[n - h + seq_len(h), , drop = FALSE])
+  if (diff(range(sp)) == 0) return(NA_real_)
+  z <- matrix(stats::qnorm((rank(sp) - 3 / 8) / (length(sp) + 1 / 4)), nrow(sp))
+  ess_raw(z)
+}
+ess_raw <- function(x) {
+  n <- nrow(x); m <- ncol(x)
+  acov <- vapply(seq_len(m), function(j) stats::acf(x[, j], lag.max = n - 1, type = "covariance",
+                                                  plot = FALSE, demean = TRUE)$acf[, 1, 1], numeric(n))
+  acov <- matrix(acov, n)
+  mean_var <- mean(acov[1, ]) * n / (n - 1)
+  var_plus <- mean_var * (n - 1) / n + if (m > 1) stats::var(colMeans(x)) else 0
+  rho <- numeric(n); rho_of <- function(t) 1 - (mean_var - mean(acov[t, ])) / var_plus
+  t <- 0; even <- 1; rho[1] <- even; odd <- rho_of(2); rho[2] <- odd
+  while (t < n - 5 && !is.nan(even + odd) && even + odd > 0) {
+    t <- t + 2; even <- rho_of(t + 1); odd <- rho_of(t + 2)
+    if (even + odd >= 0) { rho[t + 1] <- even; rho[t + 2] <- odd }
   }
-  tau <- -1 + 2 * s
-  min(n * m / max(tau, 1 / log10(n * m)), n * m * log10(n * m))
+  max_t <- t
+  if (even > 0) rho[max_t + 1] <- even
+  t <- 0
+  while (t <= max_t - 4) {
+    t <- t + 2
+    if (rho[t + 1] + rho[t + 2] > rho[t - 1] + rho[t]) { rho[t + 1] <- (rho[t - 1] + rho[t]) / 2; rho[t + 2] <- rho[t + 1] }
+  }
+  S <- n * m
+  tau <- max(-1 + 2 * sum(rho[seq_len(max_t)]) + rho[max_t + 1], 1 / log10(S))
+  S / tau
 }

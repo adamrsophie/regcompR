@@ -74,11 +74,20 @@ wrap <- function(base) {
   base <- get_family(base)
   if (base$discrete || base$variate_type != "scalar") stop_unsupported("Wrapping a discrete or vector valued law", base$id)
   lpdf <- function(y, p) log(pervec(y, p, function(x, pp) {
-    tot <- 0; xx <- x + 2 * pi * (x < 0) * (base$category == "positive")
-    for (k in 0:2000) {
-      t1 <- exp(eval_lpdf(base, xx + 2 * pi * k, pp)); t2 <- if (k > 0) exp(eval_lpdf(base, xx - 2 * pi * k, pp)) else 0
-      tot <- tot + t1 + t2
-      if (k > 3 && t1 + t2 < 1e-14 * tot) break
+    xx <- x + 2 * pi * (x < 0) * (base$category == "positive")
+    # Sum windings in growing blocks until the base mass outside the covered
+    # range (which bounds 2 pi times the remaining terms for decaying
+    # densities) is negligible.
+    dens <- function(t) exp(eval_lpdf(base, t, lapply(pp, rep_len, length(t))))
+    tot <- dens(xx); K0 <- 0; K <- 64
+    repeat {
+      k <- (K0 + 1):K
+      tot <- tot + sum(dens(xx + 2 * pi * k)) + sum(dens(xx - 2 * pi * k))
+      hi <- xx + 2 * pi * K; lo <- xx - 2 * pi * K
+      rest <- (1 - family_cdf(base, hi, pp)) + family_cdf(base, lo, pp)
+      if (!is.finite(rest) || rest < 1e-12 * max(tot, 1e-300) * 2 * pi) break
+      K0 <- K; K <- 4 * K
+      if (K > 1e7) stop_numerical("The wrapped density series did not converge.")
     }
     tot }))
   f <- op_family(base, sprintf("wrap(%s)", base$id), sprintf("Wrapped %s", base$display_name), base$pars, lpdf,

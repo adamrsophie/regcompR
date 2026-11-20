@@ -153,6 +153,9 @@ register_family(family_def("tweedie", "Tweedie (compound Poisson-gamma, 1 < powe
 #' prob(d, c(0, 1))
 censor <- function(base, lower = -Inf, upper = Inf) {
   base <- get_family(base)
+  if (lower >= upper) stop_input("lower must be smaller than upper.")
+  if (base$discrete && any(is.finite(c(lower, upper)) & abs(c(lower, upper) - round(c(lower, upper))) > 1e-12))
+    stop_input("Censoring bounds of a discrete law must be integers.")
   # Upper censoring keeps P(Y >= upper); for counts that is 1 - F(upper - 1).
   lccdf <- function(q, p) { if (base$discrete) q <- q - 1
     if (!is.null(base$lccdf)) base$lccdf(q, p) else log1p(-family_cdf(base, q, p)) }
@@ -165,7 +168,8 @@ censor <- function(base, lower = -Inf, upper = Inf) {
     out
   }
   cdf <- function(q, p) { v <- family_cdf(base, pmin(q, upper), p); v[q < lower] <- 0; v[q >= upper] <- 1; v }
-  support <- function(p) { s <- base$support(p); list(lower = pmax(s$lower, lower), upper = pmin(s$upper, upper)) }
+  support <- function(p) { s <- base$support(p)
+    list(lower = pmin(pmax(s$lower, lower), upper), upper = pmax(pmin(s$upper, upper), lower)) }
   f <- op_family(base, sprintf("censor(%s, %s, %s)", base$id, format(lower), format(upper)),
                  sprintf("%s censored to [%s, %s]", base$display_name, format(lower), format(upper)), base$pars,
                  lpdf, cdf = cdf, rng = function(n, p) pmin(pmax(family_rng(base, n, p), lower), upper),
@@ -203,6 +207,14 @@ compound <- function(base, par, mixing) {
     gpars <- stats::setNames(pp[mn], names(mixing$pars)); s <- mixing$support(gpars)
     f <- function(t) exp(eval_lpdf(base, rep(x, length(t)), c(lapply(pp[keep], rep, length(t)), stats::setNames(list(t), par))[names(base$pars)]) +
                          eval_lpdf(mixing, t, lapply(gpars, rep, length(t))))
+    if (mixing$discrete) {
+      # Discrete mixer: sum over its support up to a negligible tail.
+      hi <- if (is.finite(s$upper)) s$upper else family_quantile(mixing, 1 - 1e-15, gpars)
+      t <- seq(s$lower, hi)
+      lt <- eval_lpdf(base, rep(x, length(t)), c(lapply(pp[keep], rep, length(t)), stats::setNames(list(t), par))[names(base$pars)]) +
+        eval_lpdf(mixing, t, lapply(gpars, rep, length(t)))
+      return(log_sum_exp(lt[!is.nan(lt)]))
+    }
     log(stats::integrate(f, s$lower, s$upper, rel.tol = 1e-10, subdivisions = 1000L, stop.on.error = FALSE)$value) })
   rng <- function(n, p) { t <- family_rng(mixing, n, stats::setNames(p[mn], names(mixing$pars)))
     q <- p[keep]; q[[par]] <- t; family_rng(base, n, q[names(base$pars)]) }
