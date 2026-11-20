@@ -47,6 +47,17 @@ regcomp(
   [`cens()`](https://adamrsophie.github.io/regcompR/reference/cens.md)
   or
   [`surv()`](https://adamrsophie.github.io/regcompR/reference/cens.md).
+  A nonlinear predictor is written `response ~ nl(expr)`, as in
+  `y ~ nl(a * exp(-b * x))`: the names of `expr` that have their own
+  formula in `...` (`a ~ 1 + (1 | g)`, `b ~ z`) are nonlinear
+  parameters, each with a linear predictor that may hold covariates and
+  random effects; the other names are covariates. `expr` gives the first
+  parameter on its link scale, as in
+  [`nls()`](https://rdrr.io/r/stats/nls.html), `nlme()` and `nlmer()`.
+  Nonlinear parameters need starting values
+  (`control = regcomp_control(start = list(a = 10, b = 0.5))`, also the
+  initial values of the Stan chains) and are fitted by `engine = "ml"`
+  or by `engine = "bayes"` with a Stan runner.
 
 - ...:
 

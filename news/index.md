@@ -3,6 +3,12 @@
 ## regcompR 0.1.0
 
 - First release.
+- Nonlinear formulas: `y ~ nl(expr)` with a formula for each nonlinear
+  parameter (covariates and random effects allowed) for any family,
+  fitted by `engine = "ml"` (equal to
+  [`nls()`](https://rdrr.io/r/stats/nls.html) and to
+  [`lme4::nlmer()`](https://rdrr.io/pkg/lme4/man/nlmer.html)) or by
+  Stan.
 - Reporting:
   [`regcomp_table()`](https://adamrsophie.github.io/regcompR/reference/regcomp_table.md)
   builds regression tables of one or several fits (rows grouped by

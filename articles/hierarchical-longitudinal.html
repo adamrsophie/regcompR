@@ -200,7 +200,7 @@ differ in variability as well as in level.</p>
 <span><span class="va">fit2</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/regcomp.html">regcomp</a></span><span class="op">(</span><span class="va">z</span> <span class="op">~</span> <span class="va">x</span> <span class="op">+</span> <span class="op">(</span><span class="fl">1</span> <span class="op">|</span> <span class="va">g</span><span class="op">)</span>, <span class="va">sigma</span> <span class="op">~</span> <span class="fl">1</span> <span class="op">+</span> <span class="op">(</span><span class="fl">1</span> <span class="op">|</span> <span class="va">g</span><span class="op">)</span>, family <span class="op">=</span> <span class="st">"normal"</span>, data <span class="op">=</span> <span class="va">dat</span><span class="op">)</span></span>
 <span><span class="va">fit2</span><span class="op">$</span><span class="va">theta</span></span>
 <span><span class="co">#&gt;    mu:1 | g:log_sd((Intercept)) sigma:1 | g:log_sd((Intercept)) </span></span>
-<span><span class="co">#&gt;                      -0.7109173                      -1.2369517</span></span></code></pre></div>
+<span><span class="co">#&gt;                      -0.7109182                      -1.2369327</span></span></code></pre></div>
 </div>
 <div class="section level2">
 <h2 id="covariance-structures-for-longitudinal-data">Covariance structures for longitudinal data<a class="anchor" aria-label="anchor" href="#covariance-structures-for-longitudinal-data"></a>
@@ -273,11 +273,11 @@ no mixed model form; use <code>t2()</code>.)</p>
 <span><span class="co">#&gt; or unreliable.</span></span>
 <span><span class="va">fs</span><span class="op">$</span><span class="va">theta</span></span>
 <span><span class="co">#&gt; mu:s(x, by = f, k = 8):s(x):fa:log_sd(smooth) </span></span>
-<span><span class="co">#&gt;                                     1.0117969 </span></span>
+<span><span class="co">#&gt;                                     1.0117977 </span></span>
 <span><span class="co">#&gt; mu:s(x, by = f, k = 8):s(x):fb:log_sd(smooth) </span></span>
-<span><span class="co">#&gt;                                     0.8809979 </span></span>
+<span><span class="co">#&gt;                                     0.8809964 </span></span>
 <span><span class="co">#&gt;              sigma:s(w, k = 5):log_sd(smooth) </span></span>
-<span><span class="co">#&gt;                                   -10.7011624</span></span>
+<span><span class="co">#&gt;                                   -10.2054669</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">fs</span>, which <span class="op">=</span> <span class="st">"effects"</span>, variable <span class="op">=</span> <span class="st">"x"</span><span class="op">)</span></span></code></pre></div>
 <p><img src="hierarchical-longitudinal_files/figure-html/unnamed-chunk-8-1.png" class="r-plt" alt="" width="576"></p>
 <div class="sourceCode" id="cb8"><pre class="downlit sourceCode r">
@@ -339,8 +339,58 @@ hazards.</p>
 <span><span class="va">pp</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/person_period.html">person_period</a></span><span class="op">(</span><span class="va">sd0</span>, <span class="st">"t"</span>, <span class="st">"d"</span><span class="op">)</span></span>
 <span><span class="va">fh</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/regcomp.html">regcomp</a></span><span class="op">(</span><span class="va">event</span> <span class="op">~</span> <span class="fu"><a href="https://rdrr.io/r/base/factor.html" class="external-link">factor</a></span><span class="op">(</span><span class="va">period</span><span class="op">)</span> <span class="op">+</span> <span class="va">x</span> <span class="op">+</span> <span class="op">(</span><span class="fl">1</span> <span class="op">|</span> <span class="va">cl</span><span class="op">)</span>, family <span class="op">=</span> <span class="st">"bernoulli"</span>, data <span class="op">=</span> <span class="va">pp</span><span class="op">)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/stats/coef.html" class="external-link">coef</a></span><span class="op">(</span><span class="va">fh</span><span class="op">)</span><span class="op">[</span><span class="st">"prob:x"</span><span class="op">]</span></span>
-<span><span class="co">#&gt;    prob:x </span></span>
-<span><span class="co">#&gt; 0.5833317</span></span></code></pre></div>
+<span><span class="co">#&gt;   prob:x </span></span>
+<span><span class="co">#&gt; 0.583332</span></span></code></pre></div>
+</div>
+<div class="section level2">
+<h2 id="nonlinear-models">Nonlinear models<a class="anchor" aria-label="anchor" href="#nonlinear-models"></a>
+</h2>
+<p><code>y ~ nl(expr)</code> makes the first parameter a nonlinear
+function of nonlinear parameters, each with its own formula, as in
+<code><a href="https://rdrr.io/r/stats/nls.html" class="external-link">nls()</a></code>, <code>nlme()</code> and <code>nlmer()</code>. A
+random effect on a nonlinear parameter gives a nonlinear mixed model,
+fitted by the Laplace approximation (as <code>nlmer()</code> does). The
+logistic growth of orange trees, with a tree effect on the
+asymptote:</p>
+<div class="sourceCode" id="cb13"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">O</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/as.data.frame.html" class="external-link">as.data.frame</a></span><span class="op">(</span><span class="va">Orange</span><span class="op">)</span></span>
+<span><span class="va">O</span><span class="op">$</span><span class="va">Tree</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/factor.html" class="external-link">factor</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/character.html" class="external-link">as.character</a></span><span class="op">(</span><span class="va">O</span><span class="op">$</span><span class="va">Tree</span><span class="op">)</span><span class="op">)</span></span>
+<span><span class="va">fo</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/regcomp.html">regcomp</a></span><span class="op">(</span><span class="va">circumference</span> <span class="op">~</span> <span class="fu">nl</span><span class="op">(</span><span class="va">Asym</span> <span class="op">/</span> <span class="op">(</span><span class="fl">1</span> <span class="op">+</span> <span class="fu"><a href="https://rdrr.io/r/base/Log.html" class="external-link">exp</a></span><span class="op">(</span><span class="op">(</span><span class="va">xmid</span> <span class="op">-</span> <span class="va">age</span><span class="op">)</span> <span class="op">/</span> <span class="va">scal</span><span class="op">)</span><span class="op">)</span><span class="op">)</span>,</span>
+<span>              <span class="va">Asym</span> <span class="op">~</span> <span class="fl">1</span> <span class="op">+</span> <span class="op">(</span><span class="fl">1</span> <span class="op">|</span> <span class="va">Tree</span><span class="op">)</span>, <span class="va">xmid</span> <span class="op">~</span> <span class="fl">1</span>, <span class="va">scal</span> <span class="op">~</span> <span class="fl">1</span>, family <span class="op">=</span> <span class="st">"normal"</span>, data <span class="op">=</span> <span class="va">O</span>,</span>
+<span>              control <span class="op">=</span> <span class="fu"><a href="../reference/regcomp_control.html">regcomp_control</a></span><span class="op">(</span>start <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>Asym <span class="op">=</span> <span class="fl">200</span>, xmid <span class="op">=</span> <span class="fl">725</span>, scal <span class="op">=</span> <span class="fl">350</span><span class="op">)</span><span class="op">)</span><span class="op">)</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/base/summary.html" class="external-link">summary</a></span><span class="op">(</span><span class="va">fo</span><span class="op">)</span></span>
+<span><span class="co">#&gt; &lt;regcomp_fit&gt; Normal regression, engine 'ml' (frequentist)</span></span>
+<span><span class="co">#&gt;   marginal likelihood approximation: laplace </span></span>
+<span><span class="co">#&gt;   mu (identity link): nonlinear Asym/(1 + exp((xmid - age)/scal))</span></span>
+<span><span class="co">#&gt;   Asym (identity link): ~1 + (1 | Tree)</span></span>
+<span><span class="co">#&gt;   xmid (identity link): ~1</span></span>
+<span><span class="co">#&gt;   scal (identity link): ~1</span></span>
+<span><span class="co">#&gt;   sigma (log link): ~1</span></span>
+<span><span class="co">#&gt;   log likelihood -131.572 on 5 parameters, n = 35</span></span>
+<span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt; Wald estimates with 95% confidence intervals:</span></span>
+<span><span class="co">#&gt;                                   estimate std_error    lower    upper       z</span></span>
+<span><span class="co">#&gt; Asym:(Intercept)                  192.0530   15.6576 161.3646 222.7414 12.2658</span></span>
+<span><span class="co">#&gt; xmid:(Intercept)                  727.9059   35.2486 658.8200 796.9918 20.6506</span></span>
+<span><span class="co">#&gt; scal:(Intercept)                  348.0727   27.0798 294.9973 401.1480 12.8536</span></span>
+<span><span class="co">#&gt; sigma:(Intercept)                   2.0596    0.1291   1.8066   2.3127 15.9537</span></span>
+<span><span class="co">#&gt; Asym:1 | Tree:log_sd((Intercept))   3.4546    0.3243   2.8191   4.0901 10.6541</span></span>
+<span><span class="co">#&gt;                                   p_value</span></span>
+<span><span class="co">#&gt; Asym:(Intercept)                        0</span></span>
+<span><span class="co">#&gt; xmid:(Intercept)                        0</span></span>
+<span><span class="co">#&gt; scal:(Intercept)                        0</span></span>
+<span><span class="co">#&gt; sigma:(Intercept)                       0</span></span>
+<span><span class="co">#&gt; Asym:1 | Tree:log_sd((Intercept))       0</span></span>
+<span><span class="co">#&gt; Hessian positive definite</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/stats/predict.html" class="external-link">predict</a></span><span class="op">(</span><span class="va">fo</span>, newdata <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span>age <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">500</span>, <span class="fl">1500</span><span class="op">)</span>, Tree <span class="op">=</span> <span class="st">"3"</span><span class="op">)</span><span class="op">)</span></span>
+<span><span class="co">#&gt; [1]  52.94907 139.66355</span></span></code></pre></div>
+<p>The expression is on the link scale of the parameter, so any family
+works: <code>y ~ nl(log(a) + log1p(-exp(-k * x)))</code> with the
+Poisson family gives the mean <code>a * (1 - exp(-k * x))</code>.
+Nonlinear parameters take covariates (<code>a ~ z</code>) and need
+starting values. The fit equals <code><a href="https://rdrr.io/r/stats/nls.html" class="external-link">nls()</a></code> and
+<code>nlmer()</code>; random effects of different nonlinear parameters
+are independent.</p>
 </div>
   </main><aside class="col-md-3"><nav id="toc" aria-label="Table of contents"><h2>On this page</h2>
     </nav></aside>

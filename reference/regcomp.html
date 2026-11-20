@@ -124,7 +124,15 @@ have no such representation; use <code>t2()</code> instead.</p>
 <dl><dt id="arg-formula">formula<a class="anchor" aria-label="anchor" href="#arg-formula"></a></dt>
 <dd><p>Two sided formula <code>response ~ predictors</code> for the first
 regression parameter. The response may be wrapped in <code><a href="cens.html">cens()</a></code> or
-<code><a href="cens.html">surv()</a></code>.</p></dd>
+<code><a href="cens.html">surv()</a></code>. A nonlinear predictor is written <code>response ~ nl(expr)</code>, as in
+<code>y ~ nl(a * exp(-b * x))</code>: the names of <code>expr</code> that have their own
+formula in <code>...</code> (<code>a ~ 1 + (1 | g)</code>, <code>b ~ z</code>) are nonlinear parameters,
+each with a linear predictor that may hold covariates and random
+effects; the other names are covariates. <code>expr</code> gives the first
+parameter on its link scale, as in <code><a href="https://rdrr.io/r/stats/nls.html" class="external-link">nls()</a></code>, <code>nlme()</code> and <code>nlmer()</code>.
+Nonlinear parameters need starting values (<code>control = regcomp_control(start = list(a = 10, b = 0.5))</code>, also the initial
+values of the Stan chains) and are fitted by <code>engine = "ml"</code> or by
+<code>engine = "bayes"</code> with a Stan runner.</p></dd>
 
 
 <dt id="arg--">...<a class="anchor" aria-label="anchor" href="#arg--"></a></dt>

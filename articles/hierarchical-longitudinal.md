@@ -123,7 +123,7 @@ dat$z <- rnorm(G * m, 1 + dat$x + u[dat$g], exp(-0.5 + v[dat$g]))
 fit2 <- regcomp(z ~ x + (1 | g), sigma ~ 1 + (1 | g), family = "normal", data = dat)
 fit2$theta
 #>    mu:1 | g:log_sd((Intercept)) sigma:1 | g:log_sd((Intercept)) 
-#>                      -0.7109173                      -1.2369517
+#>                      -0.7109182                      -1.2369327
 ```
 
 ## Covariance structures for longitudinal data
@@ -198,11 +198,11 @@ fs <- regcomp(y ~ f + s(x, by = f, k = 8), sigma ~ s(w, k = 5), family = "normal
 #> or unreliable.
 fs$theta
 #> mu:s(x, by = f, k = 8):s(x):fa:log_sd(smooth) 
-#>                                     1.0117969 
+#>                                     1.0117977 
 #> mu:s(x, by = f, k = 8):s(x):fb:log_sd(smooth) 
-#>                                     0.8809979 
+#>                                     0.8809964 
 #>              sigma:s(w, k = 5):log_sd(smooth) 
-#>                                   -10.7011624
+#>                                   -10.2054669
 plot(fs, which = "effects", variable = "x")
 ```
 
@@ -277,6 +277,57 @@ sd0$t <- pmin(tev, 8); sd0$d <- as.numeric(tev <= 8)
 pp <- person_period(sd0, "t", "d")
 fh <- regcomp(event ~ factor(period) + x + (1 | cl), family = "bernoulli", data = pp)
 coef(fh)["prob:x"]
-#>    prob:x 
-#> 0.5833317
+#>   prob:x 
+#> 0.583332
 ```
+
+## Nonlinear models
+
+`y ~ nl(expr)` makes the first parameter a nonlinear function of
+nonlinear parameters, each with its own formula, as in
+[`nls()`](https://rdrr.io/r/stats/nls.html), `nlme()` and `nlmer()`. A
+random effect on a nonlinear parameter gives a nonlinear mixed model,
+fitted by the Laplace approximation (as `nlmer()` does). The logistic
+growth of orange trees, with a tree effect on the asymptote:
+
+``` r
+
+O <- as.data.frame(Orange)
+O$Tree <- factor(as.character(O$Tree))
+fo <- regcomp(circumference ~ nl(Asym / (1 + exp((xmid - age) / scal))),
+              Asym ~ 1 + (1 | Tree), xmid ~ 1, scal ~ 1, family = "normal", data = O,
+              control = regcomp_control(start = list(Asym = 200, xmid = 725, scal = 350)))
+summary(fo)
+#> <regcomp_fit> Normal regression, engine 'ml' (frequentist)
+#>   marginal likelihood approximation: laplace 
+#>   mu (identity link): nonlinear Asym/(1 + exp((xmid - age)/scal))
+#>   Asym (identity link): ~1 + (1 | Tree)
+#>   xmid (identity link): ~1
+#>   scal (identity link): ~1
+#>   sigma (log link): ~1
+#>   log likelihood -131.572 on 5 parameters, n = 35
+#> 
+#> Wald estimates with 95% confidence intervals:
+#>                                   estimate std_error    lower    upper       z
+#> Asym:(Intercept)                  192.0530   15.6576 161.3646 222.7414 12.2658
+#> xmid:(Intercept)                  727.9059   35.2486 658.8200 796.9918 20.6506
+#> scal:(Intercept)                  348.0727   27.0798 294.9973 401.1480 12.8536
+#> sigma:(Intercept)                   2.0596    0.1291   1.8066   2.3127 15.9537
+#> Asym:1 | Tree:log_sd((Intercept))   3.4546    0.3243   2.8191   4.0901 10.6541
+#>                                   p_value
+#> Asym:(Intercept)                        0
+#> xmid:(Intercept)                        0
+#> scal:(Intercept)                        0
+#> sigma:(Intercept)                       0
+#> Asym:1 | Tree:log_sd((Intercept))       0
+#> Hessian positive definite
+predict(fo, newdata = data.frame(age = c(500, 1500), Tree = "3"))
+#> [1]  52.94907 139.66355
+```
+
+The expression is on the link scale of the parameter, so any family
+works: `y ~ nl(log(a) + log1p(-exp(-k * x)))` with the Poisson family
+gives the mean `a * (1 - exp(-k * x))`. Nonlinear parameters take
+covariates (`a ~ z`) and need starting values. The fit equals
+[`nls()`](https://rdrr.io/r/stats/nls.html) and `nlmer()`; random
+effects of different nonlinear parameters are independent.

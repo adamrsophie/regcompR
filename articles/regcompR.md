@@ -277,7 +277,8 @@ plot(fit, which = "effects", variable = "x", par = "sigma")
 - [`vignette("count-models")`](https://adamrsophie.github.io/regcompR/articles/count-models.md):
   overdispersion, zeros and the count families.
 - [`vignette("hierarchical-longitudinal")`](https://adamrsophie.github.io/regcompR/articles/hierarchical-longitudinal.md):
-  random effects, covariance structures, smooth terms and GEE.
+  random effects, covariance structures, smooth terms, GEE and nonlinear
+  (mixed) models.
 - [`vignette("ordinal-categorical")`](https://adamrsophie.github.io/regcompR/articles/ordinal-categorical.md):
   ordinal, nominal, bivariate binary and selection models.
 - [`vignette("survival")`](https://adamrsophie.github.io/regcompR/articles/survival.md):

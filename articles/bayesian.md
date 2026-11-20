@@ -161,6 +161,23 @@ grep("rho", strsplit(ar, "\n")[[1]], value = TRUE)
 #> [3] "  rho_1 ~ uniform(0, 0.9);"
 ```
 
+A nonlinear formula (`y ~ nl(expr)`) computes its parameter row by row
+from the nonlinear parameters. These have no natural scale, so each
+needs an intercept prior; their starting values also start the chains.
+
+``` r
+
+dn <- data.frame(x = runif(60, 0, 5))
+dn$y <- rpois(60, 10 * exp(-0.6 * dn$x))
+pn <- c(prior("normal(2, 1)", par = "loga", class = "Intercept"),
+        prior("normal(0.5, 0.5)", par = "b", class = "Intercept"))
+nc <- stan_code(y ~ nl(loga - b * x), loga ~ 1, b ~ 1, family = "poisson", data = dn, priors = pn)$code
+grep("lambda", strsplit(nc, "\n")[[1]], value = TRUE)
+#> [1] "  vector[N] lambda;"                                              
+#> [2] "  for (i in 1:N) lambda[i] = exp(loga[i] - b[i] * nlx_x[i]);"     
+#> [3] "  for (i in 1:N) target += w[i] * poisson_lpmf(y[i] | lambda[i]);"
+```
+
 ## Fitting
 
 The examples below need a working Stan or JAGS installation.
