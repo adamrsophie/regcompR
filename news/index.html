@@ -27,6 +27,7 @@
     <li><a class="dropdown-item" href="../articles/survival.html">Censored data and survival models</a></li>
     <li><a class="dropdown-item" href="../articles/regularization.html">Penalized and bias reduced estimation</a></li>
     <li><a class="dropdown-item" href="../articles/model-checking.html">Model checking and comparison</a></li>
+    <li><a class="dropdown-item" href="../articles/reporting.html">Reporting results: tables, tidy output and export</a></li>
     <li><a class="dropdown-item" href="../articles/bayesian.html">Bayesian distributional regression</a></li>
   </ul></li>
 <li class="active nav-item"><a class="nav-link" href="../news/index.html">Changelog</a></li>
@@ -53,6 +54,13 @@
     <div class="section level2">
 <h2 class="pkg-version" data-toc-text="0.1.0" id="regcompr-010">regcompR 0.1.0<a class="anchor" aria-label="anchor" href="#regcompr-010"></a></h2>
 <ul><li>First release.</li>
+<li>Reporting: <code><a href="../reference/regcomp_table.html">regcomp_table()</a></code> builds regression tables of one or several fits (rows grouped by distribution parameter, random effect standard deviations and correlations, fit statistics, optional standardized or exponentiated coefficients and sandwich or quasi standard errors) that print in the console and render in R Markdown and Quarto (HTML, PDF, Word). <code>tidy()</code>, <code>glance()</code> and <code>augment()</code> methods work with broom and modelsummary. <code><a href="../reference/export_table.html">export_table()</a></code> writes <code>.csv</code>, <code>.html</code>, <code>.tex</code>, <code>.md</code> and <code>.docx</code>; <code><a href="../reference/export_table.html">export_plot()</a></code> saves any diagnostic plot; <code><a href="../reference/coef_plot.html">coef_plot()</a></code> draws estimates of several fits.</li>
+<li>Inference: <code><a href="https://rdrr.io/r/stats/anova.html" class="external-link">anova()</a></code> likelihood ratio tests of nested fits, <code><a href="../reference/wald_test.html">wald_test()</a></code> for linear hypotheses, <code><a href="../reference/simple_slopes.html">simple_slopes()</a></code> and <code><a href="../reference/johnson_neyman.html">johnson_neyman()</a></code> for moderation, interaction plots through <code>plot(which = "effects", by = )</code>, <code><a href="../reference/vif.html">vif()</a></code> generalized variance inflation factors, and <code><a href="../reference/step_regcomp.html">step_regcomp()</a></code> stepwise selection by AIC or BIC.</li>
+<li>
+<code>vcov(type = "quasi")</code> and <code>summary(vcov = )</code> give quasi-likelihood (Pearson dispersion) standard errors, matching <code>quasibinomial</code> and <code>quasipoisson</code>.</li>
+<li>Dirichlet regression (matrix response; one log linked concentration per component) and the shifted lognormal family.</li>
+<li>
+<code>person_period(cuts = "events")</code> builds Cox risk sets: a Poisson fit reproduces <code>coxph()</code> with Breslow ties exactly, and random effects give Cox frailty models.</li>
 <li>
 <code><a href="../reference/family_capabilities.html">family_capabilities()</a></code> (formerly <code><a href="https://rdrr.io/r/base/capabilities.html" class="external-link">capabilities()</a></code>, renamed so that attaching the package masks no base R function) labels family specific numerical methods <code>"algorithm"</code>, separately from closed forms (<code>"analytic"</code>) and the generic fallback (<code>"numeric"</code>).</li>
 <li>

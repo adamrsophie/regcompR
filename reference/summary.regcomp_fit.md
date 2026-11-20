@@ -10,7 +10,13 @@ never presented as interchangeable.
 
 ``` r
 # S3 method for class 'regcomp_fit'
-summary(object, level = 0.95, ...)
+summary(
+  object,
+  level = 0.95,
+  vcov = c("model", "sandwich", "quasi"),
+  cluster = NULL,
+  ...
+)
 ```
 
 ## Arguments
@@ -22,6 +28,17 @@ summary(object, level = 0.95, ...)
 - level:
 
   Interval level.
+
+- vcov:
+
+  Covariance for the Wald statistics: `"model"`, `"sandwich"` or
+  `"quasi"` (see
+  [`vcov.regcomp_fit()`](https://adamrsophie.github.io/regcompR/reference/vcov.regcomp_fit.md));
+  the last two cover the regression coefficients only.
+
+- cluster:
+
+  Cluster identifier for `vcov = "sandwich"`.
 
 - ...:
 

@@ -164,6 +164,78 @@ try(compare_models(fp, regcomp(log1p(y) ~ x, family = "normal", data = d)))
 #>   compare_models() needs fits to the same observations of the same response (same rows, same transformation).
 ```
 
+## Tests, simple slopes and collinearity
+
+[`anova()`](https://rdrr.io/r/stats/anova.html) gives likelihood ratio
+tests of nested fits;
+[`wald_test()`](https://adamrsophie.github.io/regcompR/reference/wald_test.md)
+tests linear hypotheses such as equal coefficients (with any covariance
+choice);
+[`simple_slopes()`](https://adamrsophie.github.io/regcompR/reference/simple_slopes.md)
+gives the slope of a covariate on a parameter’s linear predictor at
+values of a moderator, with delta method standard errors;
+[`vif()`](https://adamrsophie.github.io/regcompR/reference/vif.md) gives
+generalized variance inflation factors for each parameter’s regression.
+
+``` r
+
+d$z <- rnorm(n)
+fi <- regcomp(y ~ x * z, family = "nb2", data = d)
+anova(fnb, fi)
+#> Likelihood ratio tests
+#> 
+#>     df  logLik    AIC  Chisq Chi Df Pr(>Chisq)
+#> fnb  3 -626.52 1259.0                         
+#> fi   5 -625.59 1261.2 1.8569      2     0.3952
+wald_test(fi, c("mu:x" = 1, "mu:z" = -1))
+#>   estimate   chisq df      p_value
+#> 1   0.5156 32.4333  1 1.233542e-08
+wald_test(fi, c("mu:z", "mu:x:z"), vcov = "sandwich")
+#>            estimate    chisq df   p_value
+#> 1 -0.07583, 0.05952 1.828828  2 0.4007514
+simple_slopes(fi, "x", "z")
+#>             z     slope  std_error statistic      p_value
+#> 1 -0.95514546 0.3829537 0.08231887  4.652077 3.286081e-06
+#> 2 -0.04649919 0.4370358 0.05973123  7.316706 2.541327e-13
+#> 3  0.86214707 0.4911179 0.08123373  6.045738 1.487274e-09
+vif(fi)
+#>   parameter term df     gvif gvif_adj
+#> 1        mu    x  1 1.004200 1.002098
+#> 2        mu    z  1 1.075140 1.036890
+#> 3        mu  x:z  1 1.072318 1.035528
+```
+
+[`johnson_neyman()`](https://adamrsophie.github.io/regcompR/reference/johnson_neyman.md)
+finds the moderator values where the slope of `x` is significant, and
+`plot(which = "effects", by =)` draws the interaction:
+
+``` r
+
+johnson_neyman(fi, "x", "z", plot = TRUE)$bounds
+```
+
+![](model-checking_files/figure-html/unnamed-chunk-10-1.png)
+
+    #> numeric(0)
+    plot(fi, which = "effects", variable = "x", by = "z")
+
+![](model-checking_files/figure-html/unnamed-chunk-10-2.png)
+
+[`step_regcomp()`](https://adamrsophie.github.io/regcompR/reference/step_regcomp.md)
+selects terms of one parameter’s formula forward, backward or both ways
+by AIC or BIC. Selection makes the final standard errors too optimistic;
+prefer penalties or cross validation for prediction.
+
+``` r
+
+d$x2 <- rnorm(n); d$x3 <- rnorm(n)
+fs <- step_regcomp(regcomp(y ~ 1, family = "nb2", data = d), scope = ~ x + x2 + x3, criterion = "BIC")
+attr(fs, "steps")
+#>      step      BIC
+#> 1   start 1315.109
+#> + x   + x 1270.157
+```
+
 ## Identifiability, covariances and influence of the data
 
 ``` r
@@ -189,6 +261,24 @@ sqrt(diag(vcov(fp, type = "sandwich")))
 sqrt(diag(vcov(fp, type = "sandwich", cluster = ~ g)))
 #> lambda:(Intercept)           lambda:x 
 #>         0.06868048         0.06863328
+```
+
+`type = "quasi"` scales the model covariance by the Pearson dispersion,
+which for binomial and Poisson fits gives the standard errors of
+`glm(family = quasibinomial)` and `quasipoisson`;
+[`summary()`](https://rdrr.io/r/base/summary.html), `tidy()` and
+[`regcomp_table()`](https://adamrsophie.github.io/regcompR/reference/regcomp_table.md)
+take the same choice through `vcov =`.
+
+``` r
+
+sqrt(diag(vcov(fp, type = "quasi")))
+#> lambda:(Intercept)           lambda:x 
+#>         0.06049447         0.05700070
+summary(fp, vcov = "quasi")$table[, c("estimate", "std_error")]
+#>                     estimate  std_error
+#> lambda:(Intercept) 0.9120170 0.06049447
+#> lambda:x           0.4395698 0.05700070
 ```
 
 ## Simulation based checks

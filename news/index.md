@@ -3,6 +3,42 @@
 ## regcompR 0.1.0
 
 - First release.
+- Reporting:
+  [`regcomp_table()`](https://adamrsophie.github.io/regcompR/reference/regcomp_table.md)
+  builds regression tables of one or several fits (rows grouped by
+  distribution parameter, random effect standard deviations and
+  correlations, fit statistics, optional standardized or exponentiated
+  coefficients and sandwich or quasi standard errors) that print in the
+  console and render in R Markdown and Quarto (HTML, PDF, Word).
+  `tidy()`, `glance()` and `augment()` methods work with broom and
+  modelsummary.
+  [`export_table()`](https://adamrsophie.github.io/regcompR/reference/export_table.md)
+  writes `.csv`, `.html`, `.tex`, `.md` and `.docx`;
+  [`export_plot()`](https://adamrsophie.github.io/regcompR/reference/export_table.md)
+  saves any diagnostic plot;
+  [`coef_plot()`](https://adamrsophie.github.io/regcompR/reference/coef_plot.md)
+  draws estimates of several fits.
+- Inference: [`anova()`](https://rdrr.io/r/stats/anova.html) likelihood
+  ratio tests of nested fits,
+  [`wald_test()`](https://adamrsophie.github.io/regcompR/reference/wald_test.md)
+  for linear hypotheses,
+  [`simple_slopes()`](https://adamrsophie.github.io/regcompR/reference/simple_slopes.md)
+  and
+  [`johnson_neyman()`](https://adamrsophie.github.io/regcompR/reference/johnson_neyman.md)
+  for moderation, interaction plots through
+  `plot(which = "effects", by = )`,
+  [`vif()`](https://adamrsophie.github.io/regcompR/reference/vif.md)
+  generalized variance inflation factors, and
+  [`step_regcomp()`](https://adamrsophie.github.io/regcompR/reference/step_regcomp.md)
+  stepwise selection by AIC or BIC.
+- `vcov(type = "quasi")` and `summary(vcov = )` give quasi-likelihood
+  (Pearson dispersion) standard errors, matching `quasibinomial` and
+  `quasipoisson`.
+- Dirichlet regression (matrix response; one log linked concentration
+  per component) and the shifted lognormal family.
+- `person_period(cuts = "events")` builds Cox risk sets: a Poisson fit
+  reproduces `coxph()` with Breslow ties exactly, and random effects
+  give Cox frailty models.
 - [`family_capabilities()`](https://adamrsophie.github.io/regcompR/reference/family_capabilities.md)
   (formerly
   [`capabilities()`](https://rdrr.io/r/base/capabilities.html), renamed

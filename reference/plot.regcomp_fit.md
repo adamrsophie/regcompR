@@ -55,7 +55,10 @@ plot(
 
 - variable:
 
-  Covariate for `"effects"`.
+  Covariate for `"effects"`. Pass `by =` (a moderator) and optionally
+  `at =` (its values; mean and mean plus and minus one standard
+  deviation by default) to draw one curve per moderator value (an
+  interaction plot).
 
 - par:
 

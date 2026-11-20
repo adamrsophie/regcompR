@@ -18,5 +18,7 @@
   estimation](https://adamrsophie.github.io/regcompR/articles/regularization.md):
 - [Model checking and
   comparison](https://adamrsophie.github.io/regcompR/articles/model-checking.md):
+- [Reporting results: tables, tidy output and
+  export](https://adamrsophie.github.io/regcompR/articles/reporting.md):
 - [Bayesian distributional
   regression](https://adamrsophie.github.io/regcompR/articles/bayesian.md):

@@ -34,7 +34,7 @@ table(tab$category)
 #>                  mixed           multivariate                ordinal 
 #>                      2                     22                     10 
 #>               positive quantile_parameterized                   real 
-#>                     64                      5                     56 
+#>                     65                      5                     56 
 head(tab[, c("id", "status", "cdf", "quantile", "stan")])
 #>                        id    status         cdf    quantile        stan
 #> 1 adjacent_category_logit validated unavailable unavailable   generated

@@ -29,7 +29,7 @@ table(reg$category)
 #>                  mixed           multivariate                ordinal 
 #>                      2                     22                     10 
 #>               positive quantile_parameterized                   real 
-#>                     64                      5                     56
+#>                     65                      5                     56
 head(reg[, c("id", "category", "parameters", "status", "cdf", "stan")])
 #>                        id category      parameters    status         cdf
 #> 1 adjacent_category_logit  ordinal mu, cuts, scale validated unavailable
@@ -248,6 +248,18 @@ prob(distribution("poisson", lambda = 2), 1.5)  # off the lattice: no mass
 #> [1] 0
 ```
 
+Some families estimate a bound of their support. The shifted lognormal,
+common for reaction times, estimates the shift `ndt` below every
+response:
+
+``` r
+
+rt <- data.frame(x = rnorm(200)); rt$y <- 0.3 + rlnorm(200, -0.5 + 0.3 * rt$x, 0.4)
+exp(coef(regcomp(y ~ x, family = "shifted_lognormal", data = rt))["ndt:(Intercept)"])
+#> ndt:(Intercept) 
+#>       0.2037205
+```
+
 ## Families beyond the real line
 
 ``` r
@@ -258,15 +270,15 @@ prob(vm, c(-pi, 0, pi))
 dir <- distribution("dirichlet", alpha = c(2, 3, 5))
 rng(dir, 2)
 #>           [,1]      [,2]      [,3]
-#> [1,] 0.2563794 0.3525245 0.3910961
-#> [2,] 0.1101461 0.2610781 0.6287757
+#> [1,] 0.0956239 0.4260995 0.4782766
+#> [2,] 0.2284884 0.5677892 0.2037224
 mvn <- distribution("multivariate_normal", mu = c(0, 1), Sigma = matrix(c(1, 0.5, 0.5, 2), 2))
 log_prob(mvn, rbind(c(0, 1), c(1, 2)))
 #> [1] -2.117685 -2.689114
 plot(mvn)
 ```
 
-![](distributions_files/figure-html/unnamed-chunk-12-1.png)
+![](distributions_files/figure-html/unnamed-chunk-13-1.png)
 
 ``` r
 
@@ -276,8 +288,8 @@ try(distribution("multivariate_normal", mu = c(0, 1), Sigma = matrix(c(1, 2, 2, 
 mn <- distribution("multinomial", probs = c(0.2, 0.3, 0.5), size = 4)
 rng(mn, 2)
 #>      [,1] [,2] [,3]
-#> [1,]    1    1    2
-#> [2,]    1    0    3
+#> [1,]    0    2    2
+#> [2,]    1    2    1
 ml <- distribution("metalog", a = c(0, 1, 0.2))
 quantile(ml, c(0.1, 0.5, 0.9))
 #> [1] -2.021447  0.000000  2.373003
@@ -287,6 +299,25 @@ Multivariate families check their structured parameters (symmetric
 positive definite covariance and scale matrices, Wishart degrees of
 freedom, orthonormal frames) and the shape of each response. Multinomial
 and Ewens laws take the sample size as a parameter.
+
+Dirichlet regression takes a matrix response with one composition per
+row;
+[`regcomp()`](https://adamrsophie.github.io/regcompR/reference/regcomp.md)
+expands the family to one log linked concentration per component
+(`alpha1`, `alpha2`, …), which share the main formula unless given their
+own (the common parameterization of DirichletReg):
+
+``` r
+
+x <- rnorm(150)
+Y <- cbind(rgamma(150, exp(0.5 + 0.3 * x)), rgamma(150, 1), rgamma(150, 1.5))
+dd <- data.frame(x = x); dd$Y <- Y / rowSums(Y)
+coef(regcomp(Y ~ x, alpha3 ~ 1, family = "dirichlet", data = dd))
+#> alpha1:(Intercept)           alpha1:x alpha2:(Intercept)           alpha2:x 
+#>         0.42944315         0.29914825        -0.09330818         0.15151936 
+#> alpha3:(Intercept) 
+#>         0.35504165
+```
 
 ## Links
 

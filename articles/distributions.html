@@ -47,6 +47,7 @@
     <li><a class="dropdown-item" href="../articles/survival.html">Censored data and survival models</a></li>
     <li><a class="dropdown-item" href="../articles/regularization.html">Penalized and bias reduced estimation</a></li>
     <li><a class="dropdown-item" href="../articles/model-checking.html">Model checking and comparison</a></li>
+    <li><a class="dropdown-item" href="../articles/reporting.html">Reporting results: tables, tidy output and export</a></li>
     <li><a class="dropdown-item" href="../articles/bayesian.html">Bayesian distributional regression</a></li>
   </ul>
 </li>
@@ -108,7 +109,7 @@ status; <code><a href="../reference/registry_table.html">registry_table()</a></c
 <span><span class="co">#&gt;                  mixed           multivariate                ordinal </span></span>
 <span><span class="co">#&gt;                      2                     22                     10 </span></span>
 <span><span class="co">#&gt;               positive quantile_parameterized                   real </span></span>
-<span><span class="co">#&gt;                     64                      5                     56</span></span>
+<span><span class="co">#&gt;                     65                      5                     56</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/utils/head.html" class="external-link">head</a></span><span class="op">(</span><span class="va">reg</span><span class="op">[</span>, <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"id"</span>, <span class="st">"category"</span>, <span class="st">"parameters"</span>, <span class="st">"status"</span>, <span class="st">"cdf"</span>, <span class="st">"stan"</span><span class="op">)</span><span class="op">]</span><span class="op">)</span></span>
 <span><span class="co">#&gt;                        id category      parameters    status         cdf</span></span>
 <span><span class="co">#&gt; 1 adjacent_category_logit  ordinal mu, cuts, scale validated unavailable</span></span>
@@ -298,34 +299,42 @@ as jumps.</p>
 <span><span class="co">#&gt; [1] 0.3085375 0.0000000 0.3085375</span></span>
 <span><span class="fu"><a href="../reference/probability-interface.html">prob</a></span><span class="op">(</span><span class="fu"><a href="../reference/distribution.html">distribution</a></span><span class="op">(</span><span class="st">"poisson"</span>, lambda <span class="op">=</span> <span class="fl">2</span><span class="op">)</span>, <span class="fl">1.5</span><span class="op">)</span>  <span class="co"># off the lattice: no mass</span></span>
 <span><span class="co">#&gt; [1] 0</span></span></code></pre></div>
+<p>Some families estimate a bound of their support. The shifted
+lognormal, common for reaction times, estimates the shift
+<code>ndt</code> below every response:</p>
+<div class="sourceCode" id="cb11"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">rt</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span>x <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/stats/Normal.html" class="external-link">rnorm</a></span><span class="op">(</span><span class="fl">200</span><span class="op">)</span><span class="op">)</span>; <span class="va">rt</span><span class="op">$</span><span class="va">y</span> <span class="op">&lt;-</span> <span class="fl">0.3</span> <span class="op">+</span> <span class="fu"><a href="https://rdrr.io/r/stats/Lognormal.html" class="external-link">rlnorm</a></span><span class="op">(</span><span class="fl">200</span>, <span class="op">-</span><span class="fl">0.5</span> <span class="op">+</span> <span class="fl">0.3</span> <span class="op">*</span> <span class="va">rt</span><span class="op">$</span><span class="va">x</span>, <span class="fl">0.4</span><span class="op">)</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/base/Log.html" class="external-link">exp</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/stats/coef.html" class="external-link">coef</a></span><span class="op">(</span><span class="fu"><a href="../reference/regcomp.html">regcomp</a></span><span class="op">(</span><span class="va">y</span> <span class="op">~</span> <span class="va">x</span>, family <span class="op">=</span> <span class="st">"shifted_lognormal"</span>, data <span class="op">=</span> <span class="va">rt</span><span class="op">)</span><span class="op">)</span><span class="op">[</span><span class="st">"ndt:(Intercept)"</span><span class="op">]</span><span class="op">)</span></span>
+<span><span class="co">#&gt; ndt:(Intercept) </span></span>
+<span><span class="co">#&gt;       0.2037205</span></span></code></pre></div>
 </div>
 </div>
 <div class="section level2">
 <h2 id="families-beyond-the-real-line">Families beyond the real line<a class="anchor" aria-label="anchor" href="#families-beyond-the-real-line"></a>
 </h2>
-<div class="sourceCode" id="cb11"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb12"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">vm</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/distribution.html">distribution</a></span><span class="op">(</span><span class="st">"von_mises"</span>, mu <span class="op">=</span> <span class="fl">0</span>, kappa <span class="op">=</span> <span class="fl">2</span><span class="op">)</span></span>
 <span><span class="fu"><a href="../reference/probability-interface.html">prob</a></span><span class="op">(</span><span class="va">vm</span>, <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="op">-</span><span class="va">pi</span>, <span class="fl">0</span>, <span class="va">pi</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="co">#&gt; [1] 0.009448771 0.515885412 0.009448771</span></span>
 <span><span class="va">dir</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/distribution.html">distribution</a></span><span class="op">(</span><span class="st">"dirichlet"</span>, alpha <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">2</span>, <span class="fl">3</span>, <span class="fl">5</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="fu"><a href="../reference/probability-interface.html">rng</a></span><span class="op">(</span><span class="va">dir</span>, <span class="fl">2</span><span class="op">)</span></span>
 <span><span class="co">#&gt;           [,1]      [,2]      [,3]</span></span>
-<span><span class="co">#&gt; [1,] 0.2563794 0.3525245 0.3910961</span></span>
-<span><span class="co">#&gt; [2,] 0.1101461 0.2610781 0.6287757</span></span>
+<span><span class="co">#&gt; [1,] 0.0956239 0.4260995 0.4782766</span></span>
+<span><span class="co">#&gt; [2,] 0.2284884 0.5677892 0.2037224</span></span>
 <span><span class="va">mvn</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/distribution.html">distribution</a></span><span class="op">(</span><span class="st">"multivariate_normal"</span>, mu <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">0</span>, <span class="fl">1</span><span class="op">)</span>, Sigma <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/matrix.html" class="external-link">matrix</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">1</span>, <span class="fl">0.5</span>, <span class="fl">0.5</span>, <span class="fl">2</span><span class="op">)</span>, <span class="fl">2</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="fu"><a href="../reference/probability-interface.html">log_prob</a></span><span class="op">(</span><span class="va">mvn</span>, <span class="fu"><a href="https://rdrr.io/r/base/cbind.html" class="external-link">rbind</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">0</span>, <span class="fl">1</span><span class="op">)</span>, <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">1</span>, <span class="fl">2</span><span class="op">)</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="co">#&gt; [1] -2.117685 -2.689114</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">mvn</span><span class="op">)</span></span></code></pre></div>
-<p><img src="distributions_files/figure-html/unnamed-chunk-12-1.png" class="r-plt" alt="" width="576"></p>
-<div class="sourceCode" id="cb12"><pre class="downlit sourceCode r">
+<p><img src="distributions_files/figure-html/unnamed-chunk-13-1.png" class="r-plt" alt="" width="576"></p>
+<div class="sourceCode" id="cb13"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="kw"><a href="https://rdrr.io/r/base/try.html" class="external-link">try</a></span><span class="op">(</span><span class="fu"><a href="../reference/distribution.html">distribution</a></span><span class="op">(</span><span class="st">"multivariate_normal"</span>, mu <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">0</span>, <span class="fl">1</span><span class="op">)</span>, Sigma <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/matrix.html" class="external-link">matrix</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">1</span>, <span class="fl">2</span>, <span class="fl">2</span>, <span class="fl">1</span><span class="op">)</span>, <span class="fl">2</span><span class="op">)</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="co">#&gt; Error in validate_parameters(fam, vals) : </span></span>
 <span><span class="co">#&gt;   Sigma must be positive definite.</span></span>
 <span><span class="va">mn</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/distribution.html">distribution</a></span><span class="op">(</span><span class="st">"multinomial"</span>, probs <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">0.2</span>, <span class="fl">0.3</span>, <span class="fl">0.5</span><span class="op">)</span>, size <span class="op">=</span> <span class="fl">4</span><span class="op">)</span></span>
 <span><span class="fu"><a href="../reference/probability-interface.html">rng</a></span><span class="op">(</span><span class="va">mn</span>, <span class="fl">2</span><span class="op">)</span></span>
 <span><span class="co">#&gt;      [,1] [,2] [,3]</span></span>
-<span><span class="co">#&gt; [1,]    1    1    2</span></span>
-<span><span class="co">#&gt; [2,]    1    0    3</span></span>
+<span><span class="co">#&gt; [1,]    0    2    2</span></span>
+<span><span class="co">#&gt; [2,]    1    2    1</span></span>
 <span><span class="va">ml</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/distribution.html">distribution</a></span><span class="op">(</span><span class="st">"metalog"</span>, a <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">0</span>, <span class="fl">1</span>, <span class="fl">0.2</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/stats/quantile.html" class="external-link">quantile</a></span><span class="op">(</span><span class="va">ml</span>, <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">0.1</span>, <span class="fl">0.5</span>, <span class="fl">0.9</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="co">#&gt; [1] -2.021447  0.000000  2.373003</span></span></code></pre></div>
@@ -333,6 +342,20 @@ as jumps.</p>
 positive definite covariance and scale matrices, Wishart degrees of
 freedom, orthonormal frames) and the shape of each response. Multinomial
 and Ewens laws take the sample size as a parameter.</p>
+<p>Dirichlet regression takes a matrix response with one composition per
+row; <code><a href="../reference/regcomp.html">regcomp()</a></code> expands the family to one log linked
+concentration per component (<code>alpha1</code>, <code>alpha2</code>,
+…), which share the main formula unless given their own (the common
+parameterization of DirichletReg):</p>
+<div class="sourceCode" id="cb14"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">x</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/stats/Normal.html" class="external-link">rnorm</a></span><span class="op">(</span><span class="fl">150</span><span class="op">)</span></span>
+<span><span class="va">Y</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/cbind.html" class="external-link">cbind</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/stats/GammaDist.html" class="external-link">rgamma</a></span><span class="op">(</span><span class="fl">150</span>, <span class="fu"><a href="https://rdrr.io/r/base/Log.html" class="external-link">exp</a></span><span class="op">(</span><span class="fl">0.5</span> <span class="op">+</span> <span class="fl">0.3</span> <span class="op">*</span> <span class="va">x</span><span class="op">)</span><span class="op">)</span>, <span class="fu"><a href="https://rdrr.io/r/stats/GammaDist.html" class="external-link">rgamma</a></span><span class="op">(</span><span class="fl">150</span>, <span class="fl">1</span><span class="op">)</span>, <span class="fu"><a href="https://rdrr.io/r/stats/GammaDist.html" class="external-link">rgamma</a></span><span class="op">(</span><span class="fl">150</span>, <span class="fl">1.5</span><span class="op">)</span><span class="op">)</span></span>
+<span><span class="va">dd</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span>x <span class="op">=</span> <span class="va">x</span><span class="op">)</span>; <span class="va">dd</span><span class="op">$</span><span class="va">Y</span> <span class="op">&lt;-</span> <span class="va">Y</span> <span class="op">/</span> <span class="fu"><a href="https://rdrr.io/r/base/colSums.html" class="external-link">rowSums</a></span><span class="op">(</span><span class="va">Y</span><span class="op">)</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/stats/coef.html" class="external-link">coef</a></span><span class="op">(</span><span class="fu"><a href="../reference/regcomp.html">regcomp</a></span><span class="op">(</span><span class="va">Y</span> <span class="op">~</span> <span class="va">x</span>, <span class="va">alpha3</span> <span class="op">~</span> <span class="fl">1</span>, family <span class="op">=</span> <span class="st">"dirichlet"</span>, data <span class="op">=</span> <span class="va">dd</span><span class="op">)</span><span class="op">)</span></span>
+<span><span class="co">#&gt; alpha1:(Intercept)           alpha1:x alpha2:(Intercept)           alpha2:x </span></span>
+<span><span class="co">#&gt;         0.42944315         0.29914825        -0.09330818         0.15151936 </span></span>
+<span><span class="co">#&gt; alpha3:(Intercept) </span></span>
+<span><span class="co">#&gt;         0.35504165</span></span></code></pre></div>
 </div>
 <div class="section level2">
 <h2 id="links">Links<a class="anchor" aria-label="anchor" href="#links"></a>
@@ -341,7 +364,7 @@ and Ewens laws take the sample size as a parameter.</p>
 returns one; each parameter has a default link and a set of allowed
 links that <code><a href="../reference/regcomp.html">regcomp()</a></code> accepts through
 <code>links =</code>.</p>
-<div class="sourceCode" id="cb13"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb15"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="../reference/link.html">links</a></span><span class="op">(</span><span class="op">)</span></span>
 <span><span class="co">#&gt;  [1] "identity"  "log"       "softplus"  "sqrt"      "inverse"   "logit"    </span></span>
 <span><span class="co">#&gt;  [7] "probit"    "cloglog"   "cauchit"   "loglog"    "tan_half"  "fisherz"  </span></span>
@@ -354,7 +377,7 @@ links that <code><a href="../reference/regcomp.html">regcomp()</a></code> accept
 <h2 id="numerical-building-blocks">Numerical building blocks<a class="anchor" aria-label="anchor" href="#numerical-building-blocks"></a>
 </h2>
 <p>The log scale helpers used throughout the package are exported:</p>
-<div class="sourceCode" id="cb14"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb16"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="../reference/numerics.html">log1mexp</a></span><span class="op">(</span><span class="fl">1e-20</span><span class="op">)</span>                      <span class="co"># log(1 - exp(-x)) without cancellation</span></span>
 <span><span class="co">#&gt; [1] -46.0517</span></span>
 <span><span class="fu"><a href="../reference/numerics.html">log1pexp</a></span><span class="op">(</span><span class="fl">800</span><span class="op">)</span>                        <span class="co"># log(1 + exp(x)) without overflow</span></span>

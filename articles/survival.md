@@ -126,6 +126,36 @@ coef(regcomp(y ~ x, family = censor("normal", lower = 0), data = tob))
 #>         0.4277192         0.9548162         0.1095207
 ```
 
+## Cox proportional hazards and frailty
+
+`person_period(cuts = "events")` builds the risk set of every distinct
+event time. A Poisson regression of `event` on one intercept per event
+time and the covariates gives exactly the Cox estimates with Breslow
+ties and their standard errors (Whitehead 1980). Random effects then
+give Cox frailty models (the `"tmb"` engine is fastest here), and
+`engine = "bayes"` a Bayesian Cox model.
+
+``` r
+
+lung <- na.omit(survival::lung[, c("time", "status", "age", "sex", "inst")])
+lung$status <- lung$status - 1
+pp <- person_period(lung, "time", "status", cuts = "events")
+fc <- regcomp(event ~ 0 + factor(period) + age + sex, family = "poisson", data = pp)
+rbind(regcompR = coef(fc)[c("lambda:age", "lambda:sex")],
+      coxph = coef(survival::coxph(survival::Surv(time, status) ~ age + sex, lung, ties = "breslow")))
+#>          lambda:age lambda:sex
+#> regcompR 0.01700002 -0.5109971
+#> coxph    0.01700005 -0.5109966
+fr <- regcomp(event ~ 0 + factor(period) + age + sex + (1 | inst), family = "poisson",
+              data = transform(pp, inst = factor(inst)), engine = "tmb")
+st <- summary(fr)$table
+st[!grepl("period", rownames(st)), c("estimate", "std_error")]
+#>                                        estimate    std_error
+#> lambda:age                           0.01700007 9.222569e-03
+#> lambda:sex                          -0.51099724 1.676826e-01
+#> lambda:1 | inst:log_sd((Intercept)) -9.78357381 1.901896e+03
+```
+
 ## Discrete time and frailty
 
 See

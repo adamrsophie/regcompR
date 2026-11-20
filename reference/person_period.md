@@ -12,7 +12,7 @@ give frailty and multilevel survival models.
 ## Usage
 
 ``` r
-person_period(data, time, status, start = 1)
+person_period(data, time, status, start = 1, cuts = NULL)
 ```
 
 ## Arguments
@@ -23,7 +23,8 @@ person_period(data, time, status, start = 1)
 
 - time:
 
-  Name of the column with the last observed period (a positive integer).
+  Name of the column with the last observed period (a positive integer),
+  or the observed time when `cuts` is given.
 
 - status:
 
@@ -34,9 +35,26 @@ person_period(data, time, status, start = 1)
 
   First period (default 1).
 
+- cuts:
+
+  `NULL` for integer periods, `"events"` for the distinct event times,
+  or a sorted numeric vector of period end points. Subjects whose time
+  is before the first cut are dropped, as in the Cox risk sets. The
+  column `period_time` holds the cut of each row.
+
 ## Value
 
 The expanded data frame with columns `period` and `event`.
+
+## Details
+
+With `cuts = "events"` the time is continuous and the periods are the
+distinct event times: each subject has one row per event time at or
+before its own time, the risk set of that time. A Poisson regression of
+`event` on `0 + factor(period)` and covariates then gives exactly the
+Cox proportional hazards estimates with Breslow ties and their standard
+errors (Whitehead 1980; Laird and Olivier 1981); random effects give Cox
+frailty models, and `engine = "bayes"` a Bayesian Cox model.
 
 ## Examples
 

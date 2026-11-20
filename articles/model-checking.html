@@ -47,6 +47,7 @@
     <li><a class="dropdown-item" href="../articles/survival.html">Censored data and survival models</a></li>
     <li><a class="dropdown-item" href="../articles/regularization.html">Penalized and bias reduced estimation</a></li>
     <li><a class="dropdown-item" href="../articles/model-checking.html">Model checking and comparison</a></li>
+    <li><a class="dropdown-item" href="../articles/reporting.html">Reporting results: tables, tidy output and export</a></li>
     <li><a class="dropdown-item" href="../articles/bayesian.html">Bayesian distributional regression</a></li>
   </ul>
 </li>
@@ -213,9 +214,65 @@ transformations, or Bayesian fits.</p>
 <span><span class="co">#&gt;   compare_models() needs fits to the same observations of the same response (same rows, same transformation).</span></span></code></pre></div>
 </div>
 <div class="section level2">
+<h2 id="tests-simple-slopes-and-collinearity">Tests, simple slopes and collinearity<a class="anchor" aria-label="anchor" href="#tests-simple-slopes-and-collinearity"></a>
+</h2>
+<p><code><a href="https://rdrr.io/r/stats/anova.html" class="external-link">anova()</a></code> gives likelihood ratio tests of nested fits;
+<code><a href="../reference/wald_test.html">wald_test()</a></code> tests linear hypotheses such as equal
+coefficients (with any covariance choice); <code><a href="../reference/simple_slopes.html">simple_slopes()</a></code>
+gives the slope of a covariate on a parameter’s linear predictor at
+values of a moderator, with delta method standard errors;
+<code><a href="../reference/vif.html">vif()</a></code> gives generalized variance inflation factors for each
+parameter’s regression.</p>
+<div class="sourceCode" id="cb13"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">d</span><span class="op">$</span><span class="va">z</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/stats/Normal.html" class="external-link">rnorm</a></span><span class="op">(</span><span class="va">n</span><span class="op">)</span></span>
+<span><span class="va">fi</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/regcomp.html">regcomp</a></span><span class="op">(</span><span class="va">y</span> <span class="op">~</span> <span class="va">x</span> <span class="op">*</span> <span class="va">z</span>, family <span class="op">=</span> <span class="st">"nb2"</span>, data <span class="op">=</span> <span class="va">d</span><span class="op">)</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/stats/anova.html" class="external-link">anova</a></span><span class="op">(</span><span class="va">fnb</span>, <span class="va">fi</span><span class="op">)</span></span>
+<span><span class="co">#&gt; Likelihood ratio tests</span></span>
+<span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt;     df  logLik    AIC  Chisq Chi Df Pr(&gt;Chisq)</span></span>
+<span><span class="co">#&gt; fnb  3 -626.52 1259.0                         </span></span>
+<span><span class="co">#&gt; fi   5 -625.59 1261.2 1.8569      2     0.3952</span></span>
+<span><span class="fu"><a href="../reference/wald_test.html">wald_test</a></span><span class="op">(</span><span class="va">fi</span>, <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"mu:x"</span> <span class="op">=</span> <span class="fl">1</span>, <span class="st">"mu:z"</span> <span class="op">=</span> <span class="op">-</span><span class="fl">1</span><span class="op">)</span><span class="op">)</span></span>
+<span><span class="co">#&gt;   estimate   chisq df      p_value</span></span>
+<span><span class="co">#&gt; 1   0.5156 32.4333  1 1.233542e-08</span></span>
+<span><span class="fu"><a href="../reference/wald_test.html">wald_test</a></span><span class="op">(</span><span class="va">fi</span>, <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"mu:z"</span>, <span class="st">"mu:x:z"</span><span class="op">)</span>, vcov <span class="op">=</span> <span class="st">"sandwich"</span><span class="op">)</span></span>
+<span><span class="co">#&gt;            estimate    chisq df   p_value</span></span>
+<span><span class="co">#&gt; 1 -0.07583, 0.05952 1.828828  2 0.4007514</span></span>
+<span><span class="fu"><a href="../reference/simple_slopes.html">simple_slopes</a></span><span class="op">(</span><span class="va">fi</span>, <span class="st">"x"</span>, <span class="st">"z"</span><span class="op">)</span></span>
+<span><span class="co">#&gt;             z     slope  std_error statistic      p_value</span></span>
+<span><span class="co">#&gt; 1 -0.95514546 0.3829537 0.08231887  4.652077 3.286081e-06</span></span>
+<span><span class="co">#&gt; 2 -0.04649919 0.4370358 0.05973123  7.316706 2.541327e-13</span></span>
+<span><span class="co">#&gt; 3  0.86214707 0.4911179 0.08123373  6.045738 1.487274e-09</span></span>
+<span><span class="fu"><a href="../reference/vif.html">vif</a></span><span class="op">(</span><span class="va">fi</span><span class="op">)</span></span>
+<span><span class="co">#&gt;   parameter term df     gvif gvif_adj</span></span>
+<span><span class="co">#&gt; 1        mu    x  1 1.004200 1.002098</span></span>
+<span><span class="co">#&gt; 2        mu    z  1 1.075140 1.036890</span></span>
+<span><span class="co">#&gt; 3        mu  x:z  1 1.072318 1.035528</span></span></code></pre></div>
+<p><code><a href="../reference/johnson_neyman.html">johnson_neyman()</a></code> finds the moderator values where the
+slope of <code>x</code> is significant, and
+<code>plot(which = "effects", by =)</code> draws the interaction:</p>
+<div class="sourceCode" id="cb14"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="fu"><a href="../reference/johnson_neyman.html">johnson_neyman</a></span><span class="op">(</span><span class="va">fi</span>, <span class="st">"x"</span>, <span class="st">"z"</span>, plot <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span><span class="op">$</span><span class="va">bounds</span></span></code></pre></div>
+<p><img src="model-checking_files/figure-html/unnamed-chunk-10-1.png" class="r-plt" alt="" width="576"></p>
+<pre><code><span><span class="co">#&gt; numeric(0)</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">fi</span>, which <span class="op">=</span> <span class="st">"effects"</span>, variable <span class="op">=</span> <span class="st">"x"</span>, by <span class="op">=</span> <span class="st">"z"</span><span class="op">)</span></span></code></pre>
+<p><img src="model-checking_files/figure-html/unnamed-chunk-10-2.png" class="r-plt" alt="" width="576"></p>
+<p><code><a href="../reference/step_regcomp.html">step_regcomp()</a></code> selects terms of one parameter’s formula
+forward, backward or both ways by AIC or BIC. Selection makes the final
+standard errors too optimistic; prefer penalties or cross validation for
+prediction.</p>
+<div class="sourceCode" id="cb16"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">d</span><span class="op">$</span><span class="va">x2</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/stats/Normal.html" class="external-link">rnorm</a></span><span class="op">(</span><span class="va">n</span><span class="op">)</span>; <span class="va">d</span><span class="op">$</span><span class="va">x3</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/stats/Normal.html" class="external-link">rnorm</a></span><span class="op">(</span><span class="va">n</span><span class="op">)</span></span>
+<span><span class="va">fs</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/step_regcomp.html">step_regcomp</a></span><span class="op">(</span><span class="fu"><a href="../reference/regcomp.html">regcomp</a></span><span class="op">(</span><span class="va">y</span> <span class="op">~</span> <span class="fl">1</span>, family <span class="op">=</span> <span class="st">"nb2"</span>, data <span class="op">=</span> <span class="va">d</span><span class="op">)</span>, scope <span class="op">=</span> <span class="op">~</span> <span class="va">x</span> <span class="op">+</span> <span class="va">x2</span> <span class="op">+</span> <span class="va">x3</span>, criterion <span class="op">=</span> <span class="st">"BIC"</span><span class="op">)</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/base/attr.html" class="external-link">attr</a></span><span class="op">(</span><span class="va">fs</span>, <span class="st">"steps"</span><span class="op">)</span></span>
+<span><span class="co">#&gt;      step      BIC</span></span>
+<span><span class="co">#&gt; 1   start 1315.109</span></span>
+<span><span class="co">#&gt; + x   + x 1270.157</span></span></code></pre></div>
+</div>
+<div class="section level2">
 <h2 id="identifiability-covariances-and-influence-of-the-data">Identifiability, covariances and influence of the data<a class="anchor" aria-label="anchor" href="#identifiability-covariances-and-influence-of-the-data"></a>
 </h2>
-<div class="sourceCode" id="cb13"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb17"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="../reference/identifiability_check.html">identifiability_check</a></span><span class="op">(</span><span class="va">fnb</span><span class="op">)</span></span>
 <span><span class="co">#&gt; $condition_number</span></span>
 <span><span class="co">#&gt; [1] 8.593194</span></span>
@@ -237,6 +294,20 @@ transformations, or Bayesian fits.</p>
 <span><span class="fu"><a href="https://rdrr.io/r/base/MathFun.html" class="external-link">sqrt</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/diag.html" class="external-link">diag</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/stats/vcov.html" class="external-link">vcov</a></span><span class="op">(</span><span class="va">fp</span>, type <span class="op">=</span> <span class="st">"sandwich"</span>, cluster <span class="op">=</span> <span class="op">~</span> <span class="va">g</span><span class="op">)</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="co">#&gt; lambda:(Intercept)           lambda:x </span></span>
 <span><span class="co">#&gt;         0.06868048         0.06863328</span></span></code></pre></div>
+<p><code>type = "quasi"</code> scales the model covariance by the
+Pearson dispersion, which for binomial and Poisson fits gives the
+standard errors of <code>glm(family = quasibinomial)</code> and
+<code>quasipoisson</code>; <code><a href="https://rdrr.io/r/base/summary.html" class="external-link">summary()</a></code>, <code>tidy()</code>
+and <code><a href="../reference/regcomp_table.html">regcomp_table()</a></code> take the same choice through
+<code>vcov =</code>.</p>
+<div class="sourceCode" id="cb18"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/base/MathFun.html" class="external-link">sqrt</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/diag.html" class="external-link">diag</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/stats/vcov.html" class="external-link">vcov</a></span><span class="op">(</span><span class="va">fp</span>, type <span class="op">=</span> <span class="st">"quasi"</span><span class="op">)</span><span class="op">)</span><span class="op">)</span></span>
+<span><span class="co">#&gt; lambda:(Intercept)           lambda:x </span></span>
+<span><span class="co">#&gt;         0.06049447         0.05700070</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/base/summary.html" class="external-link">summary</a></span><span class="op">(</span><span class="va">fp</span>, vcov <span class="op">=</span> <span class="st">"quasi"</span><span class="op">)</span><span class="op">$</span><span class="va">table</span><span class="op">[</span>, <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"estimate"</span>, <span class="st">"std_error"</span><span class="op">)</span><span class="op">]</span></span>
+<span><span class="co">#&gt;                     estimate  std_error</span></span>
+<span><span class="co">#&gt; lambda:(Intercept) 0.9120170 0.06049447</span></span>
+<span><span class="co">#&gt; lambda:x           0.4395698 0.05700070</span></span></code></pre></div>
 </div>
 <div class="section level2">
 <h2 id="simulation-based-checks">Simulation based checks<a class="anchor" aria-label="anchor" href="#simulation-based-checks"></a>
@@ -245,7 +316,7 @@ transformations, or Bayesian fits.</p>
 model and <code><a href="../reference/log_lik.html">log_lik()</a></code> returns pointwise log likelihoods (one
 per observation, or a draws by observations matrix for Bayesian fits, as
 needed for LOO).</p>
-<div class="sourceCode" id="cb14"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb19"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">sims</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/stats/simulate.html" class="external-link">simulate</a></span><span class="op">(</span><span class="va">fnb</span>, nsim <span class="op">=</span> <span class="fl">200</span>, seed <span class="op">=</span> <span class="fl">1</span><span class="op">)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span>observed_zeros <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/mean.html" class="external-link">mean</a></span><span class="op">(</span><span class="va">d</span><span class="op">$</span><span class="va">y</span> <span class="op">==</span> <span class="fl">0</span><span class="op">)</span>, simulated_zeros <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/mean.html" class="external-link">mean</a></span><span class="op">(</span><span class="va">sims</span> <span class="op">==</span> <span class="fl">0</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="co">#&gt;  observed_zeros simulated_zeros </span></span>

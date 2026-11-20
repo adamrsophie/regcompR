@@ -130,6 +130,35 @@
   [`power_series_min()`](https://adamrsophie.github.io/regcompR/reference/exponentiated.md)
   : Generated distribution families
 
+## Tables and export
+
+- [`regcomp_table()`](https://adamrsophie.github.io/regcompR/reference/regcomp_table.md)
+  : Regression tables
+- [`tidy(`*`<regcomp_fit>`*`)`](https://adamrsophie.github.io/regcompR/reference/tidy.regcomp_fit.md)
+  [`glance(`*`<regcomp_fit>`*`)`](https://adamrsophie.github.io/regcompR/reference/tidy.regcomp_fit.md)
+  [`augment(`*`<regcomp_fit>`*`)`](https://adamrsophie.github.io/regcompR/reference/tidy.regcomp_fit.md)
+  : Tidy summaries of a fitted model
+- [`export_table()`](https://adamrsophie.github.io/regcompR/reference/export_table.md)
+  [`export_plot()`](https://adamrsophie.github.io/regcompR/reference/export_table.md)
+  : Export tables and plots
+- [`coef_plot()`](https://adamrsophie.github.io/regcompR/reference/coef_plot.md)
+  : Coefficient plot
+
+## Tests and effects
+
+- [`anova(`*`<regcomp_fit>`*`)`](https://adamrsophie.github.io/regcompR/reference/anova.regcomp_fit.md)
+  : Likelihood ratio tests of nested models
+- [`wald_test()`](https://adamrsophie.github.io/regcompR/reference/wald_test.md)
+  : Wald tests of linear hypotheses
+- [`simple_slopes()`](https://adamrsophie.github.io/regcompR/reference/simple_slopes.md)
+  : Simple slopes under moderation
+- [`johnson_neyman()`](https://adamrsophie.github.io/regcompR/reference/johnson_neyman.md)
+  : Johnson-Neyman regions of significance
+- [`vif()`](https://adamrsophie.github.io/regcompR/reference/vif.md) :
+  Variance inflation factors
+- [`step_regcomp()`](https://adamrsophie.github.io/regcompR/reference/step_regcomp.md)
+  : Stepwise selection of terms
+
 ## Results and prediction
 
 - [`summary(`*`<regcomp_fit>`*`)`](https://adamrsophie.github.io/regcompR/reference/summary.regcomp_fit.md)

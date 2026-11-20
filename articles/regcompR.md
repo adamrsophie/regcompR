@@ -19,7 +19,7 @@ links, moments and references.
 ``` r
 
 length(families())
-#> [1] 278
+#> [1] 279
 head(families("count"), 10)
 #>  [1] "bell"                        "beta_negative_binomial"     
 #>  [3] "borel"                       "borel_tanner"               
@@ -281,10 +281,13 @@ plot(fit, which = "effects", variable = "x", par = "sigma")
 - [`vignette("ordinal-categorical")`](https://adamrsophie.github.io/regcompR/articles/ordinal-categorical.md):
   ordinal, nominal, bivariate binary and selection models.
 - [`vignette("survival")`](https://adamrsophie.github.io/regcompR/articles/survival.md):
-  censoring, truncation, cure models and discrete time hazards.
+  censoring, truncation, cure models, Cox and frailty models and
+  discrete time hazards.
 - [`vignette("regularization")`](https://adamrsophie.github.io/regcompR/articles/regularization.md):
   penalized and bias reduced estimation.
 - [`vignette("model-checking")`](https://adamrsophie.github.io/regcompR/articles/model-checking.md):
   residuals, scoring rules, cross validation and comparison.
+- [`vignette("reporting")`](https://adamrsophie.github.io/regcompR/articles/reporting.md):
+  regression tables, tidy output and export of tables and plots.
 - [`vignette("bayesian")`](https://adamrsophie.github.io/regcompR/articles/bayesian.md):
   priors, generated Stan and BUGS programs and Bayesian fitting.

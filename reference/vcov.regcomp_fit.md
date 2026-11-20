@@ -9,13 +9,18 @@ Zeger 1986) and `M` is multiplied by `G / (G - 1)` for `G` clusters.
 This is the independence working model of generalized estimating
 equations for any family; see
 [`gee()`](https://adamrsophie.github.io/regcompR/reference/gee.md) for
-other working correlations.
+other working correlations. `type = "quasi"` multiplies the model
+covariance by the Pearson dispersion `sum(r^2) / (n - p)` of the Pearson
+residuals `r`: the quasi-likelihood covariance of
+`glm(family = quasibinomial)` and `quasipoisson` (McCullagh and Nelder
+1989, ch. 9) when the family is binomial or Poisson, whose estimates are
+the same.
 
 ## Usage
 
 ``` r
 # S3 method for class 'regcomp_fit'
-vcov(object, type = c("model", "sandwich"), cluster = NULL, ...)
+vcov(object, type = c("model", "sandwich", "quasi"), cluster = NULL, ...)
 ```
 
 ## Arguments
@@ -26,7 +31,7 @@ vcov(object, type = c("model", "sandwich"), cluster = NULL, ...)
 
 - type:
 
-  `"model"` or `"sandwich"`.
+  `"model"`, `"sandwich"` or `"quasi"`.
 
 - cluster:
 
