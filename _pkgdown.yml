@@ -87,6 +87,15 @@ reference:
   - regcomp_table
   - tidy.regcomp_fit
   - export_table
+  - coef_plot
+- title: Tests and effects
+  contents:
+  - anova.regcomp_fit
+  - wald_test
+  - simple_slopes
+  - johnson_neyman
+  - vif
+  - step_regcomp
 - title: Results and prediction
   contents:
   - summary.regcomp_fit
