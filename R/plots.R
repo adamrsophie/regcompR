@@ -171,7 +171,16 @@ plot.regcomp_fit <- function(x, which = c("qq", "pit", "residuals", "rootogram")
 
 #' @export
 `[.regcomp_dist` <- function(x, i) {
-  structure(list(family = x$family, pars = lapply(recycle_pars(x$pars), `[`, i)), class = "regcomp_dist")
+  # Only the observation axis is sliced: parameters that vary by observation
+  # (regression parameters and data arguments; every parameter of a plain
+  # scalar law). Shared thresholds, mean vectors and matrices stay whole.
+  fam <- x$family
+  obs <- vapply(fam$pars, function(p) fam$variate_type == "scalar" || isTRUE(p$regression) || isTRUE(p$data), TRUE)
+  obs <- obs & vapply(x$pars[names(fam$pars)], function(v) is.null(dim(v)), TRUE)
+  n <- max(c(1L, lengths(x$pars[names(fam$pars)][obs])))
+  pars <- x$pars
+  for (k in names(fam$pars)[obs]) pars[[k]] <- rep_len(pars[[k]], n)[i]
+  structure(list(family = fam, pars = pars), class = "regcomp_dist")
 }
 
 plot_qq <- function(fit, nsim = 50, ...) {

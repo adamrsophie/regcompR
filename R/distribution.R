@@ -70,13 +70,11 @@ validate_parameters <- function(x, pars) {
   for (p in fam$pars) {
     v <- pars[[p$name]]
     if (is.null(v)) next
-    if (fam$variate_type == "scalar" || is.null(dim(v))) {
-      ok <- check_par_domain(p, v)
-      if (!all(ok | is.na(v)))
-        stop_domain(sprintf("Parameter '%s' of '%s' must be in its %s domain; got %s.",
-                            p$name, fam$id, p$domain,
-                            format(v[!ok & !is.na(v)][1], digits = 6)))
-    }
+    ok <- check_par_domain(p, v)
+    if (!all(ok | is.na(v)))
+      stop_domain(sprintf("Parameter '%s' of '%s' must be in its %s domain; got %s.",
+                          p$name, fam$id, p$domain,
+                          format(v[!ok & !is.na(v)][1], digits = 6)))
   }
   if (!is.null(fam$check)) {
     msg <- fam$check(pars)
@@ -445,6 +443,7 @@ rng <- function(x, n, ...) UseMethod("rng")
 #' @rdname probability-interface
 #' @export
 rng.regcomp_dist <- function(x, n = NULL, ...) {
+  if (...length()) stop_input("Unused arguments to rng(); give sample sizes and similar values as distribution parameters.")
   fam <- x$family
   m <- if (fam$variate_type == "scalar") max(vapply(x$pars, length, 1L)) else 1L
   if (is.null(n)) n <- m

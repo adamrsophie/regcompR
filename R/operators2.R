@@ -49,6 +49,9 @@ cure <- function(base) {
   lccdf <- function(q, p) log(p$cure + (1 - p$cure) * (1 - family_cdf(base, q, bp(p))))
   op_family(base, sprintf("cure(%s)", base$id), sprintf("Mixture cure %s", base$display_name), pars, lpdf,
     cdf = cdf, lccdf = lccdf, numeric_moments = FALSE,
+    # The cured fraction is mass at infinity: the support extends to Inf, so
+    # F(t) + S(t) = 1 also above a finite upper bound of the uncured law.
+    support = function(p) list(lower = base$support(bp(p))$lower, upper = Inf),
     quantile = function(pr, p) { r <- pr / (1 - p$cure); out <- rep(Inf, length(pr)); ok <- r < 1
       if (any(ok)) out[ok] <- family_quantile(base, r[ok], lapply(bp(p), function(v) if (length(v) == length(pr)) v[ok] else v)); out },
     rng = function(n, p) ifelse(stats::runif(n) < p$cure, Inf, family_rng(base, n, bp(p))),

@@ -10,13 +10,29 @@ as_mats <- function(y) if (is.list(y)) y else list(y)
 lmgamma <- function(a, p) p * (p - 1) / 4 * log(pi) + sum(lgamma(a + (1 - seq_len(p)) / 2))
 ldet <- function(A) as.numeric(determinant(as.matrix(A), logarithm = TRUE)$modulus)
 etr <- function(A) sum(diag(A))
+# NULL when M is a finite symmetric positive definite matrix (of dimension
+# n when given), otherwise the reason.
+spd_msg <- function(M, name, n = NULL) {
+  M <- as.matrix(M)
+  if (nrow(M) != ncol(M)) return(sprintf("%s must be a square matrix.", name))
+  if (!is.null(n) && nrow(M) != n) return(sprintf("%s must be %d by %d to match the other parameters.", name, n, n))
+  if (any(!is.finite(M)) || !isSymmetric(unname(M), tol = 1e-8)) return(sprintf("%s must be a finite symmetric matrix.", name))
+  if (min(eigen(M, symmetric = TRUE, only.values = TRUE)$values) <= 0) return(sprintf("%s must be positive definite.", name))
+  NULL
+}
+wishart_msg <- function(nu, S, name) spd_msg(S, name) %||%
+  (if (nu <= nrow(as.matrix(S)) - 1) sprintf("Degrees of freedom nu must exceed the dimension minus one (%d).", nrow(as.matrix(S)) - 1))
 
 # Count vectors ---------------------------------------------------------------------
-mfam("multinomial", "Multinomial", list(P("probs", "unit", role = "cell probabilities", regression = FALSE)), discrete = TRUE,
-  formula = "P(y) = n! prod p_k^y_k / y_k!, n = sum y",
+mfam("multinomial", "Multinomial", list(P("probs", "unit", role = "cell probabilities", regression = FALSE),
+  P("size", "positive_integer", data = TRUE, default = NA, interpretation = "Number of trials; NA conditions on each observed total")), discrete = TRUE,
+  formula = "P(y) = n! prod p_k^y_k / y_k!, n = sum y (or the given size)",
   lpdf = function(y, p) { y <- as_rows(y); pr <- p$probs / sum(p$probs)
-    lgamma(rowSums(y) + 1) + drop(y %*% log(pr)) - rowSums(lgamma(y + 1)) },
-  rng = function(n, p, size = 10) t(stats::rmultinom(n, size, p$probs)),
+    out <- lgamma(rowSums(y) + 1) + drop(y %*% log(pr)) - rowSums(lgamma(y + 1))
+    if (!all(is.na(p$size))) out[rowSums(y) != rep_len(p$size, nrow(y))] <- -Inf
+    out },
+  rng = function(n, p) { if (anyNA(p$size)) stop_input("Simulating a multinomial needs the number of trials: give size.")
+    t(stats::rmultinom(n, p$size[1], p$probs)) },
   regression_notes = "Multinomial logit regression is provided by the 'multinomial_logit' family.",
   references = "Johnson, Kotz and Balakrishnan (1997), Discrete Multivariate Distributions. Wiley.",
   reference = ref_impl("stats", function(y, p) apply(as_rows(y), 1, stats::dmultinom, prob = p$probs, log = TRUE)), status = "validated")
@@ -54,12 +70,16 @@ mfam("dirichlet_negative_multinomial", "Dirichlet negative multinomial", list(P(
 
 ewens_lp <- function(a, th) { n <- sum(seq_along(a) * a); j <- seq_along(a)
   lgamma(n + 1) - (lgamma(th + n) - lgamma(th)) + sum(a * log(th) - a * log(j) - lgamma(a + 1)) }
-mfam("ewens", "Ewens sampling formula", list(P("theta", "positive", role = "mutation rate")), discrete = TRUE, variate_type = "partition",
+mfam("ewens", "Ewens sampling formula", list(P("theta", "positive", role = "mutation rate"),
+  P("size", "positive_integer", data = TRUE, default = NA, interpretation = "Sample size n; NA conditions on each observed partition size")), discrete = TRUE, variate_type = "partition",
   formula = "P(a) = n! / (theta (theta + 1) ... (theta + n - 1)) prod theta^a_j / (j^a_j a_j!), a_j = number of types seen j times",
-  lpdf = function(y, p) apply(as_rows(y), 1, ewens_lp, th = p$theta),
-  rng = function(n, p, size = 10) t(vapply(seq_len(n), function(i) { cl <- integer(0)
+  lpdf = function(y, p) { Y <- as_rows(y); out <- apply(Y, 1, ewens_lp, th = p$theta)
+    if (!all(is.na(p$size))) out[drop(Y %*% seq_len(ncol(Y))) != p$size[1]] <- -Inf
+    out },
+  rng = function(n, p) { if (anyNA(p$size)) stop_input("Simulating the Ewens formula needs the sample size: give size.")
+    size <- p$size[1]; t(vapply(seq_len(n), function(i) { cl <- integer(0)
     for (k in seq_len(size)) { if (stats::runif(1) < p$theta / (p$theta + k - 1)) cl <- c(cl, 1L) else { j <- sample.int(length(cl), 1, prob = cl); cl[j] <- cl[j] + 1L } }
-    tabulate(cl, size) }, numeric(size))),
+    tabulate(cl, size) }, numeric(size))) },
   references = "Ewens (1972), The sampling theory of selectively neutral alleles. Theor. Popul. Biol., 3, 87-112.",
   reference = ref_impl("Chinese restaurant process", function(y, p) apply(as_rows(y), 1, ewens_lp, th = p$theta),
     note = "Checked by summing to one over all partitions of n."), status = "validated")
@@ -87,7 +107,7 @@ mfam("continuous_categorical", "Continuous categorical", list(P("eta", "real", r
   status = "validated")
 
 mfam("multivariate_normal", "Multivariate normal", list(P("mu", "real", role = "mean vector", regression = FALSE), P("Sigma", "any", role = "covariance matrix", regression = FALSE)),
-  aliases = c("mvn", "MVN"),
+  aliases = c("mvn", "MVN"), check = function(p) spd_msg(p$Sigma, "Sigma", length(p$mu)),
   lpdf = function(y, p) { y <- as_rows(y); S <- as.matrix(p$Sigma); R <- chol(S); z <- backsolve(R, t(y) - p$mu, transpose = TRUE)
     -0.5 * ncol(y) * log(2 * pi) - sum(log(diag(R))) - 0.5 * colSums(z^2) },
   rng = function(n, p) sweep(matrix(stats::rnorm(n * length(p$mu)), n) %*% chol(as.matrix(p$Sigma)), 2, p$mu, "+"),
@@ -96,7 +116,7 @@ mfam("multivariate_normal", "Multivariate normal", list(P("mu", "real", role = "
   stan = stan_native("multi_normal_lpdf({y} | {mu}, {Sigma})", rng = "multi_normal_rng({mu}, {Sigma})"), status = "validated")
 
 mfam("multivariate_t", "Multivariate t", list(P("mu", "real", regression = FALSE), P("Sigma", "any", role = "scale matrix", regression = FALSE), P("nu", "positive", role = "degrees of freedom")),
-  aliases = "mvt",
+  aliases = "mvt", check = function(p) spd_msg(p$Sigma, "Sigma", length(p$mu)),
   lpdf = function(y, p) { y <- as_rows(y); d <- ncol(y); R <- chol(as.matrix(p$Sigma)); z <- backsolve(R, t(y) - p$mu, transpose = TRUE)
     lgamma((p$nu + d) / 2) - lgamma(p$nu / 2) - d / 2 * log(p$nu * pi) - sum(log(diag(R))) - (p$nu + d) / 2 * log1p(colSums(z^2) / p$nu) },
   rng = function(n, p) { d <- length(p$mu); z <- matrix(stats::rnorm(n * d), n) %*% chol(as.matrix(p$Sigma)); sweep(z / sqrt(stats::rchisq(n, p$nu) / p$nu), 2, p$mu, "+") },
@@ -126,6 +146,7 @@ mfam("generalized_multivariate_log_gamma", "Generalized multivariate log-gamma (
 
 mfam("bivariate_marshall_olkin_exponential", "Marshall-Olkin bivariate exponential", list(P("lambda1", "positive"), P("lambda2", "positive"), P("lambda12", "positive", role = "common shock rate")),
   aliases = "marshall_olkin_exponential", variate_type = "vector_mixed",
+  response_check = function(y, p) { Y <- as_rows(y); ncol(Y) == 2 & rowSums(!is.finite(Y) | Y < 0) == 0 },
   formula = "P(X > x, Y > y) = exp(-l1 x - l2 y - l12 max(x, y)); absolutely continuous part off the diagonal plus a singular part on x = y",
   lpdf = function(y, p) { y <- as_rows(y); a <- y[, 1]; b <- y[, 2]; l1 <- p$lambda1; l2 <- p$lambda2; l3 <- p$lambda12
     ifelse(a < b, log(l1 * (l2 + l3)) - l1 * a - (l2 + l3) * b,
@@ -152,6 +173,7 @@ register_family(family_def("balding_nichols", "Balding-Nichols", "bounded", list
 xfam <- function(...) mfam(..., variate_type = "matrix")
 xfam("wishart", "Wishart", list(P("nu", "positive", role = "degrees of freedom"), P("Sigma", "any", role = "scale matrix", regression = FALSE)),
   formula = "f(W) = |W|^((nu - p - 1)/2) etr(-Sigma^-1 W / 2) / (2^(nu p/2) |Sigma|^(nu/2) Gamma_p(nu/2))",
+  check = function(q) wishart_msg(q$nu, q$Sigma, "Sigma"),
   lpdf = function(y, q) { S <- as.matrix(q$Sigma); p <- nrow(S); Si <- solve(S)
     vapply(as_mats(y), function(W) (q$nu - p - 1) / 2 * ldet(W) - etr(Si %*% W) / 2 - q$nu * p / 2 * log(2) - q$nu / 2 * ldet(S) - lmgamma(q$nu / 2, p), 0) },
   rng = function(n, q) lapply(seq_len(n), function(i) stats::rWishart(1, q$nu, as.matrix(q$Sigma))[, , 1]),
@@ -161,6 +183,7 @@ xfam("wishart", "Wishart", list(P("nu", "positive", role = "degrees of freedom")
 
 xfam("inverse_wishart", "Inverse Wishart", list(P("nu", "positive"), P("Psi", "any", role = "scale matrix", regression = FALSE)),
   formula = "f(X) = |Psi|^(nu/2) |X|^(-(nu + p + 1)/2) etr(-Psi X^-1 / 2) / (2^(nu p/2) Gamma_p(nu/2))",
+  check = function(q) wishart_msg(q$nu, q$Psi, "Psi"),
   lpdf = function(y, q) { S <- as.matrix(q$Psi); p <- nrow(S)
     vapply(as_mats(y), function(X) q$nu / 2 * ldet(S) - (q$nu + p + 1) / 2 * ldet(X) - etr(S %*% solve(X)) / 2 - q$nu * p / 2 * log(2) - lmgamma(q$nu / 2, p), 0) },
   rng = function(n, q) lapply(seq_len(n), function(i) solve(stats::rWishart(1, q$nu, solve(as.matrix(q$Psi)))[, , 1])),
@@ -181,6 +204,8 @@ xfam("lkj", "Lewandowski-Kurowicka-Joe (correlation matrices)", list(P("eta", "p
 xfam("matrix_normal", "Matrix normal", list(P("M", "real", role = "mean matrix", regression = FALSE), P("U", "any", role = "row covariance", regression = FALSE),
   P("V", "any", role = "column covariance", regression = FALSE)),
   formula = "vec(X) ~ N(vec(M), V kron U)",
+  check = function(q) { M <- as.matrix(q$M); spd_msg(q$U, "U", nrow(M)) %||% spd_msg(q$V, "V", ncol(M)) },
+  response_check = function(y, q) vapply(as_mats(y), function(X) identical(dim(as.matrix(X)), dim(as.matrix(q$M))) && all(is.finite(X)), TRUE),
   lpdf = function(y, q) { U <- as.matrix(q$U); V <- as.matrix(q$V); n <- nrow(U); p <- nrow(V); Ui <- solve(U); Vi <- solve(V)
     vapply(as_mats(y), function(X) { D <- X - q$M; -0.5 * etr(Vi %*% t(D) %*% Ui %*% D) - n * p / 2 * log(2 * pi) - n / 2 * ldet(V) - p / 2 * ldet(U) }, 0) },
   rng = function(n, q) lapply(seq_len(n), function(i) q$M + t(chol(as.matrix(q$U))) %*% matrix(stats::rnorm(length(q$M)), nrow(q$M)) %*% chol(as.matrix(q$V))),
@@ -191,6 +216,7 @@ xfam("matrix_normal", "Matrix normal", list(P("M", "real", role = "mean matrix",
 xfam("matrix_t", "Matrix t", list(P("M", "real", regression = FALSE), P("Sigma", "any", role = "row scale", regression = FALSE), P("Omega", "any", role = "column scale", regression = FALSE),
   P("nu", "positive")),
   formula = "f(X) = Gamma_p((nu + n + p - 1)/2) / (pi^(np/2) Gamma_p((nu + p - 1)/2)) |Omega|^(-n/2) |Sigma|^(-p/2) |I_n + Sigma^-1 (X - M) Omega^-1 (X - M)'|^(-(nu + n + p - 1)/2)",
+  check = function(q) { M <- as.matrix(q$M); spd_msg(q$Sigma, "Sigma", nrow(M)) %||% spd_msg(q$Omega, "Omega", ncol(M)) },
   lpdf = function(y, q) { S <- as.matrix(q$Sigma); O <- as.matrix(q$Omega); n <- nrow(S); p <- nrow(O); a <- (q$nu + n + p - 1) / 2
     vapply(as_mats(y), function(X) { D <- X - q$M
       lmgamma(a, p) - n * p / 2 * log(pi) - lmgamma((q$nu + p - 1) / 2, p) - n / 2 * ldet(O) - p / 2 * ldet(S) - a * ldet(diag(n) + solve(S) %*% D %*% solve(O) %*% t(D)) }, 0) },
@@ -200,6 +226,7 @@ xfam("matrix_t", "Matrix t", list(P("M", "real", regression = FALSE), P("Sigma",
   status = "validated")
 
 xfam("matrix_beta", "Matrix variate beta (type I)", list(P("a", "positive"), P("b", "positive"), P("p", "positive_integer", data = TRUE)),
+  check = function(q) if (q$a <= (q$p - 1) / 2 || q$b <= (q$p - 1) / 2) "a and b must exceed (p - 1) / 2.",
   formula = "f(U) = Gamma_p(a + b) / (Gamma_p(a) Gamma_p(b)) |U|^(a - (p + 1)/2) |I - U|^(b - (p + 1)/2), 0 < U < I",
   lpdf = function(y, q) vapply(as_mats(y), function(U) { p <- nrow(U)
     lmgamma(q$a + q$b, p) - lmgamma(q$a, p) - lmgamma(q$b, p) + (q$a - (p + 1) / 2) * ldet(U) + (q$b - (p + 1) / 2) * ldet(diag(p) - U) }, 0),
@@ -212,6 +239,9 @@ xfam("matrix_beta", "Matrix variate beta (type I)", list(P("a", "positive"), P("
 stiefel_logvol <- function(n, k) k * log(2) + n * k / 2 * log(pi) - lmgamma(n / 2, k)
 xfam("stiefel_uniform", "Uniform (Haar) on the Stiefel manifold", list(P("n", "positive_integer", data = TRUE), P("k", "positive_integer", data = TRUE)),
   aliases = c("haar_orthogonal", "uniform_stiefel"),
+  check = function(q) if (q$k > q$n) "k must not exceed n.",
+  response_check = function(y, q) vapply(as_mats(y), function(X) { X <- as.matrix(X)
+    nrow(X) == q$n && ncol(X) == q$k && all(is.finite(X)) && max(abs(crossprod(X) - diag(q$k))) < 1e-6 }, TRUE),
   formula = "Constant density 1 / vol(V_{n,k}), vol = 2^k pi^(nk/2) / Gamma_k(n/2), with respect to the Hausdorff measure",
   lpdf = function(y, q) rep(-stiefel_logvol(q$n, q$k), length(as_mats(y))),
   rng = function(n, q) lapply(seq_len(n), function(i) { Z <- matrix(stats::rnorm(q$n * q$k), q$n); qr.Q(qr(Z)) %*% diag(sign(diag(qr.R(qr(Z)))), q$k) }),
