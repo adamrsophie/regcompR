@@ -23,8 +23,8 @@ Description: A framework for distributional regression in which every
     <doi:10.18637/jss.v070.i05>), or by Bayesian inference through
     generated 'Stan' programs run by 'bayescompR', 'cmdstanr' or 'rstan'.
     Predictions, quantiles, event probabilities, randomized quantile
-    residuals, proper scoring rules, cross validation, average predictions
-    and contrasts, and plots for every distribution and fit are included.
+    residuals, proper scoring rules, cross validation, and plots for
+    every distribution and fit are included.
 License: GPL-3
 Encoding: UTF-8
 Language: en-US

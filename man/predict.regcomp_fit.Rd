@@ -40,14 +40,22 @@ the matrix of category probabilities (all categories by default).}
 \item{interval}{\code{"none"}, or \code{"confidence"} for uncertainty of the
 predicted quantity. Frequentist fits use parametric simulation from the
 asymptotic normal distribution of the estimates (\code{ndraws} draws);
-Bayesian fits use posterior draws and return credible intervals.}
+Bayesian fits use posterior draws and return credible intervals. With
+\code{re = "conditional"} frequentist intervals hold the estimated random
+effects fixed: they reflect the uncertainty of the fixed effects and
+variance parameters, not of the predicted group effects.
+For Bayesian fits the estimate is the posterior mean of the conditional
+quantity (for \code{"variance"}, the mean of the conditional variances, not
+the total posterior predictive variance; \code{\link[=scoring_rule]{scoring_rule()}} uses the
+posterior predictive law).}
 
 \item{level}{Interval level.}
 
 \item{re}{\code{"conditional"}, \code{"zero"} or \code{"marginal"}. \code{"marginal"}
 averages the quantity over the random effect distribution by Monte
 Carlo integration (\code{nmarginal} draws), giving population averaged
-predictions.}
+predictions. Rows of \code{newdata} without the grouping columns, or with
+unseen levels, are new groups: one per row when the columns are absent.}
 
 \item{ndraws}{Number of simulation draws for confidence intervals.}
 

@@ -22,6 +22,7 @@ fit_bayes <- function(spec, priors, control) {
     rhat = draws$rhat, ess = draws$ess, runner = runner, code = res$code,
     approximation = "none", inference = "bayesian", engine = "bayes",
     nobs = obs_count(spec), sampler = res$sampler,
+    chain = rep(seq_len(dim(res$draws)[2]), each = dim(res$draws)[1]),
     df = length(spec$beta_names) + spec$ntheta
   ), class = "regcomp_fit")
   fit$diagnostics <- list(max_rhat = suppressWarnings(max(draws$rhat, na.rm = TRUE)),

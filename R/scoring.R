@@ -11,7 +11,18 @@
 #'   by summation for counts.
 #' * `"dss"`: Dawid-Sebastiani score `(y - m)^2 / v + log v`.
 #' * `"brier"` and `"rps"`: Brier and ranked probability scores for
-#'   ordinal and nominal families.
+#'   ordinal and nominal families (summed over the classes). For bernoulli
+#'   and binomial families `"brier"` is the usual `(y / size - p)^2` with
+#'   `p` the predicted success probability.
+#'
+#' For Bayesian fits every rule scores the posterior predictive
+#' distribution, the mixture of the laws of the posterior draws (at most
+#' 1000, evenly thinned): the log score uses the mean density, the CRPS the
+#' mean CDF, the Dawid-Sebastiani score the total predictive mean and
+#' variance, and the Brier and ranked probability scores the mean class
+#' probabilities. The CRPS is infinite when the predictive law has no finite
+#' mean; a quadrature that does not converge raises
+#' `regcomp_numerical_failure`.
 #'
 #' @param object A fitted model.
 #' @param newdata Optional data frame with the response; defaults to the
@@ -31,11 +42,14 @@ scoring_rule <- function(object, newdata = NULL, rule = c("log", "crps", "dss", 
                          re = c("conditional", "zero")) {
   rule <- match.arg(rule); re <- match.arg(re)
   spec <- new_spec(object, newdata, response = TRUE)
-  beta <- if (object$inference == "bayesian") colMeans(object$draws[, spec$beta_names, drop = FALSE]) else object$coefficients
-  u <- if (object$inference == "bayesian" && length(object$u_draws)) colMeans(object$u_draws) else object$u
-  pars <- pars_from(spec, unname(beta), u, re)
+  # Parameter sets of the predictive law: the estimate, or posterior draws.
+  PS <- if (object$inference == "bayesian") {
+    S <- nrow(object$draws); idx <- if (S <= 1000) seq_len(S) else unique(round(seq(1, S, length.out = 1000)))
+    lapply(idx, function(s) pars_from(spec, unname(object$draws[s, spec$beta_names]),
+                                      if (length(object$u_draws)) object$u_draws[s, ] else NULL, re))
+  } else list(pars_from(spec, unname(object$coefficients), object$u, re))
+  pars <- PS[[1]]
   y <- spec$y; fam <- spec$fam
-  d <- structure(list(family = fam, pars = pars), class = "regcomp_dist")
   if (rule == "log") {
     # Bayesian fits: the posterior predictive density, log mean over draws.
     if (object$inference == "bayesian") {
@@ -48,22 +62,39 @@ scoring_rule <- function(object, newdata = NULL, rule = c("log", "crps", "dss", 
     stop_unsupported(sprintf("The '%s' score for censored observations", rule))
   if (rule %in% c("crps", "dss") && !is.null(spec$cmat) && any(is.finite(spec$cmat[, c("tlower", "tupper")])))
     stop_unsupported(sprintf("The '%s' score for truncated observations", rule))
+  if (rule == "brier" && fam$id %in% c("bernoulli", "binomial")) {
+    m <- if (fam$id == "binomial") rep_len(pars$size, length(y)) else 1
+    p <- Reduce(`+`, lapply(PS, function(q) family_moment(fam, "mean", q) / m)) / length(PS)
+    return((y / m - p)^2)
+  }
   if (rule %in% c("brier", "rps")) {
     if (fam$variate_type != "categorical") stop_input("Brier and ranked probability scores need an ordinal or nominal family.")
     # All fitted classes, whatever occurs in the assessment set.
-    P <- cat_probs(fam, pars, length(y)); K <- ncol(P)
+    P <- Reduce(`+`, lapply(PS, function(p) cat_probs(fam, p, length(y)))) / length(PS); K <- ncol(P)
     if (any(!y %in% seq_len(K))) stop_input("Responses must be fitted categories 1, ..., K.")
     O <- outer(y, seq_len(K), `==`) * 1
     if (rule == "brier") return(rowSums((P - O)^2))
     return(rowSums((t(apply(P, 1, cumsum)) - t(apply(O, 1, cumsum)))^2)[, drop = TRUE])
   }
   if (fam$variate_type != "scalar") stop_unsupported(sprintf("The '%s' score for this family", rule))
-  if (rule == "dss") { m <- mean(d); v <- variance(d); return((y - m)^2 / v + log(v)) }
-  pp <- recycle_pars(pars)
+  if (rule == "dss") {
+    # Total predictive moments: mean of means; mean variance plus the
+    # variance of the means.
+    M <- sapply(PS, function(p) mean(structure(list(family = fam, pars = p), class = "regcomp_dist")))
+    V <- sapply(PS, function(p) variance(structure(list(family = fam, pars = p), class = "regcomp_dist")))
+    M <- matrix(M, length(y)); V <- matrix(V, length(y))
+    m <- rowMeans(M); v <- rowMeans(V) + rowMeans(M^2) - m^2
+    return((y - m)^2 / v + log(v))
+  }
+  PP <- lapply(PS, recycle_pars)
   vapply(seq_along(y), function(i) {
-    pi <- lapply(pp, `[`, i)
-    Fz <- function(z) family_cdf(fam, z, lapply(pi, rep, length(z)))
-    lo <- family_quantile(fam, 1e-9, pi); hi <- family_quantile(fam, 1 - 1e-9, pi)
+    pis <- lapply(PP, function(pp) lapply(pp, `[`, i))
+    Fz <- function(z) Reduce(`+`, lapply(pis, function(pi) family_cdf(fam, z, lapply(pi, rep, length(z))))) / length(pis)
+    # The CRPS is finite exactly when the predictive mean is.
+    mu <- vapply(pis, function(pi) tryCatch(family_moment(fam, "mean", pi, quiet = TRUE), error = function(e) NaN), 0)
+    if (any(is.na(mu) & !is.nan(mu)) || any(is.infinite(mu))) return(Inf)
+    lo <- min(vapply(pis, function(pi) family_quantile(fam, 1e-9, pi), 0))
+    hi <- max(vapply(pis, function(pi) family_quantile(fam, 1 - 1e-9, pi), 0))
     if (fam$discrete) {
       # The CDF is a step function on the lattice: each step's squared
       # difference times the lattice spacing.
@@ -74,9 +105,14 @@ scoring_rule <- function(object, newdata = NULL, rule = c("log", "crps", "dss", 
     }
     # Integrate over the whole support: finite cutoffs at extreme quantiles
     # make the quadrature miss the mass of heavy tails.
-    sp <- fam$support(pi); a <- min(sp$lower, y[i]); b <- max(sp$upper, y[i])
-    stats::integrate(function(z) Fz(z)^2, a, y[i], rel.tol = 1e-8, subdivisions = 1000L, stop.on.error = FALSE)$value +
-      stats::integrate(function(z) (1 - Fz(z))^2, y[i], b, rel.tol = 1e-8, subdivisions = 1000L, stop.on.error = FALSE)$value
+    sp <- lapply(pis, fam$support)
+    a <- min(unlist(lapply(sp, `[[`, "lower")), y[i]); b <- max(unlist(lapply(sp, `[[`, "upper")), y[i])
+    i1 <- stats::integrate(function(z) Fz(z)^2, a, y[i], rel.tol = 1e-8, subdivisions = 1000L, stop.on.error = FALSE)
+    i2 <- stats::integrate(function(z) (1 - Fz(z))^2, y[i], b, rel.tol = 1e-8, subdivisions = 1000L, stop.on.error = FALSE)
+    if (i1$message != "OK" || i2$message != "OK" || !is.finite(i1$value + i2$value) || i1$value + i2$value < 0)
+      stop_numerical(sprintf("The CRPS integral of observation %d did not converge (%s).", i,
+                             if (i1$message != "OK") i1$message else i2$message))
+    i1$value + i2$value
   }, 0)
 }
 
@@ -162,6 +198,14 @@ cv_regcomp <- function(object, K = 10, rule = "log", group = NULL, folds = NULL,
 compare_models <- function(..., cv = NULL, K = 10) {
   fits <- list(...)
   if (is.null(names(fits))) names(fits) <- paste0("model", seq_along(fits))
+  # Likelihood criteria compare models only on the same observations of the
+  # same response; Bayesian fits have no maximized likelihood.
+  if (any(vapply(fits, function(f) identical(f$inference, "bayesian"), TRUE)))
+    stop_unsupported("AIC and BIC for Bayesian fits (compare them by held out scores or LOO)")
+  y1 <- fits[[1]]$spec$y
+  for (f in fits[-1]) if (!identical(dim(f$spec$y), dim(y1)) || NROW(f$spec$y) != NROW(y1) ||
+                          !isTRUE(all.equal(unclass(f$spec$y), unclass(y1), check.attributes = FALSE)))
+    stop_input("compare_models() needs fits to the same observations of the same response (same rows, same transformation).")
   out <- do.call(rbind, lapply(names(fits), function(nm) { f <- fits[[nm]]
     data.frame(model = nm, family = f$family$id, logLik = f$logLik, df = f$df,
                AIC = -2 * f$logLik + 2 * f$df, BIC = -2 * f$logLik + log(f$nobs) * f$df) }))

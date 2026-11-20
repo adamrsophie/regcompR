@@ -19,7 +19,9 @@ regcomp_control(
   runner = c("bayescompR", "cmdstanr", "rstan", "jags", "openbugs"),
   cores = 1,
   adapt_delta = 0.8,
-  start = NULL
+  start = NULL,
+  prox_maxit = 5000,
+  prox_tol = 1e-08
 )
 }
 \arguments{
@@ -47,6 +49,10 @@ settings: chains, iterations, seed, the runner (\code{"bayescompR"},
 
 \item{start}{Optional named list of starting values for the coefficients
 of each parameter (vectors on the link scale).}
+
+\item{prox_maxit, prox_tol}{Iteration limit and relative step tolerance of
+the proximal gradient (FISTA) solver used for lasso type penalties
+(\code{maxit} and \code{rel_tol} apply to \code{nlminb()} only).}
 }
 \value{
 A list.

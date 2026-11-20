@@ -54,3 +54,46 @@ test_that("cluster formulas use the fitted analysis rows", {
   fit2 <- regcomp(y ~ x, family = "poisson", data = dat)
   expect_equal(vcov(fit2, type = "sandwich", cluster = ~g), vcov(fit2, type = "sandwich", cluster = dat$g[-2]), tolerance = 1e-9)
 })
+
+test_that("Bayesian scores use the posterior predictive law; CRPS divergence is infinite", {
+  base <- regcomp(y ~ 1, family = "normal", data = data.frame(y = -2:2), fixed = list(sigma = 1))
+  b <- base; b$inference <- "bayesian"; b$u_draws <- NULL
+  b$draws <- matrix(c(-3, 3), 2, dimnames = list(NULL, names(coef(base))))
+  ea <- function(mu, sd) 2 * sd * dnorm(mu / sd) + mu * (2 * pnorm(mu / sd) - 1)
+  crps <- mean(ea(c(-3, 3), 1)) - mean(outer(c(-3, 3), c(-3, 3), function(a, b) ea(a - b, sqrt(2)))) / 2
+  expect_equal(unname(scoring_rule(b, data.frame(y = 0), rule = "crps")), crps, tolerance = 1e-6)
+  expect_equal(unname(scoring_rule(b, data.frame(y = 0), rule = "dss")), log(10), tolerance = 1e-8)
+  oc <- regcomp(y ~ 1, family = "cumulative_logit", data = data.frame(y = rep(1:2, each = 5)))
+  ob <- oc; ob$inference <- "bayesian"; ob$u_draws <- NULL
+  ob$draws <- matrix(c(-1, 3), 2, dimnames = list(NULL, names(coef(oc))))
+  p1 <- mean(plogis(c(-1, 3)))
+  expect_equal(unname(scoring_rule(ob, data.frame(y = 1), rule = "brier")), 2 * (1 - p1)^2, tolerance = 1e-8)
+  expect_equal(unname(scoring_rule(ob, data.frame(y = 1), rule = "rps")), (1 - p1)^2, tolerance = 1e-8)
+  fit <- regcomp(y ~ 1, xm = 1, family = "pareto", data = data.frame(y = exp(2:6)))
+  expect_equal(unname(scoring_rule(fit, data.frame(y = 1), rule = "crps")), Inf)
+})
+
+test_that("binary Brier, comparison guards, new groups and RNG-safe plots", {
+  d <- data.frame(y = c(0, 1, 1, 0, 1, 1), x = 1:6)
+  fb <- regcomp(y ~ x, family = "bernoulli", data = d)
+  expect_equal(unname(scoring_rule(fb, rule = "brier")), unname((d$y - predict(fb))^2), tolerance = 1e-10)
+  db <- data.frame(y = c(1, 3, 2, 4), n = 5, x = 1:4)
+  fbin <- regcomp(y ~ x, family = "binomial", size = n, data = db)
+  expect_equal(unname(scoring_rule(fbin, rule = "brier")), unname((db$y / 5 - predict(fbin) / 5)^2), tolerance = 1e-10)
+  dp <- data.frame(y = c(1, 3, 2, 5, 4), x = 1:5)
+  expect_error(compare_models(regcomp(y ~ x, family = "poisson", data = dp),
+                              regcomp(y ~ x, family = "poisson", data = dp, subset = 1:3)), "same observations")
+  expect_error(compare_models(regcomp(y ~ x, family = "normal", data = dp),
+                              regcomp(log(y) ~ x, family = "normal", data = dp)), "same observations")
+  expect_true(supports("cumulative_logit", "rng"))
+  set.seed(2001)
+  dg <- data.frame(g = factor(rep(letters[1:8], each = 8)))
+  dg$y <- rep(seq(-3, 3, length.out = 8), each = 8) + rnorm(64, sd = .4)
+  fit <- regcomp(y ~ 1 + (1 | g), family = "normal", data = dg, fixed = list(sigma = .4))
+  ref <- unname(.4^2 + exp(fit$theta)^2)
+  got <- predict(fit, data.frame(dummy = 1), type = "variance", re = "marginal", nmarginal = 3000, seed = 44)
+  expect_lt(abs(unname(got) - ref) / ref, .1)
+  set.seed(5); before <- .Random.seed
+  pdf(NULL); plot(distribution("multivariate_normal", mu = c(0, 0), Sigma = diag(2))); dev.off()
+  expect_identical(.Random.seed, before)
+})

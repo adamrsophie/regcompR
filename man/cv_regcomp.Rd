@@ -16,7 +16,10 @@ cv_regcomp(object, K = 10, rule = "log", group = NULL, folds = NULL, seed = 1)
 \item{group}{Optional grouping variable name; folds then hold out whole
 groups.}
 
-\item{folds}{Optional integer vector assigning each row to a fold.}
+\item{folds}{Optional integer vector assigning each analysis row (the
+\code{nobs()} rows used in the fit) to a fold; a vector with one entry per
+row of the original data is also accepted and is restricted to the
+analysis rows.}
 
 \item{seed}{Seed for the fold assignment.}
 }

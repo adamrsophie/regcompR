@@ -103,7 +103,7 @@ plot.regcomp_dist <- function(x, type = c("density", "cdf", "survival", "hazard"
 plot_multivariate <- function(x, ...) {
   fam <- x$family
   if (!is.null(fam$extra$plot)) return(invisible(fam$extra$plot(x, ...)))
-  set.seed(1)
+  local_seed(1)
   s <- family_rng(fam, 500, x$pars)
   if (is.matrix(s) && ncol(s) >= 2) {
     graphics::pairs(s[, seq_len(min(4, ncol(s))), drop = FALSE], pch = 16, cex = 0.4,
@@ -298,7 +298,13 @@ plot_trace <- function(fit, pars = NULL, ...) {
   if (is.null(pars)) pars <- colnames(dr)[seq_len(min(6, ncol(dr)))]
   op <- graphics::par(mfrow = c(ceiling(length(pars) / 2), min(2, length(pars))), mar = c(3, 3, 2, 1))
   on.exit(graphics::par(op))
-  for (p in pars) graphics::plot(dr[, p], type = "l", col = "#1b6ca8", main = p, xlab = "", ylab = "", ...)
+  # One line per chain (draws are stored chain after chain).
+  ch <- fit$chain %||% rep(1L, nrow(dr))
+  cols <- grDevices::hcl.colors(max(3L, length(unique(ch))), "Dark 3")
+  for (p in pars) {
+    graphics::plot(NA, xlim = c(1, max(table(ch))), ylim = range(dr[, p]), main = p, xlab = "", ylab = "", ...)
+    for (k in unique(ch)) graphics::lines(dr[ch == k, p], col = cols[k])
+  }
 }
 
 model_data <- function(fit) {

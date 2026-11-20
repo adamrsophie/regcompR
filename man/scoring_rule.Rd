@@ -36,8 +36,20 @@ Scores each observation under the fitted predictive distribution
 by summation for counts.
 \item \code{"dss"}: Dawid-Sebastiani score \verb{(y - m)^2 / v + log v}.
 \item \code{"brier"} and \code{"rps"}: Brier and ranked probability scores for
-ordinal and nominal families.
+ordinal and nominal families (summed over the classes). For bernoulli
+and binomial families \code{"brier"} is the usual \code{(y / size - p)^2} with
+\code{p} the predicted success probability.
 }
+}
+\details{
+For Bayesian fits every rule scores the posterior predictive
+distribution, the mixture of the laws of the posterior draws (at most
+1000, evenly thinned): the log score uses the mean density, the CRPS the
+mean CDF, the Dawid-Sebastiani score the total predictive mean and
+variance, and the Brier and ranked probability scores the mean class
+probabilities. The CRPS is infinite when the predictive law has no finite
+mean; a quadrature that does not converge raises
+\code{regcomp_numerical_failure}.
 }
 \examples{
 set.seed(1)

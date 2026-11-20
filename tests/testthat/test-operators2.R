@@ -7,8 +7,9 @@ test_that("convolution, splice and copula operators are exact", {
   expect_equal(integrate(function(x) prob(ds, x), 0, 1.5)$value + integrate(function(x) prob(ds, x), 1.5, Inf)$value, 1, tolerance = 1e-6)
   cg <- copula_dist("normal", "normal", "gaussian")
   Y <- cbind(c(.2, -1, 1.5), c(.5, .3, -2))
-  expect_equal(cg$lpdf(Y, list(mu.1 = 0, sigma.1 = 1, mu.2 = 1, sigma.2 = 2, rho = .6)),
-               mvtnorm::dmvnorm(Y, c(0, 1), matrix(c(1, 1.2, 1.2, 4), 2), log = TRUE), tolerance = 1e-10)
+  if (requireNamespace("mvtnorm", quietly = TRUE))
+    expect_equal(cg$lpdf(Y, list(mu.1 = 0, sigma.1 = 1, mu.2 = 1, sigma.2 = 2, rho = .6)),
+                 mvtnorm::dmvnorm(Y, c(0, 1), matrix(c(1, 1.2, 1.2, 4), 2), log = TRUE), tolerance = 1e-10)
   cd <- copula_dist("poisson", "poisson", "frank")
   G <- as.matrix(expand.grid(0:40, 0:40))
   expect_equal(sum(exp(cd$lpdf(G, list(lambda.1 = 2, lambda.2 = 3, theta = 4)))), 1, tolerance = 1e-8)

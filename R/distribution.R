@@ -596,7 +596,6 @@ support.regcomp_dist <- function(x, ...) {
 #' score(d, c(-1, 0, 2))
 score <- function(x, y, ...) UseMethod("score")
 
-#' @export
 # Finite difference step that stays inside the parameter's domain: at most a
 # thousandth of the distance to a finite bound (curvature grows near it).
 domain_step <- function(spec, v, rel, small) {
@@ -605,6 +604,7 @@ domain_step <- function(spec, v, rel, small) {
   ifelse(is.finite(d) & d > 0, pmin(h, d * 1e-3), h)
 }
 
+#' @export
 score.regcomp_dist <- function(x, y, ...) {
   fam <- x$family
   free <- regression_pars(fam)
