@@ -62,9 +62,10 @@ vcov.regcomp_fit <- function(object, type = c("model", "sandwich"), cluster = NU
   if (!is.null(cluster)) {
     if (inherits(cluster, "formula"))
       cluster <- eval(cluster[[2]], eval(object$call$data, environment(object$spec$formulas[[1]])), environment(cluster))
-    if (length(cluster) != nrow(S)) stop_input("cluster must have one value per observation.")
+    if (length(cluster) != nrow(S) || anyNA(cluster)) stop_input("cluster must have one nonmissing value per observation.")
     S <- rowsum(S, as.character(cluster), reorder = FALSE)
     G <- nrow(S)
+    if (G < 2) stop_input("A clustered sandwich covariance needs at least two clusters.")
     M <- crossprod(S) * G / (G - 1)
   } else M <- crossprod(S)
   out <- V %*% M %*% V
@@ -125,6 +126,10 @@ gee <- function(formula, data, id, family = stats::gaussian(),
   pw <- w0 * if (is.null(pw)) 1 else pw
   n <- length(y); p <- ncol(X)
   cl <- split(seq_len(n), factor(idv, levels = unique(idv)))
+  if (corstr != "independence" && all(lengths(cl) < 2)) {
+    warning("No cluster has more than one observation; the working correlation is not estimable, so independence is used.", call. = FALSE)
+    corstr <- "independence"
+  }
   if (is.null(wv)) wv <- unlist(lapply(cl, seq_along))[order(unlist(cl))]
   Tmax <- max(wv)
   # Start from the independence (GLM) fit.

@@ -18,7 +18,7 @@
 residuals.regcomp_fit <- function(object, type = c("quantile", "pit", "response", "pearson"),
                                   seed = NULL, ...) {
   type <- match.arg(type)
-  if (!is.null(seed)) set.seed(seed)
+  if (!is.null(seed)) local_seed(seed)
   spec <- object$spec
   fd <- fitted_distribution(object)
   y <- spec$y

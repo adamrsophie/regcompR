@@ -150,6 +150,9 @@ num_grad <- function(f, x) {
 make_penalty <- function(pen, spec) {
   if (is.null(pen)) return(NULL)
   if (!inherits(pen, "regcomp_penalty")) stop_input("penalty must come from penalty().")
+  # A zero weight is the unpenalized fit.
+  if (isTRUE(pen$lambda == 0) && pen$type %in% c("ridge", "lasso", "elastic_net", "adaptive_lasso", "group_lasso", "scad", "mcp"))
+    return(NULL)
   pars <- if (is.null(pen$pars)) spec$rpars else pen$pars
   idx <- integer(); scale <- numeric(); grp <- character()
   for (k in intersect(pars, spec$rpars)) {

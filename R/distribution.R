@@ -133,6 +133,7 @@ in_support <- function(fam, y, pars) {
   if (isTRUE(s$open_upper)) ok[ok] <- y[ok] < hi[ok]
   if (fam$discrete) {
     g <- if (is.null(fam$extra$grid)) 1 else fam$extra$grid
+    ok[ok] <- is.finite(y[ok])
     if (g > 0) ok[ok] <- abs(y[ok] / g - round(y[ok] / g)) < 1e-9
   }
   if (!is.null(fam$response_check)) ok[ok] <- fam$response_check(y, r[-1])[ok]

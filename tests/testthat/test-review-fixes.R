@@ -216,3 +216,20 @@ test_that("inference helpers: scores, folds, priors, GEE, exact tests, covarianc
   skip_if_not_installed("posterior")
   expect_equal(ess_basic(x), posterior::ess_bulk(x), tolerance = 1e-8)
 })
+
+test_that("minor edge cases: seeds, infinities, domains, degenerate laws", {
+  d <- data.frame(y = c(0, 1, 2, 3, 4)); m <- regcomp(y ~ 1, data = d, family = "poisson")
+  set.seed(17); before <- .Random.seed; invisible(simulate(m, 2, seed = 3))
+  expect_identical(before, .Random.seed)
+  expect_error(vcov(m, type = "sandwich", cluster = rep(1, 5)), "two clusters")
+  dd <- data.frame(x = 1:8, y = c(1, 3, 2, 4, 7, 6, 6, 9))
+  expect_equal(coef(regcomp(y ~ x, data = dd, family = "normal", fixed = list(sigma = 1), penalty = penalty("scad", lambda = 0))),
+               coef(regcomp(y ~ x, data = dd, family = "normal", fixed = list(sigma = 1))))
+  expect_equal(prob(distribution("negative_binomial_nb2", mu = 2, phi = 1), c(-Inf, Inf)), c(0, 0))
+  expect_error(distribution("normal", mu = 0, sigma = Inf), "domain")
+  expect_equal(variance(distribution("hypergeometric", m = 1, n = 0, k = 1)), 0)
+  k <- distribution("kent", gamma1 = c(1, 0, 0), gamma2 = c(0, 1, 0), gamma3 = c(0, 0, 1), kappa = 2, beta = 0)
+  expect_equal(log_prob(k, rbind(c(1, 0, 0))), log_prob(distribution("von_mises_fisher", mu = c(1, 0, 0), kappa = 2), rbind(c(1, 0, 0))))
+  expect_false(supports("skellam", "cdf"))
+  expect_warning(gee(y ~ 1, data.frame(y = c(1, 4, 2, 8), g = 1:4), g, corstr = "exchangeable"), "not estimable")
+})

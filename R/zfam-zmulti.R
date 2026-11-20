@@ -223,9 +223,7 @@ xfam("stiefel_uniform", "Uniform (Haar) on the Stiefel manifold", list(P("n", "p
 ml_log0F1 <- function(Fm, nsim = 2e5) { Fm <- as.matrix(Fm); n <- nrow(Fm); k <- ncol(Fm)
   if (k == 1) { kap <- sqrt(sum(Fm^2)); if (kap < 1e-10) return(0)
     return(lgamma(n / 2) + (1 - n / 2) * log(kap / 2) + log(besselI(kap, n / 2 - 1, expon.scaled = TRUE)) + kap) }
-  old <- if (exists(".Random.seed", globalenv())) get(".Random.seed", globalenv()) else NULL
-  on.exit(if (!is.null(old)) assign(".Random.seed", old, globalenv()))
-  set.seed(20240101L)
+  local_seed(20240101L)
   v <- vapply(seq_len(nsim), function(i) { Z <- matrix(stats::rnorm(n * k), n); Q <- qr.Q(qr(Z)) %*% diag(sign(diag(qr.R(qr(Z)))), k); etr(t(Fm) %*% Q) }, 0)
   log_sum_exp(v) - log(nsim) }
 xfam("matrix_langevin", "Matrix Langevin (matrix von Mises-Fisher) on the Stiefel manifold", list(P("F", "real", role = "parameter matrix", regression = FALSE)),

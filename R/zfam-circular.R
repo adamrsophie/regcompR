@@ -170,8 +170,8 @@ sph("von_mises_fisher", "von Mises-Fisher", list(P("mu", "any", role = "mean dir
   reference = ref_impl("Directional", function(y, p) Directional::dvmf(as.matrix(y), p$mu / sqrt(sum(p$mu^2)), p$kappa[1], logden = TRUE)),
   status = "validated")
 
-kent_logc <- function(k, b) { j <- 0:200
-  log(2 * pi) + log(sum(exp(lgamma(j + 0.5) - lgamma(j + 1) + 2 * j * log(b) + (-2 * j - 0.5) * log(k / 2) +
+kent_logc <- function(k, b) { j <- if (b == 0) 0 else 0:200
+  log(2 * pi) + log(sum(exp(lgamma(j + 0.5) - lgamma(j + 1) + ifelse(j == 0, 0, 2 * j * log(b)) + (-2 * j - 0.5) * log(k / 2) +
     log(besselI(k, 2 * j + 0.5, expon.scaled = TRUE)) + k))) }
 sph("kent", "Kent (FB5)", list(P("gamma1", "any", role = "mean direction"), P("gamma2", "any", role = "major axis"), P("gamma3", "any", role = "minor axis"),
   conc(), P("beta", "nonneg", role = "ovalness")), aliases = "fisher_bingham_5",

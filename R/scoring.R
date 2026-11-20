@@ -106,9 +106,7 @@ cv_regcomp <- function(object, K = 10, rule = "log", group = NULL, folds = NULL,
   n <- nrow(data)
   if (!is.null(folds) && length(folds) != n) stop_input(sprintf("folds must have %d entries, one per analysis row.", n))
   if (is.null(folds)) {
-    old <- if (exists(".Random.seed", globalenv())) get(".Random.seed", globalenv())
-    on.exit(if (is.null(old)) rm(".Random.seed", envir = globalenv()) else assign(".Random.seed", old, globalenv()))
-    set.seed(seed)
+    local_seed(seed)
     if (is.null(group)) folds <- sample(rep_len(seq_len(K), n))
     else { g <- as.character(data[[group]]); ug <- unique(g); fg <- sample(rep_len(seq_len(K), length(ug))); folds <- fg[match(g, ug)] }
   }

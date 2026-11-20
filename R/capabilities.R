@@ -25,10 +25,12 @@ capabilities <- function(x) {
   op <- function(slot, fallback) {
     if (!is.null(fam[[slot]])) "analytic" else if (fallback) "numeric" else "unavailable"
   }
-  cdf_ok <- !is.null(fam$cdf) || (scalar && isTRUE(fam$numeric_cdf))
+  # A numerical CDF needs a support bounded below for discrete laws.
+  lb <- tryCatch({ dp <- lapply(fam$pars, function(q) q$default %||% 1); is.finite(fam$support(dp)$lower[1]) }, error = function(e) TRUE)
+  cdf_ok <- !is.null(fam$cdf) || (scalar && isTRUE(fam$numeric_cdf) && (!fam$discrete || isTRUE(lb)))
   list(
     log_prob = "analytic",
-    cdf = if (!scalar) "unavailable" else op("cdf", isTRUE(fam$numeric_cdf)),
+    cdf = if (!scalar) "unavailable" else op("cdf", cdf_ok),
     quantile = if (!scalar) "unavailable" else op("quantile", cdf_ok),
     rng = op("rng", scalar && cdf_ok),
     mean = op("mean", scalar && isTRUE(fam$numeric_moments)),

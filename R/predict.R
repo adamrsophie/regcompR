@@ -81,7 +81,7 @@ quantity_from_pars <- function(fam, pars, type, probs, at) {
     probability = sapply(at, function(a) exp(eval_lpdf(fam, rep(a, length(d)), pars))),
     density = sapply(at, function(a) exp(eval_lpdf(fam, rep(a, length(d)), pars))),
     cdf = sapply(at, function(a) family_cdf(fam, rep(a, length(d)), recycle_pars(pars))),
-    survival = sapply(at, function(a) 1 - family_cdf(fam, rep(a, length(d)), recycle_pars(pars))),
+    survival = sapply(at, function(a) survival(d, rep(a, length(d)))),
     stop_input(sprintf("Unknown prediction type '%s'.", type)))
 }
 
@@ -124,7 +124,7 @@ predict.regcomp_fit <- function(object, newdata = NULL,
                                 re = c("conditional", "zero", "marginal"),
                                 ndraws = 1000, nmarginal = 200, seed = NULL, ...) {
   type <- match.arg(type); interval <- match.arg(interval); re <- match.arg(re)
-  if (!is.null(seed)) set.seed(seed)
+  if (!is.null(seed)) local_seed(seed)
   spec <- new_spec(object, newdata)
   fam <- spec$fam
   if (fam$variate_type == "categorical") {
@@ -216,7 +216,7 @@ draw_re <- function(spec, theta) {
 simulate.regcomp_fit <- function(object, nsim = 1, seed = NULL, newdata = NULL,
                                  re = c("conditional", "new"), ...) {
   re <- match.arg(re)
-  if (!is.null(seed)) set.seed(seed)
+  if (!is.null(seed)) local_seed(seed)
   spec <- new_spec(object, newdata)
   sims <- sapply(seq_len(nsim), function(s) {
     if (object$inference == "bayesian") {

@@ -75,19 +75,15 @@ print.regcomp_par <- function(x, ...) {
 # valid positions (after recycling).
 check_par_domain <- function(spec, value) {
   ok <- !is.na(value)
-  if (spec$domain %in% c("positive", "greater_than_one", "greater_than_two"))
-    ok <- ok & value > spec$lower
-  else if (spec$domain %in% c("nonneg", "unit_closed"))
-    ok <- ok & value >= spec$lower & value <= spec$upper
-  else if (spec$domain == "unit") ok <- ok & value > 0 & value < 1
-  else if (spec$domain %in% c("positive_integer", "nonneg_integer", "integer"))
-    ok <- ok & value >= spec$lower & abs(value - round(value)) < 1e-8
-  else if (spec$domain == "real") ok <- ok & is.finite(value)
-  if (!is.null(spec$lower) && spec$domain %in% c("real", "any") && is.finite(spec$lower))
-    ok <- ok & value > spec$lower
-  if (!is.null(spec$upper) && spec$domain %in% c("real", "any") && is.finite(spec$upper))
-    ok <- ok & value < spec$upper
-  ok
+  d <- spec$domain
+  # Only the "any" domain admits infinite values.
+  if (d != "any") ok <- ok & is.finite(value)
+  lo <- spec$lower %||% -Inf; hi <- spec$upper %||% Inf
+  closed <- d %in% c("nonneg", "unit_closed", "positive_integer", "nonneg_integer", "integer")
+  if (d == "circular") return(ok)
+  ok <- ok & (if (closed) value >= lo & value <= hi else (value > lo | lo == -Inf) & (value < hi | hi == Inf))
+  if (d %in% c("positive_integer", "nonneg_integer", "integer")) ok <- ok & abs(value - round(value)) < 1e-8
+  ok & !is.na(ok)
 }
 
 valid_statuses <- c("metadata_only", "experimental", "implemented", "validated",

@@ -287,3 +287,16 @@ numeric_moment_cont <- function(lpdf, pars, fun, lower, upper) {
     part(lower[i], c0) + part(c0, upper[i])
   }, 0)
 }
+
+# set.seed() scoped to the calling function: the caller's random number
+# state (or its absence) is restored when that function exits.
+local_seed <- function(seed, env = parent.frame()) {
+  had <- exists(".Random.seed", globalenv(), inherits = FALSE)
+  old <- if (had) get(".Random.seed", globalenv())
+  restore <- function() {
+    if (had) assign(".Random.seed", old, globalenv())
+    else if (exists(".Random.seed", globalenv(), inherits = FALSE)) rm(".Random.seed", envir = globalenv())
+  }
+  do.call(on.exit, list(bquote(.(restore)()), add = TRUE), envir = env)
+  set.seed(seed)
+}
