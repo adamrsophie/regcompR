@@ -53,6 +53,7 @@ reference:
   - validate_parameters
   - validate_response
   - ordinal-families
+  - partial_odds
 - title: Building families
   contents:
   - par_spec

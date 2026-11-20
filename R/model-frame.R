@@ -393,6 +393,7 @@ parse_formulas <- function(formula, dots, fam) {
   }
   for (k in rp) if (is.null(fl[[k]])) fl[[k]] <- if (isTRUE(fam$extra$share_formula))
     stats::as.formula(call("~", formula[[3]]), env = environment(formula)) else
+    if (!is.null(fam$extra$default_formula[[k]])) fam$extra$default_formula[[k]] else
     stats::as.formula("~ 1", env = environment(formula))
   attr(fl, "given") <- c(prim, names(fl)[vapply(names(fl), function(k) k != prim && k %in% vapply(dots, function(f) as.character(f[[2]]), ""), TRUE)])
   keep <- c(nl$pars, setdiff(rp, nl$par))

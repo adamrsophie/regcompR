@@ -1,6 +1,14 @@
 # regcompR 0.1.0
 
 * First release.
+* Econometrics: `iv_regcomp()` (two stage least squares with weak
+  instrument, Wu-Hausman and Sargan tests; equal to ivreg),
+  `panel_within()` (fixed effects within estimator; equal to plm) and
+  `hausman_test()` (equal to plm::phtest).
+* Families: `huber` (its ML estimate with fixed scale is the Huber M
+  estimate of MASS::rlm), `stochastic_frontier` (normal minus half normal),
+  `multinomial_probit` (independent errors) and `partial_odds()` (partial
+  proportional odds; equal to ordinal::clm with nominal effects).
 * Nonlinear formulas: `y ~ nl(expr)` with a formula for each nonlinear
   parameter (covariates and random effects allowed) for any family, fitted
   by `engine = "ml"` (equal to `nls()` and to `lme4::nlmer()`) or by Stan.
