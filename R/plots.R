@@ -335,7 +335,8 @@ plot_interaction <- function(fit, data, variable, by, at, par, level, n, ...) {
 #' @return The plotted data, invisibly.
 #' @export
 #' @examples
-#' d <- data.frame(x = rnorm(200), z = rnorm(200)); d$y <- rnbinom(200, mu = exp(1 + 0.4 * d$x), size = 2)
+#' d <- data.frame(x = rnorm(200), z = rnorm(200))
+#' d$y <- rnbinom(200, mu = exp(1 + 0.4 * d$x), size = 2)
 #' coef_plot(Poisson = regcomp(y ~ x + z, family = "poisson", data = d),
 #'           NB = regcomp(y ~ x + z, family = "nb2", data = d))
 coef_plot <- function(..., conf.level = 0.95, exponentiate = FALSE, intercept = FALSE, standardize = FALSE, vcov = "model") {

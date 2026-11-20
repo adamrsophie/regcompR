@@ -24,7 +24,9 @@ same_response <- function(fits, what) {
 #' @export
 #' @examples
 #' d <- data.frame(x = rnorm(200), z = rnorm(200)); d$y <- rpois(200, exp(0.5 + 0.3 * d$x))
-#' anova(regcomp(y ~ x, family = "poisson", data = d), regcomp(y ~ x + z, family = "poisson", data = d))
+#' f1 <- regcomp(y ~ x, family = "poisson", data = d)
+#' f2 <- regcomp(y ~ x + z, family = "poisson", data = d)
+#' anova(f1, f2)
 anova.regcomp_fit <- function(object, ...) {
   fits <- c(list(object), list(...))
   if (length(fits) < 2) stop_input("anova() of regcompR fits compares two or more nested models.")

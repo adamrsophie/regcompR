@@ -36,7 +36,8 @@ one row per coefficient, grouped by distribution parameter; several fits
 are drawn side by side in different colors.
 }
 \examples{
-d <- data.frame(x = rnorm(200), z = rnorm(200)); d$y <- rnbinom(200, mu = exp(1 + 0.4 * d$x), size = 2)
+d <- data.frame(x = rnorm(200), z = rnorm(200))
+d$y <- rnbinom(200, mu = exp(1 + 0.4 * d$x), size = 2)
 coef_plot(Poisson = regcomp(y ~ x + z, family = "poisson", data = d),
           NB = regcomp(y ~ x + z, family = "nb2", data = d))
 }

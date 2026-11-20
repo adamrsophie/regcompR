@@ -24,5 +24,7 @@ Self and Liang 1987).
 }
 \examples{
 d <- data.frame(x = rnorm(200), z = rnorm(200)); d$y <- rpois(200, exp(0.5 + 0.3 * d$x))
-anova(regcomp(y ~ x, family = "poisson", data = d), regcomp(y ~ x + z, family = "poisson", data = d))
+f1 <- regcomp(y ~ x, family = "poisson", data = d)
+f2 <- regcomp(y ~ x + z, family = "poisson", data = d)
+anova(f1, f2)
 }
