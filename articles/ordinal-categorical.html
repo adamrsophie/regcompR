@@ -120,9 +120,9 @@ natural scale; the main formula has no intercept.</p>
 <span><span class="co">#&gt;               estimate std_error   lower   upper       z p_value</span></span>
 <span><span class="co">#&gt; mu:x            0.6056    0.0998  0.4099  0.8013  6.0653       0</span></span>
 <span><span class="co">#&gt; mu:z           -0.3720    0.0863 -0.5412 -0.2028 -4.3091       0</span></span>
-<span><span class="co">#&gt; cuts:low|mid   -0.7929    0.1116 -1.0116 -0.5743 -7.1065       0</span></span>
-<span><span class="co">#&gt; cuts:mid|high   0.4777    0.1074  0.2671  0.6883  4.4462       0</span></span>
-<span><span class="co">#&gt; cuts:high|top   1.8334    0.1444  1.5505  2.1164 12.7002       0</span></span>
+<span><span class="co">#&gt; cuts:low|mid   -0.7929    0.1116 -1.0116 -0.5743 -7.1064       0</span></span>
+<span><span class="co">#&gt; cuts:mid|high   0.4777    0.1074  0.2671  0.6883  4.4460       0</span></span>
+<span><span class="co">#&gt; cuts:high|top   1.8334    0.1444  1.5505  2.1164 12.7003       0</span></span>
 <span><span class="co">#&gt; max |gradient| 1.63e-04; Hessian positive definite</span></span></code></pre></div>
 <p>The estimates and standard errors equal those of
 <code><a href="https://rdrr.io/pkg/MASS/man/polr.html" class="external-link">MASS::polr()</a></code>. A formula for <code>scale</code> gives the
@@ -150,7 +150,7 @@ available, and random effects work as for any other family:</p>
 <code class="sourceCode R"><span><span class="va">fit_m</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/regcomp.html">regcomp</a></span><span class="op">(</span><span class="va">y</span> <span class="op">~</span> <span class="va">x</span> <span class="op">+</span> <span class="va">z</span> <span class="op">+</span> <span class="op">(</span><span class="fl">1</span> <span class="op">|</span> <span class="va">g</span><span class="op">)</span>, family <span class="op">=</span> <span class="st">"cumulative_logit"</span>, data <span class="op">=</span> <span class="va">d</span><span class="op">)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/Log.html" class="external-link">exp</a></span><span class="op">(</span><span class="va">fit_m</span><span class="op">$</span><span class="va">theta</span><span class="op">)</span>   <span class="co"># random intercept standard deviation (true value 0.7)</span></span>
 <span><span class="co">#&gt; mu:1 | g:log_sd((Intercept)) </span></span>
-<span><span class="co">#&gt;                     0.591244</span></span></code></pre></div>
+<span><span class="co">#&gt;                    0.5912711</span></span></code></pre></div>
 </div>
 <div class="section level2">
 <h2 id="nominal-responses">Nominal responses<a class="anchor" aria-label="anchor" href="#nominal-responses"></a>

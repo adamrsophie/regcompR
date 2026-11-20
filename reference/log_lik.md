@@ -7,7 +7,7 @@ observations matrix suitable for 'loo'.
 ## Usage
 
 ``` r
-log_lik(object, newdata = NULL, ...)
+log_lik(object, newdata = NULL, re = c("conditional", "zero"), ...)
 ```
 
 ## Arguments
@@ -19,6 +19,11 @@ log_lik(object, newdata = NULL, ...)
 - newdata:
 
   Optional data frame containing the response.
+
+- re:
+
+  `"conditional"` uses the fitted random effects, `"zero"` sets them to
+  zero.
 
 - ...:
 

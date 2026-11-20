@@ -33,11 +33,11 @@ d <- data.frame(g, x = rnorm(200))
 d$y <- rpois(200, exp(0.3 + 0.4 * d$x + rnorm(20, 0, 0.5)[g]))
 fit <- regcomp(y ~ x + (1 | g), family = "poisson", data = d)
 ranef_regcomp(fit)$varcorr
-#> $`1 | g`
-#> $`1 | g`$sd
+#> $`lambda:1 | g`
+#> $`lambda:1 | g`$sd
 #> [1] 0.5321327
 #> 
-#> $`1 | g`$cor
+#> $`lambda:1 | g`$cor
 #>      [,1]
 #> [1,]    1
 #> 

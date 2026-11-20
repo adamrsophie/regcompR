@@ -66,7 +66,7 @@ compare_models(poisson = fp, nb2 = fnb)
 
 identifiability_check(fnb)
 #> $condition_number
-#> [1] 8.593197
+#> [1] 8.593194
 #> 
 #> $weak_directions
 #> list()
