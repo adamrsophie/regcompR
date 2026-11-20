@@ -72,7 +72,7 @@ uses_numerics <- function(fn, depth = 4) {
   # Follow helpers and closures defined in the package (not base R).
   ns <- asNamespace("regcompR"); env <- environment(fn) %||% ns
   for (h in setdiff(nm, dispatch)) {
-    g <- get0(h, envir = env, mode = "function")
+    g <- tryCatch(get0(h, envir = env, mode = "function"), error = function(e) NULL)
     if (!is.null(g) && !is.primitive(g) && identical(topenv(environment(g)), ns) && uses_numerics(g, depth - 1)) return(TRUE)
   }
   FALSE
