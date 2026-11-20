@@ -54,9 +54,9 @@ AIC(fw, fl)
 #> fl  4 1053.875
 nd <- data.frame(x = c(0, 1), age = 0)
 predict(fw, nd, type = "survival", at = c(1, 3, 5))
-#>      survival(1) survival(3) survival(5)
-#> [1,]   0.7977997   0.3620883   0.1295408
-#> [2,]   0.8860239   0.5803113   0.3345988
+#>   survival(1) survival(3) survival(5)
+#> 1   0.7977997   0.3620883   0.1295408
+#> 2   0.8860239   0.5803113   0.3345988
 predict(fw, nd, type = "median")
 #> [1] 2.268868 3.580171
 ```
