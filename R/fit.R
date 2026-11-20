@@ -68,8 +68,9 @@
 #'   effects; the other names are covariates. `expr` gives the first
 #'   parameter on its link scale, as in `nls()`, `nlme()` and `nlmer()`.
 #'   Nonlinear parameters need starting values (`control =
-#'   regcomp_control(start = list(a = 10, b = 0.5))`) and are fitted by
-#'   `engine = "ml"`.
+#'   regcomp_control(start = list(a = 10, b = 0.5))`, also the initial
+#'   values of the Stan chains) and are fitted by `engine = "ml"` or by
+#'   `engine = "bayes"` with a Stan runner.
 #' @param ... Further formulas for other parameters, such as `sigma ~ x`,
 #'   and data arguments of the family (for example `trials = n` for the
 #'   binomial), evaluated in `data`.
@@ -121,7 +122,7 @@ regcomp <- function(formula, ..., family, data, engine = c("ml", "tmb", "bayes")
     penalty$type %in% c("ridge", "lasso", "elastic_net", "adaptive_lasso", "group_lasso", "scad", "mcp")
   spec <- build_spec(formula, mr$dots, fam, mr$data, weights = mr$weights,
                      links = links, fixed = fixed, env = parent.frame(), allow_aliased = shrink)
-  if (!is.null(spec$nl) && engine != "ml") stop_unsupported(sprintf("A nonlinear formula with engine \"%s\" (use engine = \"ml\")", engine))
+  if (!is.null(spec$nl) && engine == "tmb") stop_unsupported("A nonlinear formula with engine \"tmb\" (use engine = \"ml\" or \"bayes\")")
   spec$data_args <- dots[setdiff(names(spec$data_args), "")]
   spec$call <- cl
   fit <- switch(engine,

@@ -51,3 +51,13 @@ test_that("nonlinear formulas check their input", {
                class = "regcomp_unsupported")
   expect_error(regcomp(y ~ nl(x * exp(-b * x)), x ~ 1, b ~ 1, family = "normal", data = d, control = ctl), "data columns")
 })
+
+test_that("Stan code for a nonlinear formula computes the parameter row by row", {
+  d <- data.frame(x = runif(30, 0, 5), y = rpois(30, 3))
+  pr <- c(prior("normal(2, 2)", par = "a", class = "Intercept"), prior("normal(0, 1)", par = "b", class = "Intercept"))
+  sc <- stan_code(y ~ nl(log(a) - b * x), a ~ 1, b ~ 1, family = "poisson", data = d, priors = pr)
+  expect_match(sc$code, "lambda[i] = exp(log(a[i]) - b[i] * nlx_x[i]);", fixed = TRUE)
+  expect_equal(sc$data$nlx_x, d$x)
+  expect_error(stan_code(y ~ nl(log(a) - b * x), a ~ 1, b ~ 1, family = "poisson", data = d), "prior for the nonlinear parameter")
+  expect_error(bugs_code(y ~ nl(log(a) - b * x), a ~ 1, b ~ 1, family = "poisson", data = d), class = "regcomp_unsupported")
+})

@@ -3,7 +3,7 @@
 * First release.
 * Nonlinear formulas: `y ~ nl(expr)` with a formula for each nonlinear
   parameter (covariates and random effects allowed) for any family, fitted
-  by `engine = "ml"`; equal to `nls()` and to `lme4::nlmer()`.
+  by `engine = "ml"` (equal to `nls()` and to `lme4::nlmer()`) or by Stan.
 * Reporting: `regcomp_table()` builds regression tables of one or several
   fits (rows grouped by distribution parameter, random effect standard
   deviations and correlations, fit statistics, optional standardized or

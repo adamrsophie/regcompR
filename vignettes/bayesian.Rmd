@@ -97,6 +97,19 @@ ar <- stan_code(y ~ 1 + ar1(0 + t | id), family = "normal", data = lg,
 grep("rho", strsplit(ar, "\n")[[1]], value = TRUE)
 ```
 
+A nonlinear formula (`y ~ nl(expr)`) computes its parameter row by row
+from the nonlinear parameters. These have no natural scale, so each
+needs an intercept prior; their starting values also start the chains.
+
+```{r}
+dn <- data.frame(x = runif(60, 0, 5))
+dn$y <- rpois(60, 10 * exp(-0.6 * dn$x))
+pn <- c(prior("normal(2, 1)", par = "loga", class = "Intercept"),
+        prior("normal(0.5, 0.5)", par = "b", class = "Intercept"))
+nc <- stan_code(y ~ nl(loga - b * x), loga ~ 1, b ~ 1, family = "poisson", data = dn, priors = pn)$code
+grep("lambda", strsplit(nc, "\n")[[1]], value = TRUE)
+```
+
 ## Fitting
 
 The examples below need a working Stan or JAGS installation.

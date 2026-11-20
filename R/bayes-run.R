@@ -11,6 +11,12 @@ fit_bayes <- function(spec, priors, control) {
   } else {
     code <- stan_program(spec, priors)
     data <- stan_data(spec)
+    # Nonlinear parameters start every chain at the given starting values.
+    if (!is.null(spec$nl) && is.null(control$init)) {
+      b0 <- start_values(spec, control)
+      ini <- lapply(stats::setNames(spec$rpars, paste0("b_", stan_spec(spec)$rpars)), function(k) array(b0[spec$beta_idx[[k]]]))
+      control$init <- rep(list(ini), control$chains)
+    }
     res <- run_stan(code, data, control, runner)
     res$code <- code
   }

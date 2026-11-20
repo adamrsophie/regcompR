@@ -75,11 +75,27 @@ stan_spec <- function(spec) {
   for (f in c("preds", "links", "beta_idx", "fixed", "data_pars", "aux", "formulas", "Z"))
     if (length(spec[[f]])) names(spec[[f]]) <- rn(names(spec[[f]]))
   spec$blocks <- lapply(spec$blocks, function(b) { b$par <- rn(b$par); b })
+  if (!is.null(spec$nl)) spec$nl$par <- rn(spec$nl$par)
   spec
 }
 
+# Stan statement computing the nonlinear parameter row by row: nonlinear
+# parameters and covariates are indexed by i, a few R functions renamed.
+stan_nl <- function(spec) {
+  nl <- spec$nl
+  bad <- nl$pars[!grepl("^[A-Za-z][A-Za-z0-9_]*$", nl$pars) | nl$pars %in% stan_reserved]
+  if (length(bad)) stop_input(sprintf("Rename the nonlinear parameter%s %s for Stan.", if (length(bad) > 1) "s" else "", paste(bad, collapse = ", ")))
+  idx <- function(nm) call("[", as.name(nm), quote(i))
+  sub <- c(lapply(stats::setNames(nm = nl$pars), idx),
+           lapply(stats::setNames(nm = names(nl$data)), function(v) idx(stan_nl_name(v))),
+           list(pi = quote(pi()), plogis = quote(inv_logit), qlogis = quote(logit), pnorm = quote(Phi)))
+  ex <- paste(deparse(do.call(substitute, list(nl$expr, sub)), width.cutoff = 500L), collapse = "")
+  c(sprintf("  vector[N] %s;", nl$par),
+    sprintf("  for (i in 1:N) %s[i] = %s;", nl$par, spec$links[[nl$par]]$stan_inv(ex)))
+}
+stan_nl_name <- function(v) paste0("nlx_", gsub("[^A-Za-z0-9_]", "_", v))
+
 stan_program <- function(spec, priors = NULL) {
-  if (!is.null(spec$nl)) stop_unsupported("A nonlinear formula in Stan")
   spec <- stan_spec(spec)
   # Priors name the user facing parameters (mu.1); map them to the Stan
   # identifiers before matching.
@@ -116,6 +132,11 @@ stan_program <- function(spec, priors = NULL) {
            sprintf("  vector[N] off_%s;", k))
     par <- c(par, sprintf("  vector[P_%s] b_%s;", k, k))
     cn <- colnames(spec$preds[[k]]$X)
+    # Nonlinear parameters have no natural scale: their intercept prior
+    # must be given, as brms requires.
+    if (k %in% spec$nl$pars && "(Intercept)" %in% cn &&
+        !any(vapply(priors, function(p) p$class == "Intercept" && identical(p$par, k), TRUE)))
+      stop_input(sprintf("Give a prior for the nonlinear parameter '%s', as in prior(\"normal(1, 2)\", par = \"%s\", class = \"Intercept\").", k, k))
     for (j in seq_along(cn)) {
       cls <- if (cn[j] == "(Intercept)") "Intercept" else "b"
       pri <- c(pri, "  " %+% prior_stan(find_prior(priors, cls, k, cn[j]), sprintf("b_%s[%d]", k, j)))
@@ -167,6 +188,10 @@ stan_program <- function(spec, priors = NULL) {
   }
   for (k in spec$rpars)
     mdl <- c(mdl, sprintf("  vector[N] %s = %s;", k, spec$links[[k]]$stan_inv(sprintf("eta_%s", k))))
+  if (!is.null(spec$nl)) {
+    d <- c(d, sprintf("  vector[N] %s;", stan_nl_name(names(spec$nl$data))))
+    mdl <- c(mdl, stan_nl(spec))
+  }
   for (k in names(spec$fixed)) mdl <- c(mdl, sprintf("  vector[N] %s = rep_vector(fix_%s, N);", k, k))
   pm <- stats::setNames(lapply(names(fam$pars), function(k)
     if (k %in% names(spec$aux) || !is.null(fam$pars[[k]]$estimate)) k else sprintf("%s[i]", k)), names(fam$pars))
@@ -263,6 +288,7 @@ stan_data <- function(spec) {
     out[[paste0("X_", k)]] <- unname(X)
     out[[paste0("off_", k)]] <- as.numeric(spec$preds[[k]]$offset)
   }
+  for (v in names(spec$nl$data)) out[[stan_nl_name(v)]] <- rep_len(as.numeric(spec$nl$data[[v]]), spec$n)
   for (k in names(spec$aux)) out[[paste0("Kc_", k)]] <- spec$aux[[k]]$size
   for (j in seq_along(spec$blocks)) {
     b <- spec$blocks[[j]]

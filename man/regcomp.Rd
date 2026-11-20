@@ -29,8 +29,9 @@ formula in \code{...} (\code{a ~ 1 + (1 | g)}, \code{b ~ z}) are nonlinear param
 each with a linear predictor that may hold covariates and random
 effects; the other names are covariates. \code{expr} gives the first
 parameter on its link scale, as in \code{nls()}, \code{nlme()} and \code{nlmer()}.
-Nonlinear parameters need starting values (\code{control = regcomp_control(start = list(a = 10, b = 0.5))}) and are fitted by
-\code{engine = "ml"}.}
+Nonlinear parameters need starting values (\code{control = regcomp_control(start = list(a = 10, b = 0.5))}, also the initial
+values of the Stan chains) and are fitted by \code{engine = "ml"} or by
+\code{engine = "bayes"} with a Stan runner.}
 
 \item{...}{Further formulas for other parameters, such as \code{sigma ~ x},
 and data arguments of the family (for example \code{trials = n} for the
