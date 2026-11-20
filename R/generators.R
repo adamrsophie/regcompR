@@ -17,7 +17,7 @@ gen_family <- function(base, tag, display, newpars, T, logt, Tinv = NULL, formul
   bp <- function(p) p[bn]
   G <- function(y, p) pmin(pmax(family_cdf(base, y, bp(p)), 0), 1)
   lpdf <- if (base$discrete) {
-    function(y, p) log(pmax(T(G(y, p), gp(p)) - T(G(y - 1, p), gp(p)), 0))
+    function(y, p) log(pmax(T(G(y, p), gp(p)) - T(pmin(pmax(family_cdf_left(base, y, bp(p)), 0), 1), gp(p)), 0))
   } else {
     function(y, p) {
       lb <- eval_lpdf(base, y, bp(p))

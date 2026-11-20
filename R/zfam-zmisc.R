@@ -128,6 +128,8 @@ register_family(family_def("tweedie", "Tweedie (compound Poisson-gamma, 1 < powe
   rng = function(n, p) { pw <- 1 + p$power; lam <- p$mu^(2 - pw) / (p$phi * (2 - pw)); N <- stats::rpois(n, lam)
     ifelse(N == 0, 0, stats::rgamma(n, pmax(N, 1) * (2 - pw) / (pw - 1), scale = p$phi * (pw - 1) * p$mu^(pw - 1))) },
   mean = function(p) p$mu, variance = function(p) p$phi * p$mu^(1 + p$power),
+  extra = list(atom_points = 0),
+  atom = function(y, p) { pw <- 1 + p$power; ifelse(y == 0, exp(-p$mu^(2 - pw) / (p$phi * (2 - pw))), 0) },
   numeric_cdf = FALSE, numeric_moments = FALSE,
   regression_notes = "Log link on mu gives Tweedie GLM; zeros have positive probability.",
   references = c("Jorgensen (1987), Exponential dispersion models. JRSS B, 49, 127-162.", "Dunn and Smyth (2005), Series evaluation of Tweedie exponential dispersion model densities. Stat. Comput., 15, 267-280."),
@@ -160,7 +162,8 @@ censor <- function(base, lower = -Inf, upper = Inf) {
   if (base$discrete && any(is.finite(c(lower, upper)) & abs(c(lower, upper) - round(c(lower, upper))) > 1e-12))
     stop_input("Censoring bounds of a discrete law must be integers.")
   # Upper censoring keeps P(Y >= upper); for counts that is 1 - F(upper - 1).
-  lccdf <- function(q, p) { if (base$discrete) q <- q - 1
+  reject_atoms(base, "Censoring")
+  lccdf <- function(q, p) { if (base$discrete) q <- q - lattice_step(base)
     if (!is.null(base$lccdf)) base$lccdf(q, p) else log1p(-family_cdf(base, q, p)) }
   lpdf <- function(y, p) {
     out <- eval_lpdf(base, y, p)
@@ -178,6 +181,12 @@ censor <- function(base, lower = -Inf, upper = Inf) {
                  lpdf, cdf = cdf, rng = function(n, p) pmin(pmax(family_rng(base, n, p), lower), upper),
                  quantile = function(pr, p) pmin(pmax(family_quantile(base, pr, p), lower), upper),
                  support = support, operator = list(type = "censor", base = base, lower = lower, upper = upper),
+                 extra = if (!base$discrete) list(atom_points = c(lower, upper)[is.finite(c(lower, upper))]) else list(),
+                 atom = if (!base$discrete) function(y, p) {
+                   out <- rep(0, length(y)); lo <- y == lower; hi <- y == upper
+                   if (any(lo)) out[lo] <- family_cdf(base, y[lo], lapply(p, `[`, lo))
+                   if (any(hi)) out[hi] <- exp(lccdf(y[hi], lapply(p, `[`, hi)))
+                   out },
                  formula = "point masses F(lower) and 1 - F(upper) at the bounds; f(y) inside")
   if (!base$discrete) f$category <- "mixed"; f$numeric_moments <- FALSE
   f

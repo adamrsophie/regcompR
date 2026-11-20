@@ -42,22 +42,17 @@ pit_values <- function(fam, y, pars, cmat = NULL) {
     lo <- pmax(cmat[, "lower"], cmat[, "tlower"]); up <- pmin(cmat[, "upper"], cmat[, "tupper"])
   }
   Fup <- ifelse(is.infinite(up) & up > 0, 1, family_cdf(fam, ifelse(is.finite(up), up, 0), pars))
-  lo_q <- if (fam$discrete) lo - 1 else lo
-  Flo <- ifelse(is.infinite(lo) & lo < 0, 0, family_cdf(fam, ifelse(is.finite(lo_q), lo_q, 0), pars))
-  exact_cont <- !fam$discrete & lo == up
-  # Continuous laws can carry atoms (censored, rectified or inflated laws):
-  # use the left limit of the distribution function and randomize over the
-  # jump when there is one.
-  if (any(exact_cont)) {
-    i <- which(exact_cont & is.finite(lo))
-    Fl <- family_cdf(fam, lo[i] - 1e-8 * (1 + abs(lo[i])), lapply(pars, function(v) if (length(v) == n) v[i] else v))
-    Flo[exact_cont] <- Fup[exact_cont]
-    jump <- Fup[i] - Fl > 1e-6
-    Flo[i[jump]] <- Fl[jump]
-  }
+  # Lower end: the left limit F(lo-) for a discrete law or an exact value
+  # (so an atom, and only an atom, is randomized over); F(lo) for the lower
+  # bound of a continuous censoring interval. A continuous law without
+  # atoms has F(y-) = F(y) and uses no random numbers.
+  left <- fam$discrete | lo == up
+  lq <- ifelse(is.finite(lo), lo, 0)
+  Flo <- ifelse(is.infinite(lo) & lo < 0, 0, ifelse(left, family_cdf_left(fam, lq, pars), family_cdf(fam, lq, pars)))
   if (!is.null(cmat)) {
     tl <- cmat[, "tlower"]; tu <- cmat[, "tupper"]
-    Ftl <- ifelse(is.finite(tl), family_cdf(fam, ifelse(is.finite(tl), if (fam$discrete) tl - 1 else tl, 0), pars), 0)
+    tq <- ifelse(is.finite(tl), tl, 0)
+    Ftl <- ifelse(is.finite(tl), if (fam$discrete) family_cdf_left(fam, tq, pars) else family_cdf(fam, tq, pars), 0)
     Ftu <- ifelse(is.finite(tu), family_cdf(fam, ifelse(is.finite(tu), tu, 0), pars), 1)
     Fup <- (Fup - Ftl) / (Ftu - Ftl); Flo <- (Flo - Ftl) / (Ftu - Ftl)
   }

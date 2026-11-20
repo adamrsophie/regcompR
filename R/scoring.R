@@ -65,8 +65,12 @@ scoring_rule <- function(object, newdata = NULL, rule = c("log", "crps", "dss", 
     Fz <- function(z) family_cdf(fam, z, lapply(pi, rep, length(z)))
     lo <- family_quantile(fam, 1e-9, pi); hi <- family_quantile(fam, 1 - 1e-9, pi)
     if (fam$discrete) {
-      k <- seq(min(lo, y[i]), max(hi, y[i]))
-      return(sum((Fz(k) - (y[i] <= k))^2))
+      # The CDF is a step function on the lattice: each step's squared
+      # difference times the lattice spacing.
+      g <- lattice_step(fam)
+      if (g == 0) stop_unsupported("CRPS for a discrete law on an irregular support", fam$id)
+      k <- seq(min(lo, y[i]), max(hi, y[i]), by = g)
+      return(g * sum((Fz(k) - (y[i] <= k + g / 2))^2))
     }
     # Integrate over the whole support: finite cutoffs at extreme quantiles
     # make the quadrature miss the mass of heavy tails.

@@ -274,6 +274,9 @@ bfam("ordered_beta", "Ordered beta (Kubinec)", list(unit_mean(), P("phi", "posit
     ifelse(y == 0, stats::plogis(e - p$k1, lower.tail = FALSE, log.p = TRUE),
     ifelse(y == 1, stats::plogis(e - p$k2, log.p = TRUE),
       log(stats::plogis(e - p$k1) - stats::plogis(e - p$k2)) + stats::dbeta(y, p$mu * p$phi, (1 - p$mu) * p$phi, log = TRUE))) },
+  extra = list(atom_points = c(0, 1)),
+  atom = function(y, p) { e <- stats::qlogis(p$mu)
+    ifelse(y == 0, stats::plogis(e - p$k1, lower.tail = FALSE), ifelse(y == 1, stats::plogis(e - p$k2), 0)) },
   numeric_cdf = FALSE, numeric_moments = FALSE,
   references = "Kubinec (2023), Ordered beta regression: A parsimonious, well-fitting model for continuous data with lower and upper bounds. Political Analysis, 31, 519-536.",
   reference = ref_impl("definition", function(y, p) { e <- stats::qlogis(p$mu)

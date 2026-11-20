@@ -7,20 +7,22 @@ new_par_name <- function(base, nm) {
 
 sub_pars <- function(p, names) p[intersect(names(p), names)]
 
-# Continuous laws with point masses (inflated, hurdle or censored
-# continuous laws). Operators whose formulas assume a density reject them.
-has_atoms <- function(f) {
-  if (f$discrete || is.null(f$operator)) return(FALSE)
-  if (f$operator$type %in% c("inflate", "hurdle", "censor")) return(TRUE)
-  !is.null(f$operator$base) && inherits(f$operator$base, "regcomp_family") && has_atoms(f$operator$base)
-}
+# Continuous laws with point masses (see has_atoms()). Operators whose
+# formulas assume a density reject them.
 reject_atoms <- function(f, what) if (has_atoms(f))
   stop_unsupported(sprintf("%s of a continuous law with point masses", what), f$id)
 
 op_family <- function(base, id, display, pars, lpdf, cdf = NULL, lccdf = NULL,
                       quantile = NULL, rng = NULL, mean = NULL, variance = NULL,
                       support = NULL, discrete = base$discrete, stan = NULL, bugs = NULL,
-                      operator, formula = "", extra = list(), numeric_moments = TRUE, check = NULL) {
+                      operator, formula = "", extra = list(), numeric_moments = TRUE, check = NULL,
+                      atom = NULL) {
+  # Base constraints carry over when the base parameters keep their names.
+  if (is.null(check) && !is.null(base$check) && all(names(base$pars) %in% names(pars))) {
+    bn <- names(base$pars); check <- function(p) base$check(p[bn])
+  }
+  # A discrete result on the same support keeps the base lattice.
+  if (discrete && base$discrete && is.null(extra$grid) && !is.null(base$extra$grid)) extra$grid <- base$extra$grid
   f <- family_def(
     id, display, base$category, pars, lpdf = lpdf, cdf = cdf, lccdf = lccdf,
     quantile = quantile, rng = rng, mean = mean, variance = variance,
@@ -28,7 +30,7 @@ op_family <- function(base, id, display, pars, lpdf, cdf = NULL, lccdf = NULL,
     discrete = discrete, variate_type = base$variate_type, formula = formula,
     references = base$references, stan = stan, bugs = bugs,
     status = if (base$status %in% c("validated", "production")) "implemented" else base$status,
-    numeric_moments = numeric_moments, extra = extra, check = check)
+    numeric_moments = numeric_moments, extra = extra, check = check, atom = atom)
   f$operator <- operator
   f
 }
@@ -64,8 +66,10 @@ inflate <- function(base, at = 0, names = NULL) {
   if (base$variate_type != "scalar") stop_unsupported("Inflation of a vector valued law", base$id)
   k <- length(at)
   if (anyDuplicated(at)) stop_input("Inflation points must be distinct.")
-  if (base$discrete && any(abs(at - round(at)) > 1e-12))
-    stop_input("Inflation points of a discrete law must be integers.")
+  g <- lattice_step(base)
+  if (base$discrete && (g == 0 || any(abs(at / g - round(at / g)) > 1e-9)))
+    stop_input("Inflation points of a discrete law must lie on its lattice (integers for counts).")
+  atomic <- base$discrete || has_atoms(base)
   if (is.null(names)) names <- if (k == 1 && at == 0) "zi" else if (k == 1 && at == 1) "oi" else paste0("pi", seq_len(k))
   names <- vapply(names, function(n) new_par_name(base, n), "")
   bnames <- names(base$pars)
@@ -81,11 +85,16 @@ inflate <- function(base, at = 0, names = NULL) {
     out <- log(rest) + lb
     for (j in seq_len(k)) {
       hit <- !is.na(y) & y == at[j]
-      if (any(hit)) {
-        if (base$discrete) out[hit] <- log(W[hit, j] + rest[hit] * exp(lb[hit]))
-        else out[hit] <- log(W[hit, j])
-      }
+      if (any(hit)) out[hit] <- if (atomic)
+        log(W[hit, j] + rest[hit] * family_atom(base, y[hit], lapply(bp, function(v) rep_len(v, length(y))[hit])))
+        else log(W[hit, j])
     }
+    out
+  }
+  atom <- if (!base$discrete) function(y, p) {
+    W <- wts(p); bp <- sub_pars(p, bnames)
+    out <- (1 - rowSums(W)) * family_atom(base, y, bp)
+    for (j in seq_len(k)) out <- out + W[, j] * (y == at[j])
     out
   }
   cdf <- function(q, p) {
@@ -125,7 +134,7 @@ inflate <- function(base, at = 0, names = NULL) {
   newpars <- c(base$pars, stats::setNames(lapply(names, function(n)
     P(n, "unit", role = "inflation", interpretation = "Probability of the added point mass")), names))
   stan <- NULL
-  if (!is.null(base$stan) && k == 1) {
+  if (!is.null(base$stan) && k == 1 && !has_atoms(base)) {
     fn <- sprintf("rc_inflate_%s_%s", stan_ident(base$id), gsub("[^0-9a-z]", "", tolower(format(at))))
     args <- stan_args(base$pars, bnames)
     pm <- stats::setNames(lapply(bnames, identity), bnames)
@@ -157,18 +166,20 @@ inflate <- function(base, at = 0, names = NULL) {
       lccdf = if (nzchar(lc)) sprintf("%s_lccdf({y} | %s, {%s})", fn, paste(sprintf("{%s}", bnames), collapse = ", "), names))
   }
   bugs <- NULL
-  if (!is.null(base$bugs$loglik) && k == 1) {
+  if (!is.null(base$bugs$loglik) && k == 1 && !has_atoms(base)) {
     bl <- base$bugs$loglik
     bugs <- list(loglik = if (base$discrete)
       sprintf("log(equals({y}, %s) * {%s} + (1 - {%s}) * exp(%s))", format(at), names, names, bl)
       else sprintf("equals({y}, %s) * log({%s}) + (1 - equals({y}, %s)) * (log(1 - {%s}) + %s)",
-                   format(at), names, format(at), names, gsub("\\{y\\}", "({y} + equals({y}, %s))", bl)))
-    if (!base$discrete) bugs$loglik <- sprintf(bugs$loglik, format(at))
+                   format(at), names, format(at), names,
+                   gsub("{y}", sprintf("({y} + equals({y}, %s))", format(at)), bl, fixed = TRUE)))
   }
   f <- op_family(base, sprintf("inflate(%s, at = %s)", base$id, paste(format(at), collapse = ",")),
             sprintf("%s inflated at %s", base$display_name, paste(format(at), collapse = ", ")),
             newpars, lpdf, cdf = cdf, rng = rng, mean = mean, variance = variance,
-            support = support, discrete = base$discrete, stan = stan, bugs = bugs,
+            support = support, discrete = base$discrete, stan = stan, bugs = bugs, atom = atom,
+            extra = if (!base$discrete && (!has_atoms(base) || !is.null(base$extra$atom_points)))
+              list(atom_points = sort(unique(c(at, base$extra$atom_points)))) else list(),
             operator = list(type = "inflate", base = base, at = at, pars = names),
             check = function(p) { m <- if (is.null(base$check)) NULL else base$check(sub_pars(p, bnames))
               if (!is.null(m)) return(m)
@@ -208,9 +219,14 @@ inflate <- function(base, at = 0, names = NULL) {
 hurdle <- function(base, at = 0, name = "hu") {
   base <- get_family(base)
   if (base$variate_type != "scalar") stop_unsupported("Hurdles for a vector valued law", base$id)
+  g <- lattice_step(base)
+  if (base$discrete && (g == 0 || abs(at / g - round(at / g)) > 1e-9))
+    stop_input("The hurdle point of a discrete law must lie on its lattice.")
   name <- new_par_name(base, name)
   bnames <- names(base$pars)
-  lp_at <- function(bp) if (base$discrete) eval_lpdf(base, rep(at, max(lengths(bp))), bp) else rep(-Inf, max(lengths(bp)))
+  # Log base probability of the hurdle point (an atom of a mixed base too).
+  lp_at <- function(bp) { n <- max(lengths(bp))
+    if (base$discrete) eval_lpdf(base, rep(at, n), bp) else log(family_atom(base, rep(at, n), bp)) }
   lpdf <- function(y, p) {
     bp <- sub_pars(p, bnames); pi <- p[[name]]
     out <- log1p(-pi) + eval_lpdf(base, y, bp) - log1mexp(-lp_at(bp))
@@ -227,6 +243,10 @@ hurdle <- function(base, at = 0, name = "hu") {
     cond <- ifelse(above, 1 - exp(family_lccdf(base, q, bp) - l1), exp(log(family_cdf(base, q, bp)) - l1))
     pi * above + (1 - pi) * pmin(pmax(cond, 0), 1)
   }
+  atom <- if (!base$discrete) function(y, p) {
+    bp <- sub_pars(p, bnames); pi <- p[[name]]
+    ifelse(y == at, pi, (1 - pi) * family_atom(base, y, bp) / -expm1(lp_at(bp)))
+  }
   support <- function(p) {
     s <- base$support(sub_pars(p, bnames))
     list(lower = pmin(s$lower, at), upper = pmax(s$upper, at))
@@ -235,6 +255,20 @@ hurdle <- function(base, at = 0, name = "hu") {
     bp <- sub_pars(p, bnames); pi <- p[[name]]
     y <- rep(at, n)
     todo <- which(stats::runif(n) >= pi); tries <- 0
+    # Rows whose base law has almost no mass off the hurdle point: draw from
+    # the conditional law directly by summing masses along the lattice.
+    lpa <- rep_len(lp_at(bp), n)
+    direct <- todo[base$discrete & is.finite(base$support(lapply(bp, `[`, 1))$lower) & lpa[todo] > log(0.99)]
+    for (i in direct) {
+      bi <- lapply(bp, `[`, i); l1 <- log(-expm1(lpa[i])); u <- stats::runif(1)
+      k <- base$support(bi)$lower; acc <- 0
+      for (s in 1:100000) {
+        if (k != at) { acc <- acc + exp(eval_lpdf(base, k, bi) - l1); if (acc >= u) break }
+        k <- k + g
+      }
+      y[i] <- k
+    }
+    todo <- setdiff(todo, direct)
     while (length(todo)) {
       tries <- tries + 1
       if (tries > 1000) stop_numerical("Hurdle sampling: the base law has almost no mass away from the hurdle point.")
@@ -247,14 +281,14 @@ hurdle <- function(base, at = 0, name = "hu") {
   }
   mean <- function(p) {
     bp <- sub_pars(p, bnames); pi <- p[[name]]
-    m <- family_moment(base, "mean", bp, quiet = TRUE); pa <- exp(lp_at(bp))
-    pi * at + (1 - pi) * (m - pa * at) / (1 - pa)
+    m <- family_moment(base, "mean", bp, quiet = TRUE); la <- lp_at(bp); pa <- exp(la)
+    pi * at + (1 - pi) * (m - pa * at) / -expm1(la)
   }
   variance <- function(p) {
     bp <- sub_pars(p, bnames); pi <- p[[name]]
     m <- family_moment(base, "mean", bp, quiet = TRUE)
-    v <- family_moment(base, "variance", bp, quiet = TRUE); pa <- exp(lp_at(bp))
-    m1 <- (m - pa * at) / (1 - pa); m2 <- (v + m^2 - pa * at^2) / (1 - pa)
+    v <- family_moment(base, "variance", bp, quiet = TRUE); la <- lp_at(bp); pa <- exp(la); q1 <- -expm1(la)
+    m1 <- (m - pa * at) / q1; m2 <- (v + m^2 - pa * at^2) / q1
     ey <- pi * at + (1 - pi) * m1; ey2 <- pi * at^2 + (1 - pi) * m2
     ey2 - ey^2
   }
@@ -265,7 +299,7 @@ hurdle <- function(base, at = 0, name = "hu") {
   newpars <- c(base$pars, stats::setNames(list(P(name, "unit", role = "hurdle",
     interpretation = "Probability of the hurdle value")), name))
   stan <- NULL
-  if (!is.null(base$stan)) {
+  if (!is.null(base$stan) && !has_atoms(base)) {
     fn <- sprintf("rc_hurdle_%s", stan_ident(base$id))
     args <- stan_args(base$pars, bnames)
     pm <- stats::setNames(lapply(bnames, identity), bnames)
@@ -292,7 +326,9 @@ hurdle <- function(base, at = 0, name = "hu") {
   op_family(base, sprintf("hurdle(%s, at = %s)", base$id, format(at)),
             sprintf("%s hurdle at %s", base$display_name, format(at)),
             newpars, lpdf, cdf = cdf, rng = rng, mean = mean, variance = variance,
-            support = support, stan = stan, bugs = bugs,
+            support = support, stan = stan, bugs = bugs, atom = atom,
+            extra = if (!base$discrete && (!has_atoms(base) || !is.null(base$extra$atom_points)))
+              list(atom_points = sort(unique(c(at, base$extra$atom_points)))) else list(),
             operator = list(type = "hurdle", base = base, at = at, pars = name), check = hcheck,
             formula = "P(Y = c) = pi; P(Y = y) = (1 - pi) f0(y) / (1 - P0(c)) otherwise")
 }
@@ -321,7 +357,7 @@ truncate_dist <- function(base, lower = -Inf, upper = Inf) {
   if (lower >= upper) stop_input("lower must be smaller than upper.")
   bn <- names(base$pars)
   if (base$discrete) { lower <- ceiling(lower); upper <- floor(upper) }
-  lo_q <- if (base$discrete) lower - 1 else lower
+  lo_q <- if (base$discrete) lower - lattice_step(base) else lower
   # Log normalizer and conditional probabilities in log space, so a region
   # far in a tail keeps its mass.
   lnorm <- function(p) { n <- max(lengths(p))
@@ -415,6 +451,9 @@ mixture <- function(...) {
   if (K < 2) stop_input("A mixture needs at least two components.")
   disc <- vapply(comps, `[[`, TRUE, "discrete")
   if (length(unique(disc)) > 1) stop_input("Mixture components must all be discrete or all continuous.")
+  grids <- unique(vapply(comps, lattice_step, 0))
+  if (disc[1] && length(grids) > 1) stop_unsupported("A mixture of discrete laws on different lattices")
+  atomic <- !disc[1] && any(vapply(comps, has_atoms, TRUE))
   pars <- list(); cmap <- vector("list", K)
   for (k in seq_len(K)) {
     for (p in comps[[k]]$pars) {
@@ -437,6 +476,10 @@ mixture <- function(...) {
     m <- cmap[[k]]
     stats::setNames(lapply(m, function(nm) p[[nm]]), names(m))
   }
+  atom <- if (atomic) function(y, p) {
+    W <- weights(p)
+    rowSums(matrix(vapply(seq_len(K), function(k) W[, k] * family_atom(comps[[k]], y, comp_pars(p, k)), numeric(length(y))), ncol = K))
+  }
   lpdf <- function(y, p) {
     W <- weights(p)
     L <- sapply(seq_len(K), function(k) log(W[, k]) + eval_lpdf(comps[[k]], y, comp_pars(p, k)))
@@ -444,6 +487,9 @@ mixture <- function(...) {
     m <- apply(L, 1, max)
     out <- m + log(rowSums(exp(L - m)))
     out[!is.finite(m)] <- m[!is.finite(m)]
+    # At an atom of any component the law has a point mass there; the
+    # densities of the other components do not add to it.
+    if (atomic) { a <- atom(y, p); out[!is.na(a) & a > 0] <- log(a[!is.na(a) & a > 0]) }
     out
   }
   cdf <- function(q, p) {
@@ -477,7 +523,7 @@ mixture <- function(...) {
     list(lower = do.call(pmin, lapply(s, `[[`, "lower")), upper = do.call(pmax, lapply(s, `[[`, "upper")))
   }
   stan <- NULL
-  if (all(vapply(comps, function(f) !is.null(f$stan), TRUE))) {
+  if (all(vapply(comps, function(f) !is.null(f$stan), TRUE)) && !atomic) {
     fn <- paste0("rc_mix_", paste(vapply(comps, function(f) stan_ident(f$id), ""), collapse = "_"))
     yt <- if (disc[1]) "int" else "real"
     args <- stan_args(pars, names(pars), stan_ident(names(pars)))
@@ -503,7 +549,12 @@ mixture <- function(...) {
     paste0("mixture(", paste(vapply(comps, `[[`, "", "id"), collapse = ", "), ")"),
     paste("Mixture of", paste(vapply(comps, `[[`, "", "display_name"), collapse = " and ")),
     comps[[1]]$category, pars, lpdf = lpdf, cdf = cdf, rng = rng, mean = mean,
-    variance = variance, support = support, discrete = disc[1], stan = stan,
+    variance = variance, support = support, discrete = disc[1], stan = stan, atom = atom,
+    check = function(p) { for (k in seq_len(K)) if (!is.null(comps[[k]]$check)) {
+      m <- comps[[k]]$check(comp_pars(p, k)); if (is.character(m) && length(m) && nzchar(m[1])) return(sprintf("Component %d: %s", k, m[1])) }
+      NULL },
+    extra = if (disc[1]) list(grid = grids[1]) else if (atomic && all(vapply(comps, function(f) !has_atoms(f) || !is.null(f$extra$atom_points), TRUE)))
+      list(atom_points = sort(unique(unlist(lapply(comps, function(f) f$extra$atom_points))))) else list(),
     status = "implemented", formula = "f(y) = sum_k w_k f_k(y)",
     identifiability_notes = "Component labels are exchangeable when components share a family (label switching).")
   f$operator <- list(type = "mixture", components = comps)
@@ -594,10 +645,15 @@ transform_dist <- function(base, transform = c("log", "exp", "logit", "inv_logit
 discretize <- function(base, offset = 0) {
   base <- get_family(base)
   if (base$discrete) stop_input("The base law is already discrete.")
+  # floor(X + offset) = k exactly when k - offset <= X < k + 1 - offset, so
+  # P(Y = k) = F((k + 1 - offset)-) - F((k - offset)-): left limits keep an
+  # atom of a mixed base in its own bin. Without atoms the log interval
+  # probability keeps tail masses.
   lpdf <- function(y, p) {
-    log(pmax(family_cdf(base, y + 1 - offset, p) - family_cdf(base, y - offset, p), 0))
+    if (!has_atoms(base)) return(family_log_interval(base, y - offset, y + 1 - offset, recycle_pars(p, length(y))))
+    log(pmax(family_cdf_left(base, y + 1 - offset, p) - family_cdf_left(base, y - offset, p), 0))
   }
-  cdf <- function(q, p) family_cdf(base, floor(q) + 1 - offset, p)
+  cdf <- function(q, p) family_cdf_left(base, floor(q) + 1 - offset, p)
   support <- function(p) {
     s <- base$support(p)
     list(lower = floor(s$lower + offset), upper = ifelse(is.finite(s$upper), floor(s$upper + offset), Inf))
@@ -614,11 +670,12 @@ discretize <- function(base, offset = 0) {
 round_dist <- function(base, digits = 0) {
   base <- get_family(base)
   if (base$discrete) stop_input("The base law is already discrete.")
+  reject_atoms(base, "Rounding")
   h <- 10^-digits
   f <- family_def(
     sprintf("round(%s, %d)", base$id, as.integer(digits)), sprintf("Rounded %s", base$display_name),
     base$category, base$pars, discrete = TRUE,
-    lpdf = function(y, p) log(pmax(family_cdf(base, y + h / 2, p) - family_cdf(base, y - h / 2, p), 0)),
+    lpdf = function(y, p) family_log_interval(base, y - h / 2, y + h / 2, recycle_pars(p, length(y))),
     cdf = function(q, p) family_cdf(base, floor(q / h + 1e-9) * h + h / 2, p),
     quantile = function(pr, p) ceiling((family_quantile(base, pr, p) - h / 2) / h - 1e-9) * h,
     rng = function(n, p) round(family_rng(base, n, p) / h) * h,

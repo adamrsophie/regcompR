@@ -294,6 +294,28 @@ tail_refine <- function(fam, q, p, out, bad, upper) {
   }, error = function(e) out[i])
   out
 }
+# Measure contract. A discrete law has mass only on its support points: a
+# lattice of multiples of `lattice_step()` (0 means an irregular finite set
+# described by the density). A continuous law has a density with respect to
+# Lebesgue measure plus, when `fam$atom` is set, point masses given by
+# `fam$atom(y, p)`; at an atom `lpdf` returns the log mass. `family_atom()`
+# gives the point mass at y and `family_cdf_left()` the left limit F(y-).
+lattice_step <- function(fam) if (is.null(fam$extra$grid)) 1 else fam$extra$grid
+has_atoms <- function(f) !f$discrete && !is.null(f$atom)
+family_atom <- function(fam, y, p) {
+  if (fam$discrete) { v <- exp(eval_lpdf(fam, y, p)); v[is.na(v)] <- 0; return(v) }
+  if (is.null(fam$atom)) return(rep(0, length(y)))
+  r <- recycle_pars(c(list(.y = y), p))
+  v <- rep(0, length(r$.y)); ok <- !is.na(r$.y)
+  if (any(ok)) v[ok] <- fam$atom(r$.y[ok], lapply(r[-1], `[`, ok))
+  v
+}
+family_cdf_left <- function(fam, q, p) {
+  F <- family_cdf(fam, q, p)
+  if (!fam$discrete && is.null(fam$atom)) return(F)
+  pmax(F - family_atom(fam, q, p), 0)
+}
+
 family_log_interval <- function(fam, a, b, p) {
   n <- length(a); out <- rep(-Inf, n)
   pos <- !is.na(a) & !is.na(b) & b > a

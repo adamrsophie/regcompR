@@ -108,7 +108,7 @@ family_def <- function(id, display_name, category, pars,
                        check = NULL, operators_allowed = NULL,
                        pars_fun = NULL, response_check = NULL,
                        numeric_cdf = TRUE, numeric_moments = TRUE,
-                       tmb = NULL, bugs = NULL, extra = list()) {
+                       tmb = NULL, bugs = NULL, extra = list(), atom = NULL) {
   stopifnot(status %in% valid_statuses)
   names(pars) <- vapply(pars, `[[`, "", "name")
   if (is.null(support)) {
@@ -138,7 +138,7 @@ family_def <- function(id, display_name, category, pars,
     limits = limits, check = check, operators_allowed = operators_allowed,
     pars_fun = pars_fun, response_check = response_check,
     numeric_cdf = numeric_cdf, numeric_moments = numeric_moments,
-    tmb = tmb, bugs = bugs, extra = extra, operator = NULL
+    tmb = tmb, bugs = bugs, extra = extra, atom = atom, operator = NULL
   ), class = "regcomp_family")
 }
 

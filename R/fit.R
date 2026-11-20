@@ -788,8 +788,11 @@ factor_response <- function(y, fam, ylev, refit) {
 # Responses outside the family support: integrality for discrete laws and
 # the support bounds that do not depend on the parameters.
 check_response <- function(y, fam) {
-  if (fam$discrete && any(bad <- abs(y - round(y)) > 1e-8))
-    stop_input(sprintf("'%s' needs integer responses; rows %s are not.", fam$id, paste(head(which(bad), 5), collapse = ", ")))
+  g <- lattice_step(fam)
+  if (fam$discrete && g > 0 && any(bad <- abs(y / g - round(y / g)) > 1e-8))
+    stop_input(sprintf("'%s' needs %s; rows %s are not.", fam$id,
+                       if (g == 1) "integer responses" else sprintf("responses on its lattice of multiples of %s", format(g)),
+                       paste(utils::head(which(bad), 5), collapse = ", ")))
   sup <- function(scale) tryCatch(fam$support(lapply(fam$pars, function(q) {
     v <- q$default %||% generic_start(q, y)
     if (q$domain == "unit") v / scale else if (q$domain == "real") v + scale - 1 else v * scale
@@ -801,7 +804,7 @@ check_response <- function(y, fam) {
   bad <- which(y < lo | y > hi)
   if (length(bad))
     stop_input(sprintf("Responses outside the support [%s, %s] of '%s' in rows %s.", format(lo), format(hi), fam$id,
-                       paste(head(bad, 5), collapse = ", ")))
+                       paste(utils::head(bad, 5), collapse = ", ")))
   invisible()
 }
 

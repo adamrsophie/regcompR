@@ -5,6 +5,18 @@ rename_pars <- function(fam, suffix) {
   stats::setNames(out, paste0(names(fam$pars), suffix))
 }
 suffix_pars <- function(p, fam, suffix) stats::setNames(lapply(names(fam$pars), function(k) p[[paste0(k, suffix)]]), names(fam$pars))
+# Constraint check of a multi component family: each component's own check
+# on its renamed parameters.
+component_checks <- function(fams, suffixes) {
+  if (all(vapply(fams, function(f) is.null(f$check), TRUE))) return(NULL)
+  function(p) {
+    for (k in seq_along(fams)) if (!is.null(fams[[k]]$check)) {
+      m <- fams[[k]]$check(suffix_pars(p, fams[[k]], suffixes[k]))
+      if (is.character(m) && length(m) && nzchar(m[1])) return(m[1])
+    }
+    NULL
+  }
+}
 
 #' Mixture cure models
 #'
@@ -63,6 +75,7 @@ cure <- function(base) {
 splice <- function(body, tail) {
   body <- get_family(body); tail <- get_family(tail)
   if (body$discrete || tail$discrete) stop_input("splice() needs continuous laws.")
+  reject_atoms(body, "Splicing"); reject_atoms(tail, "Splicing")
   pars <- c(rename_pars(body, ".b"), rename_pars(tail, ".t"),
             list(threshold = P("threshold", "real", role = "threshold", link = "identity"),
                  w = P("w", "unit", role = "body weight", link = "logit")))
@@ -78,6 +91,7 @@ splice <- function(body, tail) {
   support <- function(p) list(lower = body$support(pb(p))$lower, upper = tail$support(pt(p))$upper)
   f <- family_def(sprintf("splice(%s, %s)", body$id, tail$id), sprintf("Spliced %s body and %s tail", body$display_name, tail$display_name),
     body$category, pars, lpdf = lpdf, cdf = cdf, support = support, status = "implemented",
+    check = component_checks(list(body, tail), c(".b", ".t")),
     formula = "w f_b(y)/F_b(u) for y <= u; (1 - w) f_t(y)/S_t(u) for y > u", references = c("Cooray and Ananda (2005), Modeling actuarial data with a composite lognormal-Pareto model. Scand. Actuar. J., 2005, 321-334.",
       "Scollnik (2007), On composite lognormal-Pareto models. Scand. Actuar. J., 2007, 20-33."))
   f$operator <- list(type = "splice", body = body, tail = tail)
@@ -102,8 +116,16 @@ splice <- function(body, tail) {
 convolve_dist <- function(a, b) {
   a <- get_family(a); b <- get_family(b)
   if (a$discrete != b$discrete) stop_input("convolve_dist() needs two continuous or two discrete laws.")
-  pars <- c(rename_pars(a, ".1"), rename_pars(b, ".2"))
-  pa <- function(p) suffix_pars(p, a, ".1"); pb <- function(p) suffix_pars(p, b, ".2")
+  # One mixed law with known atom points and one law with a density: the
+  # sum has a density, int f1c(y - x) f2(x) dx + sum_j A_j f2(y - c_j).
+  if (has_atoms(b) && !has_atoms(a)) { t <- a; a <- b; b <- t; swapped <- TRUE } else swapped <- FALSE
+  if (has_atoms(b) || has_atoms(a) && is.null(a$extra$atom_points))
+    stop_unsupported("Convolution of a continuous law with point masses (other than one law with known atom points)")
+  pts <- a$extra$atom_points
+  if (a$discrete && (lattice_step(a) != 1 || lattice_step(b) != 1)) stop_unsupported("Convolution of discrete laws off the integer lattice")
+  sa_ <- if (swapped) ".2" else ".1"; sb_ <- if (swapped) ".1" else ".2"
+  pars <- if (swapped) c(rename_pars(b, ".1"), rename_pars(a, ".2")) else c(rename_pars(a, ".1"), rename_pars(b, ".2"))
+  pa <- function(p) suffix_pars(p, a, sa_); pb <- function(p) suffix_pars(p, b, sb_)
   one <- function(y, p) {
     if (a$discrete) {
       sb <- b$support(pb(p)); sa <- a$support(pa(p))
@@ -114,14 +136,20 @@ convolve_dist <- function(a, b) {
       return(log_sum_exp(eval_lpdf(a, y - x, lapply(pa(p), rep, length(x))) + eval_lpdf(b, x, lapply(pb(p), rep, length(x)))))
     }
     sb <- b$support(pb(p))
-    log(integrate_safe(function(x) exp(eval_lpdf(a, y - x, lapply(pa(p), rep, length(x))) + eval_lpdf(b, x, lapply(pb(p), rep, length(x)))),
-                       sb$lower, sb$upper))
+    dens <- function(x) { la <- eval_lpdf(a, y - x, lapply(pa(p), rep, length(x)))
+      if (length(pts)) la[(y - x) %in% pts] <- -Inf
+      exp(la + eval_lpdf(b, x, lapply(pb(p), rep, length(x)))) }
+    v <- integrate_safe(dens, sb$lower, sb$upper)
+    if (length(pts)) v <- v + sum(family_atom(a, pts, lapply(pa(p), rep, length(pts))) *
+                                  exp(eval_lpdf(b, y - pts, lapply(pb(p), rep, length(pts)))))
+    log(v)
   }
   lpdf <- function(y, p) pervec(y, p, function(x, pp) one(x, pp))
   support <- function(p) { s1 <- a$support(pa(p)); s2 <- b$support(pb(p)); list(lower = s1$lower + s2$lower, upper = s1$upper + s2$upper) }
   f <- family_def(sprintf("convolve(%s, %s)", a$id, b$id), sprintf("Convolution of %s and %s", a$display_name, b$display_name),
     a$category, pars, lpdf = lpdf, support = support, discrete = a$discrete, status = "implemented",
     rng = function(n, p) family_rng(a, n, pa(p)) + family_rng(b, n, pb(p)),
+    check = component_checks(list(a, b), c(sa_, sb_)),
     mean = if (!is.null(a$mean) && !is.null(b$mean)) function(p) a$mean(pa(p)) + b$mean(pb(p)),
     formula = "f(y) = int f1(y - x) f2(x) dx", references = "Feller (1971), An Introduction to Probability Theory and Its Applications, vol. 2, sec. V.4.")
   f$operator <- list(type = "convolve", a = a, b = b)
@@ -151,6 +179,7 @@ copula_dist <- function(m1, m2, copula = c("gaussian", "clayton", "gumbel", "fra
   copula <- match.arg(copula)
   m1 <- get_family(m1); m2 <- get_family(m2)
   if (m1$discrete != m2$discrete) stop_input("copula_dist() needs margins of the same type.")
+  reject_atoms(m1, "A copula margin"); reject_atoms(m2, "A copula margin")
   dep <- switch(copula, gaussian = P("rho", "symmetric_unit", role = "copula correlation"),
     clayton = P("theta", "positive", role = "copula dependence"),
     gumbel = P("theta", "greater_than_one", role = "copula dependence"),
@@ -178,12 +207,13 @@ copula_dist <- function(m1, m2, copula = c("gaussian", "clayton", "gumbel", "fra
       u <- family_cdf(m1, y[, 1], a); v <- family_cdf(m2, y[, 2], b)
       return(logc(u, v, th) + eval_lpdf(m1, y[, 1], a) + eval_lpdf(m2, y[, 2], b))
     }
-    u1 <- family_cdf(m1, y[, 1], a); u0 <- family_cdf(m1, y[, 1] - 1, a)
-    v1 <- family_cdf(m2, y[, 2], b); v0 <- family_cdf(m2, y[, 2] - 1, b)
+    u1 <- family_cdf(m1, y[, 1], a); u0 <- family_cdf_left(m1, y[, 1], a)
+    v1 <- family_cdf(m2, y[, 2], b); v0 <- family_cdf_left(m2, y[, 2], b)
     valid <- is.finite(eval_lpdf(m1, y[, 1], a)) & is.finite(eval_lpdf(m2, y[, 2], b))
     ifelse(valid, log(pmax(Cfun(u1, v1, th) - Cfun(u0, v1, th) - Cfun(u1, v0, th) + Cfun(u0, v0, th), 1e-300)), -Inf) }
   f <- family_def(sprintf("copula_%s(%s, %s)", copula, m1$id, m2$id), sprintf("%s copula of %s and %s", copula, m1$display_name, m2$display_name),
     "multivariate", pars, lpdf = lpdf, discrete = m1$discrete, variate_type = "vector", numeric_cdf = FALSE, numeric_moments = FALSE,
+    check = component_checks(list(m1, m2), c(".1", ".2")),
     status = "implemented", formula = "log c(F1(y1), F2(y2)) + log f1(y1) + log f2(y2); rectangle probabilities for discrete margins",
     references = c("Nelsen (2006), An Introduction to Copulas, 2nd ed.", "Trivedi and Zimmer (2007), Copula modeling: an introduction for practitioners. Found. Trends Econom., 1, 1-111."),
     extra = list(primary = paste0(primary_par(m1), ".1")))
