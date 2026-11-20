@@ -90,6 +90,9 @@ reference:
   - coef_plot
 - title: Tests and effects
   contents:
+  - avg_effects
+  - marginal_means
+  - r2
   - anova.regcomp_fit
   - wald_test
   - simple_slopes

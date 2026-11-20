@@ -15,6 +15,10 @@
   `johnson_neyman()` for moderation, interaction plots through
   `plot(which = "effects", by = )`, `vif()` generalized variance inflation
   factors, and `step_regcomp()` stepwise selection by AIC or BIC.
+* Effects: `avg_effects()` (average marginal effects and contrasts, with
+  delta method or posterior uncertainty), `marginal_means()` (average
+  predictions at covariate values), `r2()` (McFadden, Cox and Snell,
+  Nagelkerke, and Nakagawa marginal and conditional R squared) and `icc()`.
 * `vcov(type = "quasi")` and `summary(vcov = )` give quasi-likelihood
   (Pearson dispersion) standard errors, matching `quasibinomial` and
   `quasipoisson`.

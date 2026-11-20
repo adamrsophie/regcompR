@@ -13,7 +13,7 @@ test_that("Dirichlet regression matches DirichletReg", {
 
 test_that("quasi covariance equals glm quasibinomial and quasipoisson", {
   set.seed(1); d <- data.frame(x = rnorm(200), m = 20)
-  d$s <- VGAM::rbetabinom(200, 20, plogis(d$x), 0.2)
+  d$s <- rbinom(200, 20, rbeta(200, plogis(d$x) * 4, (1 - plogis(d$x)) * 4))
   f <- regcomp(s ~ x, family = "binomial", size = m, data = d)
   expect_equal(unname(vcov(f, type = "quasi")), unname(vcov(glm(cbind(s, m - s) ~ x, quasibinomial, d))), tolerance = 1e-4)
   d$y <- rnbinom(200, mu = exp(1 + d$x), size = 2)

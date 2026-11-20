@@ -111,6 +111,27 @@ compare_models(poisson = fp, nb2 = fnb, cv = "crps", K = 5)
 try(compare_models(fp, regcomp(log1p(y) ~ x, family = "normal", data = d)))
 ```
 
+## Marginal effects, marginal means and R squared
+
+`avg_effects()` gives average marginal effects of numeric covariates and
+average contrasts between the levels of factors on the scale of the
+predicted mean (or of any parameter or linear predictor), with delta method
+standard errors (posterior summaries for Bayesian fits); they equal the
+`avg_slopes()` and `avg_comparisons()` of marginaleffects. `marginal_means()`
+averages predictions with every row set to each value of a covariate.
+`r2()` gives McFadden, Cox and Snell, Nagelkerke and (for normal, binary,
+binomial, Poisson and NB2 models) the marginal and conditional R squared of
+Nakagawa and Schielzeth; `icc()` the intraclass correlations.
+
+```{r}
+d$grp <- factor(sample(c("a", "b", "c"), n, TRUE))
+fe <- regcomp(y ~ x + grp + (1 | g), family = "nb2", data = d)
+avg_effects(fe)
+marginal_means(fe, "grp")
+r2(fe)
+icc(fe)
+```
+
 ## Tests, simple slopes and collinearity
 
 `anova()` gives likelihood ratio tests of nested fits; `wald_test()` tests
