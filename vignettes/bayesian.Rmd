@@ -141,8 +141,10 @@ variance); `scoring_rule()` uses the posterior predictive law.
 
 Families with a Stan density, operators built from them, ordinal and
 nominal models, all random effect covariance structures and multiple
-membership terms are supported by the Stan backends. Continuous laws with
-point masses inside their density (an inflated or hurdle continuous law)
+membership terms are supported by the Stan backends, as are a single
+inflation or hurdle point on a continuous law (zero inflated or zero
+adjusted gamma, say). Other operators applied to a law that already has
+point masses (truncation, censoring, copulas, several inflation points)
 are fitted by the `"ml"` and `"tmb"` engines only. The BUGS backends
 support families with BUGS densities and unstructured random effects.
 `family_capabilities()` reports what is available for a family.
