@@ -57,6 +57,7 @@ bfam("pert", "PERT (beta PERT)", list(P("a", "real", role = "minimum", link = "i
     stats::dbeta((y - p$a) / (p$b - p$a), al, be, log = TRUE) - log(p$b - p$a) },
   cdf = function(q, p) stats::pbeta((q - p$a) / (p$b - p$a), 1 + 4 * (p$m - p$a) / (p$b - p$a), 1 + 4 * (p$b - p$m) / (p$b - p$a)),
   mean = function(p) (p$a + 4 * p$m + p$b) / 6,
+  check = function(p) if (any(p$m < p$a | p$m > p$b, na.rm = TRUE)) "The mode m must lie in [a, b].",
   references = "Malcolm, Roseboom, Clark and Fazar (1959), Operations Research, 7, 646-669.",
   reference = ref_impl("beta4", function(y, p) { al <- 1 + 4 * (p$m - p$a) / (p$b - p$a); be <- 1 + 4 * (p$b - p$m) / (p$b - p$a)
     (al - 1) * log(y - p$a) + (be - 1) * log(p$b - y) - lbeta(al, be) - (al + be - 1) * log(p$b - p$a) }), status = "validated")
@@ -112,12 +113,20 @@ bfam("trapezoidal", "Trapezoidal", list(P("a", "real", link = "identity", data =
   references = "Kacker and Lawrence (2007), Metrologia, 44, 117-127.",
   reference = ref_impl("trapezoid", function(y, p) log(trapezoid::dtrapezoid(y, p$a, p$b, p$c, p$d))), status = "validated")
 
-ih_cdf <- function(x, n) vapply(seq_along(x), function(i) { k <- 0:floor(x[i]); if (x[i] <= 0) return(0); if (x[i] >= n[i]) return(1)
-  sum((-1)^k * choose(n[i], k) * (x[i] - k)^n[i]) / factorial(n[i]) }, 0)
+# Irwin-Hall density and CDF by the alternating sum, evaluated in the lower
+# half of the support (symmetry f(x) = f(n - x), F(x) = 1 - F(n - x)) where
+# the cancellation is mild.
+# ponytail: still loses digits for n above about 40; switch to log scale
+# compensated sums if larger n is needed.
+ih_cdf <- function(x, n) vapply(seq_along(x), function(i) { if (x[i] <= 0) return(0); if (x[i] >= n[i]) return(1)
+  up <- x[i] > n[i] / 2; z <- if (up) n[i] - x[i] else x[i]; k <- 0:floor(z)
+  v <- sum((-1)^k * choose(n[i], k) * (z - k)^n[i]) / factorial(n[i]); if (up) 1 - v else v }, 0)
+ih_dens <- function(x, n) vapply(seq_along(x), function(i) { if (x[i] <= 0 || x[i] >= n[i]) return(0)
+  z <- min(x[i], n[i] - x[i]); k <- 0:floor(z)
+  max(0, sum((-1)^k * choose(n[i], k) * (z - k)^(n[i] - 1)) / factorial(n[i] - 1)) }, 0)
 bfam("irwin_hall", "Irwin-Hall (sum of uniforms)", list(P("n", "positive_integer", role = "count", data = TRUE)),
   support = function(p) list(lower = 0, upper = p$n),
-  lpdf = function(y, p) log(vapply(seq_along(y), function(i) { k <- 0:floor(y[i]); n <- p$n[i]
-    if (y[i] <= 0 || y[i] >= n) return(0); sum((-1)^k * choose(n, k) * (y[i] - k)^(n - 1)) / factorial(n - 1) }, 0)),
+  lpdf = function(y, p) log(ih_dens(y, rep_len(p$n, length(y)))),
   cdf = function(q, p) ih_cdf(q, rep_len(p$n, length(q))),
   rng = function(n, p) vapply(seq_len(n), function(i) sum(stats::runif(rep_len(p$n, n)[i])), 0),
   mean = function(p) p$n / 2, variance = function(p) p$n / 12,
@@ -128,8 +137,7 @@ bfam("irwin_hall", "Irwin-Hall (sum of uniforms)", list(P("n", "positive_integer
   status = "validated")
 
 bfam("bates", "Bates (mean of uniforms)", list(P("n", "positive_integer", role = "count", data = TRUE)),
-  lpdf = function(y, p) log(vapply(seq_along(y), function(i) { n <- p$n[i]; x <- n * y[i]; k <- 0:floor(x)
-    if (x <= 0 || x >= n) return(0); n * sum((-1)^k * choose(n, k) * (x - k)^(n - 1)) / factorial(n - 1) }, 0)),
+  lpdf = function(y, p) { n <- rep_len(p$n, length(y)); log(n * ih_dens(n * y, n)) },
   cdf = function(q, p) ih_cdf(q * p$n, rep_len(p$n, length(q))),
   mean = function(p) 0.5 + 0 * p$n, variance = function(p) 1 / (12 * p$n),
   references = "Bates (1955), Ann. Math. Stat., 26, 705-720.",
@@ -181,8 +189,6 @@ bfam("continuous_bernoulli", "Continuous Bernoulli", list(P("lambda", "unit", ro
 
 # Cobin: exponential dispersion family on [0, 1] with B(theta) = log((e^theta - 1)/theta)
 cobin_B <- function(th) ifelse(abs(th) < 1e-8, th / 2, log(abs(expm1(th) / th)))
-ih_dens <- function(x, n) vapply(seq_along(x), function(i) { k <- 0:floor(x[i]); if (x[i] <= 0 || x[i] >= n[i]) return(0)
-  sum((-1)^k * choose(n[i], k) * (x[i] - k)^(n[i] - 1)) / factorial(n[i] - 1) }, 0)
 bfam("cobin", "Continuous binomial (cobin, Lee, Kim and Ji)", list(P("theta", "real", role = "natural", link = "identity"),
   P("lambda", "positive_integer", role = "dispersion", data = TRUE, interpretation = "Integer dispersion; mean of lambda continuous Bernoullis")),
   formula = "f(y) = h(y, lambda) exp(lambda (theta y - B(theta))), B(theta) = log((e^theta - 1)/theta), h from the Irwin-Hall density",

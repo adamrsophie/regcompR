@@ -76,9 +76,12 @@ register_family(family_def("mie", "Mie phase function (scattering angle law)", "
        P("n_im", "nonneg", role = "absorption index", regression = FALSE)),
   support = function(p) list(lower = 0, upper = pi),
   formula = "f(theta) proportional to (|S1(theta)|^2 + |S2(theta)|^2) sin(theta), S1, S2 the Mie amplitudes of a homogeneous sphere",
-  lpdf = function(y, p) { m <- complex(real = p$n_re[1], imaginary = p$n_im[1])
-    z <- stats::integrate(function(t) mie_unnorm(t, p$x[1], m), 0, pi, subdivisions = 5000L, rel.tol = 1e-10)$value
-    ifelse(y <= 0 | y >= pi, -Inf, log(mie_unnorm(pmin(pmax(y, 1e-12), pi - 1e-12), p$x[1], m)) - log(z)) },
+  # Normalized once per distinct parameter set.
+  lpdf = function(y, p) { r <- recycle_pars(c(list(.y = y), p)); key <- paste(r$x, r$n_re, r$n_im); out <- numeric(length(y))
+    for (g in unique(key)) { i <- which(key == g); m <- complex(real = r$n_re[i[1]], imaginary = r$n_im[i[1]]); x0 <- r$x[i[1]]
+      z <- stats::integrate(function(t) mie_unnorm(t, x0, m), 0, pi, subdivisions = 5000L, rel.tol = 1e-10)$value
+      yi <- r$.y[i]; out[i] <- ifelse(yi <= 0 | yi >= pi, -Inf, log(mie_unnorm(pmin(pmax(yi, 1e-12), pi - 1e-12), x0, m)) - log(z)) }
+    out },
   numeric_moments = FALSE,
   references = c("Mie (1908), Beitraege zur Optik trueber Medien. Ann. Phys., 330, 377-445.",
                  "Bohren and Huffman (1983), Absorption and Scattering of Light by Small Particles. Wiley, appendix A."),

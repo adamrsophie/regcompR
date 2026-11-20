@@ -128,8 +128,10 @@ eval_group <- function(gexpr, data, env) {
   g
 }
 
-is_smooth_call <- function(x) is.call(x) &&
-  as.character(x[[1]]) %in% c("s", "te", "ti", "t2")
+is_smooth_call <- function(x) is.call(x) && {
+  h <- x[[1]]
+  if (is.call(h) && identical(h[[1]], as.name("::"))) h <- h[[3]]
+  is.name(h) && as.character(h) %in% c("s", "te", "ti", "t2") }
 
 find_smooths <- function(term) {
   if (is.name(term) || !is.language(term)) return(NULL)
@@ -178,6 +180,13 @@ build_predictor <- function(rhs, data, par, xlev = NULL, smooth_specs = NULL,
                              xlev = xlev, drop.unused.levels = is.null(xlev))
     tt <- stats::terms(mf)
     X <- stats::model.matrix(tt, mf)
+    ok <- stats::complete.cases(X)
+    if (ncol(X) && any(ok)) {
+      qx <- qr(X[ok, , drop = FALSE])
+      if (qx$rank < ncol(X))
+        stop_input(sprintf("The design for '%s' is rank deficient; aliased columns: %s. Remove them from the formula.",
+                           par, paste(colnames(X)[qx$pivot[-seq_len(qx$rank)]], collapse = ", ")))
+    }
   }
   contr <- attr(X, "contrasts")
   off <- stats::model.offset(mf)

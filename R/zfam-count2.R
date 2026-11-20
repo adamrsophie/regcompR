@@ -381,6 +381,12 @@ register_family(family_def(
   lpdf = function(y, p) { z <- 2 * sqrt(p$mu1 * p$mu2)
     -p$mu1 - p$mu2 + y / 2 * log(p$mu1 / p$mu2) + log(besselI(z, abs(y), expon.scaled = TRUE)) + z },
   rng = function(n, p) stats::rpois(n, p$mu1) - stats::rpois(n, p$mu2),
+  # Sum of masses over mean +/- 40 sd (the rest is below 1e-300).
+  cdf = function(q, p) pervec(q, p, function(x, pp) { m <- pp$mu1 - pp$mu2; s <- sqrt(pp$mu1 + pp$mu2)
+    L <- floor(m - 40 * s) - 5; U <- ceiling(m + 40 * s) + 5
+    if (x < L) return(0); if (x >= U) return(1)
+    k <- L:floor(x); z <- 2 * sqrt(pp$mu1 * pp$mu2)
+    min(1, sum(exp(-pp$mu1 - pp$mu2 + k / 2 * log(pp$mu1 / pp$mu2) + log(besselI(z, abs(k), expon.scaled = TRUE)) + z))) }),
   mean = function(p) p$mu1 - p$mu2, variance = function(p) p$mu1 + p$mu2,
   support = function(p) list(lower = -Inf, upper = Inf),
   references = "Skellam (1946), The frequency distribution of the difference between two Poisson variates. JRSS, 109, 296.",
@@ -466,8 +472,8 @@ register_family(family_def(
   support = function(p) list(lower = p$m, upper = Inf),
   numerical_notes = "Uses gamma ratios with sign for negative r; moderate y only.",
   references = "Hess, Lewis and Liebscher (2002), Extended negative binomial distribution. ASTIN Bulletin, 32, 283-303.",
-  reference = ref_impl("definition (r > 0 reduces to a zero truncated negative binomial for m = 1)",
-    function(y, p) stats::dnbinom(y, p$r, 1 - p$prob, log = TRUE) - log1p(-stats::dnbinom(0, p$r, 1 - p$prob))),
+  reference = ref_impl("definition (r > 0 reduces to a negative binomial truncated below m)",
+    function(y, p) stats::dnbinom(y, p$r, 1 - p$prob, log = TRUE) - stats::pnbinom(p$m - 1, p$r, 1 - p$prob, lower.tail = FALSE, log.p = TRUE)),
   status = "implemented"))
 
 pf_lt <- function(k, p) -p$b * log(k) - p$c * log(k)^2

@@ -60,12 +60,16 @@ rfam("generalized_pareto", "Generalized Pareto", list(P("mu", "real", role = "th
   status = "validated")
 
 rfam("extended_gpd", "Extended generalized Pareto (Naveau et al., model 1)", list(scale_par("sigma"), P("xi", "real", role = "tail", link = "identity"), shp("kappa")),
-  aliases = "egpd", support = function(p) list(lower = 0, upper = Inf),
+  aliases = "egpd", support = function(p) list(lower = 0, upper = ifelse(p$xi < 0, -p$sigma / p$xi, Inf)),
   formula = "F(y) = H(y)^kappa with H the GPD(0, sigma, xi) CDF",
-  lpdf = function(y, p) { H <- 1 - pmax(1 + p$xi * y / p$sigma, 0)^(-1 / p$xi)
-    log(p$kappa) + (p$kappa - 1) * log(H) - log(p$sigma) - (1 / p$xi + 1) * log1p(p$xi * y / p$sigma) },
-  cdf = function(q, p) (1 - pmax(1 + p$xi * pmax(q, 0) / p$sigma, 0)^(-1 / p$xi))^p$kappa,
-  quantile = function(pr, p) p$sigma * ((1 - pr^(1 / p$kappa))^(-p$xi) - 1) / p$xi,
+  # log survival of the GPD, with the exponential limit at xi = 0.
+  lpdf = function(y, p) { z <- y / p$sigma; sm <- abs(p$xi) < 1e-9
+    lS <- ifelse(sm, -z, -log1p(p$xi * z) / p$xi)
+    log(p$kappa) + (p$kappa - 1) * log(-expm1(lS)) - log(p$sigma) + ifelse(sm, -z, -(1 / p$xi + 1) * log1p(p$xi * z)) },
+  cdf = function(q, p) { z <- pmax(q, 0) / p$sigma; sm <- abs(p$xi) < 1e-9
+    (-expm1(ifelse(sm, -z, -log1p(pmax(p$xi * z, -1)) / p$xi)))^p$kappa },
+  quantile = function(pr, p) { l <- log1p(-pr^(1 / p$kappa))
+    ifelse(abs(p$xi) < 1e-9, -p$sigma * l, p$sigma * expm1(-p$xi * l) / p$xi) },
   references = "Naveau, Huser, Ribereau and Hannart (2016), Modeling jointly low, moderate, and heavy rainfall intensities without a threshold selection. Water Resources Research, 52, 2753-2769.",
   reference = ref_impl("mev", function(y, p) log(p$kappa) + (p$kappa - 1) * log(evd::pgpd(y, 0, p$sigma, p$xi)) + mapply(function(x, b, c) evd::dgpd(x, 0, b, c, log = TRUE), y, p$sigma, p$xi)),
   status = "validated")
@@ -190,8 +194,12 @@ dstable1 <- function(z, a, b) {
   if (z < 1e-10) return(gamma(1 + 1 / a) * cos(th0) / (pi * (1 + zeta^2)^(1 / (2 * a))))
   V <- function(t) (cos(a * th0))^(1 / (a - 1)) * (cos(t) / sin(a * (th0 + t)))^(a / (a - 1)) * cos(a * th0 + (a - 1) * t) / cos(t)
   k <- z^(a / (a - 1))
-  a * z^(1 / (a - 1)) / (pi * abs(a - 1)) * stats::integrate(function(t) { v <- V(t); ifelse(is.finite(v) & v > 0, v * exp(-k * v), 0) },
+  val <- a * z^(1 / (a - 1)) / (pi * abs(a - 1)) * stats::integrate(function(t) { v <- V(t); ifelse(is.finite(v) & v > 0, v * exp(-k * v), 0) },
     -th0, pi / 2, subdivisions = 2000L, rel.tol = 1e-10, stop.on.error = FALSE)$value
+  # Far in the tail the integrand is a narrow spike the quadrature can miss;
+  # use the Pareto tail f(z) ~ a sin(pi a / 2) Gamma(a) (1 + b) z^(-1 - a) / pi.
+  if ((!is.finite(val) || val <= 0) && z > 10) val <- a * sin(pi * a / 2) * gamma(a) * (1 + b) * z^(-1 - a) / pi
+  val
 }
 # S1 with alpha = 1 adds beta (2/pi) gamma log(gamma) to the location (Nolan 2020, def. 1.7).
 s1_shift <- function(a, b, g) if (abs(a - 1) < 1e-8) b * 2 / pi * g * log(g) else 0
@@ -229,8 +237,8 @@ rfam("stable", "Stable (alpha stable, S1 parameterization)", list(P("alpha", "un
 
 rfam("landau", "Landau", list(loc_par("mu"), scale_par("c")),
   formula = "f(x) = (1/pi) int_0^inf exp(-t log t - z t) sin(pi t) dt / c, z = (x - mu)/c",
-  lpdf = function(y, p) log(pervec(y, p, function(x, pp) dstable_s1(x, 1, 1, pi / 2 * pp$c, pp$mu))),
-  cdf = function(q, p) pervec(q, p, function(x, pp) pstable_s1(x, 1, 1, pi / 2 * pp$c, pp$mu)),
+  lpdf = function(y, p) log(pervec(y, p, function(x, pp) dstable_s1(x, 1, 1, pi / 2 * pp$c, pp$mu - pp$c * log(pp$c)))),
+  cdf = function(q, p) pervec(q, p, function(x, pp) pstable_s1(x, 1, 1, pi / 2 * pp$c, pp$mu - pp$c * log(pp$c))),
   numeric_moments = FALSE,
   references = "Landau (1944), On the energy loss of fast particles by ionization. J. Phys. USSR, 8, 201-205.",
   reference = ref_impl("Landau integral", function(y, p) log(vapply((y - p$mu) / p$c, function(z) stats::integrate(function(t)
@@ -275,6 +283,9 @@ rfam("geometric_stable", "Geometric stable", list(P("alpha", "unit", role = "ind
 rfam("voigt", "Voigt profile", list(loc_par("mu"), scale_par("sigma"), scale_par("gamma")),
   formula = "Convolution of Normal(mu, sigma) and Cauchy(0, gamma)",
   lpdf = function(y, p) log(pervec(y, p, function(x, pp) cf_density(x - pp$mu, function(t) exp(-pp$sigma^2 * t^2 / 2 - pp$gamma * t)))),
+  # F(x) = E Phi((x - mu - C) / sigma) over the Cauchy quantiles C.
+  cdf = function(q, p) pervec(q, p, function(x, pp) stats::integrate(function(u)
+    stats::pnorm((x - pp$mu - pp$gamma * tan(pi * (u - 0.5))) / pp$sigma), 0, 1, rel.tol = 1e-10, subdivisions = 1000L)$value),
   rng = function(n, p) stats::rnorm(n, p$mu, p$sigma) + stats::rcauchy(n, 0, p$gamma), numeric_moments = FALSE,
   references = "Olivero and Longbothum (1977), J. Quant. Spectrosc. Radiat. Transfer, 17, 233-236.",
   reference = ref_impl("convolution", function(y, p) log(pervec(y, p, function(x, pp) stats::integrate(function(t)
@@ -315,6 +326,7 @@ rfam("champernowne", "Champernowne", list(shp("alpha"), P("lambda", "real", role
   reference = ref_impl("closed form for lambda = 0", function(y, p) log(p$alpha / pi / cosh(p$alpha * (y - p$y0)))), status = "validated")
 
 rfam("tracy_widom", "Tracy-Widom", list(P("beta", "positive_integer", role = "symmetry class (1, 2 or 4)", data = TRUE)),
+  check = function(p) if (any(!p$beta %in% c(1, 2, 4))) "beta must be 1, 2 or 4.",
   lpdf = function(y, p) { if (!requireNamespace("RMTstat", quietly = TRUE)) stop_unsupported("Tracy-Widom without RMTstat", "tracy_widom")
     RMTstat::dtw(y, p$beta[1], log = TRUE) },
   cdf = function(q, p) RMTstat::ptw(q, p$beta[1]), numeric_moments = FALSE,

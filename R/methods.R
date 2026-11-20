@@ -135,6 +135,8 @@ BIC.regcomp_fit <- function(object, ...) ic_table(list(object, ...), NULL, "BIC"
 
 # One value for one model; a data frame of df and criterion for several, as in stats.
 ic_table <- function(fits, k, name, calls) {
+  if (any(vapply(fits, function(f) identical(f$inference, "bayesian"), TRUE)))
+    stop_unsupported(sprintf("%s for a Bayesian fit; use log_lik() with an information criterion such as LOO", name))
   val <- vapply(fits, function(f) -2 * f$logLik + (if (is.null(k)) log(f$nobs) else k) * f$df, 0)
   if (length(fits) == 1) return(val)
   out <- data.frame(df = vapply(fits, function(f) f$df, 0), val)

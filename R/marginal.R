@@ -143,6 +143,7 @@ gee <- function(formula, data, id, family = stats::gaussian(),
       unstructured = { R <- alpha[t, t, drop = FALSE]; diag(R) <- 1; R })
   }
   alpha <- switch(corstr, independence = 0, exchangeable = 0, ar1 = 0, unstructured = diag(Tmax))
+  conv <- FALSE
   for (it in seq_len(maxit)) {
     eta <- drop(X %*% beta) + off
     mu <- family$linkinv(eta); dmu <- family$mu.eta(eta)
@@ -181,7 +182,8 @@ gee <- function(formula, data, id, family = stats::gaussian(),
     }
     step <- solve(A, U)
     beta <- beta + step
-    if (max(abs(step)) < tol * (1 + max(abs(beta)))) break
+    conv <- max(abs(step)) < tol * (1 + max(abs(beta)))
+    if (conv) break
   }
   eta <- drop(X %*% beta) + off
   mu <- family$linkinv(eta); dmu <- family$mu.eta(eta); v <- family$variance(mu) / pw
@@ -198,7 +200,7 @@ gee <- function(formula, data, id, family = stats::gaussian(),
   vr <- Ai %*% B %*% Ai; dimnames(vr) <- dimnames(Ai) <- list(colnames(X), colnames(X))
   structure(list(coefficients = beta, vcov = vr, vcov_naive = Ai, alpha = alpha, scale = phi,
                  corstr = corstr, family = family, fitted.values = mu, iterations = it,
-                 converged = it < maxit, nclusters = length(cl), call = match.call()),
+                 converged = conv, nclusters = length(cl), call = match.call()),
             class = "regcomp_gee")
 }
 

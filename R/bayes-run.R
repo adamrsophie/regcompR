@@ -17,7 +17,7 @@ fit_bayes <- function(spec, priors, control) {
   draws <- map_draws(spec, res$draws, res$language)
   fit <- structure(list(
     spec = spec, family = spec$fam, draws = draws$fixed, u_draws = draws$u,
-    theta = stats::setNames(numeric(spec$ntheta), theta_names(spec)),
+    theta = { tn <- theta_names(spec); stats::setNames(if (all(tn %in% colnames(draws$fixed))) colMeans(draws$fixed[, tn, drop = FALSE]) else rep(NA_real_, length(tn)), tn) },
     coefficients = colMeans(draws$fixed[, spec$beta_names, drop = FALSE]),
     rhat = draws$rhat, ess = draws$ess, runner = runner, code = res$code,
     approximation = "none", inference = "bayesian", engine = "bayes",

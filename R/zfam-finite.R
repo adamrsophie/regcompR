@@ -208,7 +208,8 @@ register_family(family_def(
   quantile = function(pr, p) pmax(ceiling(p$base^pr - 1 - 1e-12), 1),
   support = function(p) list(lower = 1, upper = p$base - 1),
   references = c("Benford (1938), Proc. Am. Philos. Soc., 78, 551-572.", "Hill (1995), Statistical Science, 10, 354-363."),
-  reference = ref_impl("VGAM", function(y, p) VGAM::dbenf(y, log = TRUE), note = "VGAM covers base 10."),
+  reference = ref_impl("VGAM", function(y, p) ifelse(p$base == 10, VGAM::dbenf(y, log = TRUE), log(log(y + 1) - log(y)) - log(log(p$base))),
+    note = "VGAM covers base 10; other bases use the definition."),
   stan = sfun("benford", "base", "    return log(log1p(1.0 / y) / log(base));", discrete = TRUE),
   status = "validated"))
 

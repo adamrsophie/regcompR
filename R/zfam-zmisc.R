@@ -322,6 +322,8 @@ jqpd_family <- function(id, display, bounded) register_family(family_def(id, dis
     if (bounded) list(P("u", "real", role = "upper bound", link = "identity", data = TRUE)),
     list(P("alpha", "unit", role = "tail level", regression = FALSE, default = 0.1))),
   support = function(p) list(lower = p$l, upper = if (bounded) p$u else Inf),
+  check = function(p) if (any(!(p$l < p$xl & p$xl < p$xm & p$xm < p$xh & (!bounded | p$xh < p$u %||% Inf)), na.rm = TRUE))
+    sprintf("The quantiles must satisfy l < xl < xm < xh%s.", if (bounded) " < u" else ""),
   formula = if (bounded) "J-QPD-B: Q(p) = l + (u - l) Phi(xi + lambda sinh(delta (Phi^-1(p) + n c)))" else
     "J-QPD-S: Q(p) = l + theta exp(lambda sinh(asinh(delta Phi^-1(p)) + asinh(n c delta)))",
   lpdf = function(y, p) pervec(y, p, function(x, pp) { cr <- jqpd_core(pp, bounded)

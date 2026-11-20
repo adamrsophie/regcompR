@@ -164,6 +164,7 @@ predict.regcomp_fit <- function(object, newdata = NULL,
     })
   }
   arr <- simplify2array(vals)
+  if (is.null(dim(arr))) arr <- matrix(arr, nrow = 1)
   a <- (1 - level) / 2
   dims <- length(dim(arr))
   mar <- seq_len(dims - 1)

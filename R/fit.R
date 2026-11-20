@@ -232,9 +232,10 @@ build_spec <- function(formula, dots, fam, data, weights = NULL, links = NULL,
   n <- nrow(data)
   y <- if (response) get_response(formula, data) else NULL
   ylev <- if (!is.null(prev)) prev$ylev else if (is.factor(y)) levels(y)
-  if (is.factor(y)) y <- if (!is.null(prev)) match(as.character(y), ylev) else as.integer(y)
+  if (is.factor(y)) y <- factor_response(y, fam, ylev, !is.null(prev))
   cmat <- NULL
   if (inherits(y, "regcomp_cens")) { cmat <- unclass(y); y <- cmat[, "lower"] }
+  if (is.null(prev) && is.null(cmat) && fam$variate_type == "scalar") check_response(y, fam)
   # Links.
   lk <- list()
   for (k in rpars) {
@@ -653,6 +654,18 @@ robust_nlminb <- function(start, obj, gr, control) {
   }
   if (is.null(best) || best$objective >= 1e299)
     stop_numerical("The optimizer could not find a finite log likelihood from the starting values.")
+  # "False convergence" with numerical gradients often stops at the optimum:
+  # restart once; no further decrease confirms the solution.
+  if (best$convergence != 0 && grepl("false convergence", best$message)) {
+    o <- tryCatch(stats::nlminb(best$par, obj, gr, control = list(iter.max = control$maxit,
+      eval.max = 2 * control$maxit, rel.tol = control$rel_tol)), error = function(e) NULL)
+    if (!is.null(o)) {
+      if (abs(best$objective - o$objective) <= 1e-6 * (1 + abs(best$objective))) {
+        if (o$objective < best$objective) best <- o
+        best$convergence <- 0L; best$message <- paste(best$message, "(confirmed by a restart)")
+      } else if (o$objective < best$objective) best <- o
+    }
+  }
   best
 }
 
@@ -743,5 +756,38 @@ fit_diagnostics <- function(fit) {
     sds <- fit$theta[grepl("log_sd", names(fit$theta))]
     out$boundary_variance <- names(sds)[sds < log(1e-4)]
   }
+  if (!isTRUE(out$converged)) warning("The optimizer did not report convergence.", call. = FALSE)
+  if (identical(out$hessian_positive_definite, FALSE))
+    warning("The Hessian is not positive definite; standard errors are unavailable or unreliable.", call. = FALSE)
   out
+}
+
+# Factor responses: level codes for categorical and ordinal families, 0/1
+# for a two level factor with a binary family.
+factor_response <- function(y, fam, ylev, refit) {
+  if (refit) y <- factor(as.character(y), levels = ylev)
+  if (grepl("ordinal|categorical", fam$category)) return(as.integer(y))
+  s <- tryCatch(fam$support(lapply(fam$pars, function(q) q$default %||% 1)), error = function(e) NULL)
+  if (nlevels(y) == 2 && fam$discrete && isTRUE(s$lower == 0 && s$upper == 1)) return(as.integer(y) - 1L)
+  stop_input(sprintf("A factor response is only allowed for categorical and ordinal families (and two levels with a binary family); '%s' needs a numeric response.", fam$id))
+}
+
+# Responses outside the family support: integrality for discrete laws and
+# the support bounds that do not depend on the parameters.
+check_response <- function(y, fam) {
+  if (fam$discrete && any(bad <- abs(y - round(y)) > 1e-8))
+    stop_input(sprintf("'%s' needs integer responses; rows %s are not.", fam$id, paste(head(which(bad), 5), collapse = ", ")))
+  sup <- function(scale) tryCatch(fam$support(lapply(fam$pars, function(q) {
+    v <- q$default %||% generic_start(q, y)
+    if (q$domain == "unit") v / scale else if (q$domain == "real") v + scale - 1 else v * scale
+  })), error = function(e) NULL)
+  s1 <- sup(1); s2 <- sup(1.7)
+  if (is.null(s1) || is.null(s2)) return(invisible())
+  lo <- if (length(s1$lower) == 1 && isTRUE(s1$lower == s2$lower)) s1$lower else -Inf
+  hi <- if (length(s1$upper) == 1 && isTRUE(s1$upper == s2$upper)) s1$upper else Inf
+  bad <- which(y < lo | y > hi)
+  if (length(bad))
+    stop_input(sprintf("Responses outside the support [%s, %s] of '%s' in rows %s.", format(lo), format(hi), fam$id,
+                       paste(head(bad, 5), collapse = ", ")))
+  invisible()
 }

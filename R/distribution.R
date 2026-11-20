@@ -82,6 +82,12 @@ validate_parameters <- function(x, pars) {
     msg <- fam$check(pars)
     if (is.character(msg) && length(msg) && nzchar(msg[1])) stop_domain(msg[1])
   }
+  if (fam$variate_type == "scalar") {
+    s <- tryCatch(fam$support(pars), error = function(e) NULL)
+    # Discrete laws and operators (censoring) may legitimately collapse to a point.
+    if (!is.null(s) && any(s$lower > s$upper | (s$lower == s$upper & !fam$discrete & is.null(fam$operator)), na.rm = TRUE))
+      stop_domain(sprintf("The parameters of '%s' give an empty support (lower bound not below the upper bound).", fam$id))
+  }
   invisible(pars)
 }
 
@@ -144,6 +150,8 @@ in_support <- function(fam, y, pars) {
 # the family function on valid positions.
 eval_lpdf <- function(fam, y, pars) {
   if (fam$variate_type != "scalar") {
+    # A plain vector is one observation of a vector valued law.
+    if (fam$variate_type %in% c("unit_vector", "vector", "vector_mixed") && is.null(dim(y))) y <- matrix(y, nrow = 1)
     out <- fam$lpdf(y, pars)
     ok <- in_support(fam, y, pars)
     if (length(ok) == 1L || length(ok) == length(out)) out[!rep_len(ok, length(out))] <- -Inf
@@ -159,6 +167,22 @@ eval_lpdf <- function(fam, y, pars) {
   out[!pok] <- NaN
   sel <- ok & pok
   if (any(sel)) out[sel] <- fam$lpdf(y[sel], lapply(p, `[`, sel))
+  # A continuous density that is NaN at a finite support bound (0 log 0 and
+  # similar forms) takes its limit from inside the support.
+  nb <- which(sel & is.nan(out))
+  if (!fam$discrete && length(nb)) {
+    pb <- lapply(p, `[`, nb)
+    s <- tryCatch(fam$support(pb), error = function(e) NULL)
+    if (!is.null(s)) {
+      lo <- rep_len(s$lower, length(nb)); hi <- rep_len(s$upper, length(nb)); yb <- y[nb]
+      eps <- 1e-10 * pmax(1, abs(yb))
+      inner <- ifelse(is.finite(lo) & yb == lo, yb + eps, ifelse(is.finite(hi) & yb == hi, yb - eps, NA))
+      v <- suppressWarnings(fam$lpdf(ifelse(is.na(inner), yb, inner), pb))
+      # A limit of zero density shows as a large negative value.
+      v[!is.na(inner) & v < -1e6] <- -Inf
+      out[nb[!is.na(inner)]] <- v[!is.na(inner)]
+    }
+  }
   out
 }
 

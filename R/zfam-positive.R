@@ -280,6 +280,8 @@ posfam("defective_gompertz", "Defective Gompertz (cure fraction)", list(P("eta",
   cdf = function(q, p) -expm1(-p$eta * ifelse(p$b == 0, q, expm1(p$b * q) / p$b)),
   quantile = function(pr, p) { a <- -p$b * log1p(-pr) / p$eta
     ifelse(p$b == 0, -log1p(-pr) / p$eta, ifelse(a <= -1, Inf, log1p(a) / p$b)) },
+  rng = function(n, p) { pr <- stats::runif(n); a <- -p$b * log1p(-pr) / p$eta
+    ifelse(p$b == 0, -log1p(-pr) / p$eta, ifelse(a <= -1, Inf, log1p(pmax(a, -1)) / p$b)) },
   numeric_moments = FALSE, numeric_cdf = FALSE,
   regression_notes = "Used for cure rate regression; the cure fraction is exp(eta / b) for b < 0.",
   references = "Gieser, Chang, Rao, Shuster and Pullen (1998), Modelling cure rates using the Gompertz model with covariate information. Statistics in Medicine, 17, 831-839.",
@@ -563,10 +565,15 @@ posfam("generalized_inverse_gaussian", "Generalized inverse Gaussian", list(P("l
     needs = "log_besselK"),
   status = "validated")
 
-posfam("hypoexponential", "Hypoexponential (two distinct rates)", list(P("lambda1", "positive", role = "rate"), P("lambda2", "positive", role = "rate")),
+hypo_h <- function(y, d) ifelse(d > 0, -expm1(-d * y) / d, y)
+posfam("hypoexponential", "Hypoexponential (two rates)", list(P("lambda1", "positive", role = "rate"), P("lambda2", "positive", role = "rate")),
   formula = "f(y) = l1 l2 / (l2 - l1) (exp(-l1 y) - exp(-l2 y))",
-  lpdf = function(y, p) log(p$lambda1 * p$lambda2 / abs(p$lambda2 - p$lambda1) * abs(exp(-p$lambda1 * y) - exp(-p$lambda2 * y))),
-  cdf = function(q, p) 1 - (p$lambda2 * exp(-p$lambda1 * q) - p$lambda1 * exp(-p$lambda2 * q)) / (p$lambda2 - p$lambda1),
+  # With a = min rate, d = |l2 - l1| and h = (1 - exp(-d y)) / d (h = y at
+  # d = 0, the Erlang limit): f = l1 l2 exp(-a y) h, S = exp(-a y) (1 + a h).
+  lpdf = function(y, p) { a <- pmin(p$lambda1, p$lambda2); h <- hypo_h(y, abs(p$lambda2 - p$lambda1))
+    log(p$lambda1) + log(p$lambda2) - a * y + log(h) },
+  cdf = function(q, p) { a <- pmin(p$lambda1, p$lambda2); -expm1(-a * q + log1p(a * hypo_h(q, abs(p$lambda2 - p$lambda1)))) },
+  lccdf = function(q, p) { a <- pmin(p$lambda1, p$lambda2); -a * q + log1p(a * hypo_h(q, abs(p$lambda2 - p$lambda1))) },
   rng = function(n, p) stats::rexp(n, p$lambda1) + stats::rexp(n, p$lambda2),
   mean = function(p) 1 / p$lambda1 + 1 / p$lambda2,
   references = "Ross (2014), Introduction to Probability Models.",
