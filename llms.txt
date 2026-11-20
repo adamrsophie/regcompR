@@ -354,6 +354,13 @@ GPL-3. See
 
 ## Tests and effects
 
+- [`avg_effects()`](https://adamrsophie.github.io/regcompR/reference/avg_effects.md)
+  : Average marginal effects and contrasts
+- [`marginal_means()`](https://adamrsophie.github.io/regcompR/reference/marginal_means.md)
+  : Marginal means (average predictions)
+- [`r2()`](https://adamrsophie.github.io/regcompR/reference/r2.md)
+  [`icc()`](https://adamrsophie.github.io/regcompR/reference/r2.md) : R
+  squared and intraclass correlation
 - [`anova(`*`<regcomp_fit>`*`)`](https://adamrsophie.github.io/regcompR/reference/anova.regcomp_fit.md)
   : Likelihood ratio tests of nested models
 - [`wald_test()`](https://adamrsophie.github.io/regcompR/reference/wald_test.md)

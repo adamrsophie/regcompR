@@ -20,6 +20,7 @@
 <url><loc>https://adamrsophie.github.io/regcompR/index.html</loc></url>
 <url><loc>https://adamrsophie.github.io/regcompR/news/index.html</loc></url>
 <url><loc>https://adamrsophie.github.io/regcompR/reference/anova.regcomp_fit.html</loc></url>
+<url><loc>https://adamrsophie.github.io/regcompR/reference/avg_effects.html</loc></url>
 <url><loc>https://adamrsophie.github.io/regcompR/reference/bugs_code.html</loc></url>
 <url><loc>https://adamrsophie.github.io/regcompR/reference/cens.html</loc></url>
 <url><loc>https://adamrsophie.github.io/regcompR/reference/censor.html</loc></url>
@@ -47,6 +48,7 @@
 <url><loc>https://adamrsophie.github.io/regcompR/reference/johnson_neyman.html</loc></url>
 <url><loc>https://adamrsophie.github.io/regcompR/reference/link.html</loc></url>
 <url><loc>https://adamrsophie.github.io/regcompR/reference/log_lik.html</loc></url>
+<url><loc>https://adamrsophie.github.io/regcompR/reference/marginal_means.html</loc></url>
 <url><loc>https://adamrsophie.github.io/regcompR/reference/mixture.html</loc></url>
 <url><loc>https://adamrsophie.github.io/regcompR/reference/moments.html</loc></url>
 <url><loc>https://adamrsophie.github.io/regcompR/reference/numerics.html</loc></url>
@@ -62,6 +64,7 @@
 <url><loc>https://adamrsophie.github.io/regcompR/reference/quantile.regcomp_dist.html</loc></url>
 <url><loc>https://adamrsophie.github.io/regcompR/reference/quantile_count.html</loc></url>
 <url><loc>https://adamrsophie.github.io/regcompR/reference/quantile_param.html</loc></url>
+<url><loc>https://adamrsophie.github.io/regcompR/reference/r2.html</loc></url>
 <url><loc>https://adamrsophie.github.io/regcompR/reference/ranef_regcomp.html</loc></url>
 <url><loc>https://adamrsophie.github.io/regcompR/reference/regcomp-conditions.html</loc></url>
 <url><loc>https://adamrsophie.github.io/regcompR/reference/regcomp.html</loc></url>

@@ -164,6 +164,45 @@ try(compare_models(fp, regcomp(log1p(y) ~ x, family = "normal", data = d)))
 #>   compare_models() needs fits to the same observations of the same response (same rows, same transformation).
 ```
 
+## Marginal effects, marginal means and R squared
+
+[`avg_effects()`](https://adamrsophie.github.io/regcompR/reference/avg_effects.md)
+gives average marginal effects of numeric covariates and average
+contrasts between the levels of factors on the scale of the predicted
+mean (or of any parameter or linear predictor), with delta method
+standard errors (posterior summaries for Bayesian fits); they equal the
+`avg_slopes()` and `avg_comparisons()` of marginaleffects.
+[`marginal_means()`](https://adamrsophie.github.io/regcompR/reference/marginal_means.md)
+averages predictions with every row set to each value of a covariate.
+[`r2()`](https://adamrsophie.github.io/regcompR/reference/r2.md) gives
+McFadden, Cox and Snell, Nagelkerke and (for normal, binary, binomial,
+Poisson and NB2 models) the marginal and conditional R squared of
+Nakagawa and Schielzeth;
+[`icc()`](https://adamrsophie.github.io/regcompR/reference/r2.md) the
+intraclass correlations.
+
+``` r
+
+d$grp <- factor(sample(c("a", "b", "c"), n, TRUE))
+fe <- regcomp(y ~ x + grp + (1 | g), family = "nb2", data = d)
+avg_effects(fe)
+#>   term contrast  estimate std_error statistic      p_value      lower    upper
+#> 1    x    dY/dX 1.2098679 0.1950798  6.201912 5.578116e-10 0.82751852 1.592217
+#> 2  grp    b - a 0.9147995 0.3707427  2.467478 1.360685e-02 0.18815718 1.641442
+#> 3  grp    c - a 0.7409931 0.3584592  2.067162 3.871891e-02 0.03842604 1.443560
+marginal_means(fe, "grp")
+#>   grp estimate std_error statistic      p_value    lower    upper
+#> 1   a 2.191969 0.2313372  9.475210 2.662251e-21 1.738556 2.645382
+#> 2   b 3.106768 0.3151544  9.857926 6.334413e-23 2.489077 3.724460
+#> 3   c 2.932962 0.2972091  9.868346 5.709826e-23 2.350443 3.515481
+r2(fe)
+#>    mcfadden   cox_snell  nagelkerke    marginal conditional 
+#>  0.04498657  0.17757410  0.17990618  0.24514885  0.27529060
+icc(fe)
+#>    adjusted conditional 
+#>  0.03993071  0.03014174
+```
+
 ## Tests, simple slopes and collinearity
 
 [`anova()`](https://rdrr.io/r/stats/anova.html) gives likelihood ratio
@@ -186,23 +225,23 @@ anova(fnb, fi)
 #> 
 #>     df  logLik    AIC  Chisq Chi Df Pr(>Chisq)
 #> fnb  3 -626.52 1259.0                         
-#> fi   5 -625.59 1261.2 1.8569      2     0.3952
+#> fi   5 -626.31 1262.6 0.4318      2     0.8058
 wald_test(fi, c("mu:x" = 1, "mu:z" = -1))
-#>   estimate   chisq df      p_value
-#> 1   0.5156 32.4333  1 1.233542e-08
+#>   estimate    chisq df      p_value
+#> 1   0.4718 32.80417  1 1.019257e-08
 wald_test(fi, c("mu:z", "mu:x:z"), vcov = "sandwich")
-#>            estimate    chisq df   p_value
-#> 1 -0.07583, 0.05952 1.828828  2 0.4007514
+#>            estimate     chisq df   p_value
+#> 1 -0.03592, 0.01325 0.4420737  2 0.8016871
 simple_slopes(fi, "x", "z")
 #>             z     slope  std_error statistic      p_value
-#> 1 -0.95514546 0.3829537 0.08231887  4.652077 3.286081e-06
-#> 2 -0.04649919 0.4370358 0.05973123  7.316706 2.541327e-13
-#> 3  0.86214707 0.4911179 0.08123373  6.045738 1.487274e-09
+#> 1 -0.93315143 0.4235550 0.08272297  5.120161 3.052743e-07
+#> 2  0.08929015 0.4371033 0.05980144  7.309244 2.686499e-13
+#> 3  1.11173173 0.4506516 0.08813699  5.113082 3.169450e-07
 vif(fi)
 #>   parameter term df     gvif gvif_adj
-#> 1        mu    x  1 1.004200 1.002098
-#> 2        mu    z  1 1.075140 1.036890
-#> 3        mu  x:z  1 1.072318 1.035528
+#> 1        mu    x  1 1.001544 1.000771
+#> 2        mu    z  1 1.037092 1.018377
+#> 3        mu  x:z  1 1.037183 1.018422
 ```
 
 [`johnson_neyman()`](https://adamrsophie.github.io/regcompR/reference/johnson_neyman.md)
@@ -214,12 +253,12 @@ finds the moderator values where the slope of `x` is significant, and
 johnson_neyman(fi, "x", "z", plot = TRUE)$bounds
 ```
 
-![](model-checking_files/figure-html/unnamed-chunk-10-1.png)
+![](model-checking_files/figure-html/unnamed-chunk-11-1.png)
 
     #> numeric(0)
     plot(fi, which = "effects", variable = "x", by = "z")
 
-![](model-checking_files/figure-html/unnamed-chunk-10-2.png)
+![](model-checking_files/figure-html/unnamed-chunk-11-2.png)
 
 [`step_regcomp()`](https://adamrsophie.github.io/regcompR/reference/step_regcomp.md)
 selects terms of one parameter’s formula forward, backward or both ways

@@ -31,6 +31,16 @@
   generalized variance inflation factors, and
   [`step_regcomp()`](https://adamrsophie.github.io/regcompR/reference/step_regcomp.md)
   stepwise selection by AIC or BIC.
+- Effects:
+  [`avg_effects()`](https://adamrsophie.github.io/regcompR/reference/avg_effects.md)
+  (average marginal effects and contrasts, with delta method or
+  posterior uncertainty),
+  [`marginal_means()`](https://adamrsophie.github.io/regcompR/reference/marginal_means.md)
+  (average predictions at covariate values),
+  [`r2()`](https://adamrsophie.github.io/regcompR/reference/r2.md)
+  (McFadden, Cox and Snell, Nagelkerke, and Nakagawa marginal and
+  conditional R squared) and
+  [`icc()`](https://adamrsophie.github.io/regcompR/reference/r2.md).
 - `vcov(type = "quasi")` and `summary(vcov = )` give quasi-likelihood
   (Pearson dispersion) standard errors, matching `quasibinomial` and
   `quasipoisson`.
