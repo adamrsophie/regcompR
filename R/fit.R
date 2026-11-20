@@ -727,7 +727,7 @@ new_fit <- function(spec, beta, theta, u, cov, ll, opt, approx, pen = NULL,
   edf <- length(beta) + length(theta)
   fit <- structure(list(
     spec = spec, family = spec$fam, coefficients = beta, theta = theta, u = u,
-    vcov = cov, logLik = ll, df = edf, nobs = sum(spec$weights > 0 & !is.na(spec$y)),
+    vcov = cov, logLik = ll, df = edf, nobs = obs_count(spec),
     optimizer = list(convergence = opt$convergence, message = opt$message,
                      iterations = opt$iterations, objective = opt$objective),
     approximation = approx, penalty = pen, engine = engine,
@@ -744,6 +744,8 @@ fit_diagnostics <- function(fit) {
   out <- list(converged = fit$optimizer$convergence == 0)
   if (fit$approximation == "none" && length(fit$coefficients)) {
     g <- tryCatch(ml_gradient(spec, unname(fit$coefficients)), error = function(e) NA)
+    # Penalized fits: the gradient of the penalized objective.
+    if (is.function(fit$penalty$grad)) g <- g - fit$penalty$grad(unname(fit$coefficients))
     out$max_abs_gradient <- max(abs(g))
   }
   if (!is.null(fit$vcov)) {
@@ -790,4 +792,11 @@ check_response <- function(y, fam) {
     stop_input(sprintf("Responses outside the support [%s, %s] of '%s' in rows %s.", format(lo), format(hi), fam$id,
                        paste(head(bad, 5), collapse = ", ")))
   invisible()
+}
+
+# Observations: rows (not cells) for vector valued responses.
+obs_count <- function(spec) {
+  y <- spec$y
+  ok <- if (is.matrix(y)) stats::complete.cases(y) else !is.na(y)
+  sum(rep_len(spec$weights, length(ok)) > 0 & ok)
 }

@@ -25,9 +25,12 @@ gen_family <- function(base, tag, display, newpars, T, logt, Tinv = NULL, formul
       ifelse(lb == -Inf, -Inf, logt(u, gp(p)) + lb)
     }
   }
-  cdf <- function(q, p) T(G(q, p), gp(p))
-  quantile <- if (!is.null(Tinv)) function(pr, p) family_quantile(base, pmin(pmax(Tinv(pr, gp(p)), 0), 1), bp(p)) else NULL
-  rng <- if (!is.null(Tinv)) function(n, p) family_quantile(base, Tinv(stats::runif(n), gp(p)), bp(p)) else NULL
+  # Every generator maps the endpoints 0 and 1 to themselves; set them
+  # exactly, as the formulas give 0 log 0 or Inf / Inf there.
+  ends <- function(f) function(u, g) { v <- f(u, g); v[!is.na(u) & u <= 0] <- 0; v[!is.na(u) & u >= 1] <- 1; v }
+  cdf <- function(q, p) ends(T)(G(q, p), gp(p))
+  quantile <- if (!is.null(Tinv)) function(pr, p) family_quantile(base, pmin(pmax(ends(Tinv)(pr, gp(p)), 0), 1), bp(p)) else NULL
+  rng <- if (!is.null(Tinv)) function(n, p) family_quantile(base, ends(Tinv)(stats::runif(n), gp(p)), bp(p)) else NULL
   f <- op_family(base, sprintf("%s(%s)", tag, base$id), sprintf("%s %s", display, base$display_name),
                  c(base$pars, stats::setNames(newpars, actual)), lpdf, cdf = cdf, quantile = quantile, rng = rng,
                  operator = list(type = "generator", generator = tag, base = base),

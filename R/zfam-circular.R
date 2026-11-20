@@ -154,7 +154,7 @@ cfam("dirac_comb", "Dirac comb on the circle (discrete uniform on m equally spac
   P("phase", "circular", role = "offset")),
   formula = "P(Y = phase + 2 pi j / m) = 1/m", discrete = TRUE,
   lpdf = function(y, p) { j <- (y - p$phase) * p$m / (2 * pi); ifelse(abs(j - round(j)) < 1e-9, -log(p$m), -Inf) },
-  rng = function(n, p) wrap_angle(p$phase + 2 * pi * sample.int(p$m[1], n, TRUE) / p$m[1]),
+  rng = function(n, p) { m <- rep_len(p$m, n); wrap_angle(rep_len(p$phase, n) + 2 * pi * floor(stats::runif(n) * m) / m) },
   extra = list(grid = 0), numeric_cdf = FALSE,
   references = "Wikipedia, Dirac comb; Mardia and Jupp (2000), lattice distributions.",
   reference = ref_impl("definition", function(y, p) rep(-log(p$m), length(y))), status = "validated")

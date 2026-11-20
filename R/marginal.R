@@ -124,6 +124,13 @@ gee <- function(formula, data, id, family = stats::gaussian(),
   wv <- eval(substitute(waves), data, parent.frame())
   pw <- eval(substitute(weights), data, parent.frame())
   pw <- w0 * if (is.null(pw)) 1 else pw
+  pw <- rep_len(pw, length(y))
+  if (any(!is.finite(pw) | pw < 0)) stop_input("weights must be finite and nonnegative.")
+  # Rows with zero weight do not contribute; drop them as glm() effectively does.
+  if (any(pw == 0)) {
+    k <- pw > 0; y <- y[k]; X <- X[k, , drop = FALSE]; off <- off[k]; idv <- idv[k]; pw <- pw[k]
+    if (!is.null(wv)) wv <- wv[k]
+  }
   n <- length(y); p <- ncol(X)
   cl <- split(seq_len(n), factor(idv, levels = unique(idv)))
   if (corstr != "independence" && all(lengths(cl) < 2)) {

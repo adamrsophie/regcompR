@@ -141,9 +141,11 @@ posfam("generalized_gamma", "Generalized gamma (GAMLSS GG, Lopatatzidis and Gree
   formula = "theta = 1/(sigma^2 nu^2), z = (y/mu)^nu, Z ~ Gamma(theta, rate theta)",
   lpdf = function(y, p) ifelse(abs(p$nu) < 1e-6, stats::dlnorm(y, log(p$mu), p$sigma, log = TRUE), gg_lpdf(y, p)),
   cdf = function(q, p) { th <- 1 / (p$sigma^2 * p$nu^2); z <- (q / p$mu)^p$nu
-    ifelse(p$nu > 0, stats::pgamma(z * th, th), stats::pgamma(z * th, th, lower.tail = FALSE)) },
+    ifelse(abs(p$nu) < 1e-6, stats::plnorm(q, log(p$mu), p$sigma),
+           ifelse(p$nu > 0, stats::pgamma(z * th, th), stats::pgamma(z * th, th, lower.tail = FALSE))) },
   quantile = function(pr, p) { th <- 1 / (p$sigma^2 * p$nu^2)
-    p$mu * (stats::qgamma(ifelse(p$nu > 0, pr, 1 - pr), th) / th)^(1 / p$nu) },
+    ifelse(abs(p$nu) < 1e-6, stats::qlnorm(pr, log(p$mu), p$sigma),
+           p$mu * (stats::qgamma(ifelse(p$nu > 0, pr, 1 - pr), th) / th)^(1 / p$nu)) },
   references = c("Stacy (1962), A generalization of the gamma distribution. Ann. Math. Stat., 33, 1187-1192.", GS),
   reference = ref_impl("gamlss.dist", gd("dGG"), gp("pGG")),
   stan = sfun("gengamma", c("mu", "sigma", "nu"),

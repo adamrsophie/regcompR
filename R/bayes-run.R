@@ -21,7 +21,7 @@ fit_bayes <- function(spec, priors, control) {
     coefficients = colMeans(draws$fixed[, spec$beta_names, drop = FALSE]),
     rhat = draws$rhat, ess = draws$ess, runner = runner, code = res$code,
     approximation = "none", inference = "bayesian", engine = "bayes",
-    nobs = sum(spec$weights > 0 & !is.na(spec$y)), sampler = res$sampler,
+    nobs = obs_count(spec), sampler = res$sampler,
     df = length(spec$beta_names) + spec$ntheta
   ), class = "regcomp_fit")
   fit$diagnostics <- list(max_rhat = suppressWarnings(max(draws$rhat, na.rm = TRUE)),
@@ -89,10 +89,15 @@ run_bugs <- function(spec, priors, control, runner) {
     for (k in spec$rpars) out[[paste0("b_", k)]] <- rep(0, ncol(spec$preds[[k]]$X))
     out
   }
+  # R2jags and R2OpenBUGS also draw from R's generator.
+  if (!is.null(control$seed)) local_seed(control$seed)
   if (runner == "jags") {
     if (!requireNamespace("R2jags", quietly = TRUE))
       stop_unsupported("The 'jags' runner needs the 'R2jags' package and JAGS; it")
-    f <- R2jags::jags(data = data, inits = inits, parameters.to.save = params,
+    # One JAGS random number generator seed per chain makes runs reproducible.
+    jinits <- lapply(seq_len(control$chains), function(ch) c(inits(), list(.RNG.name = "base::Mersenne-Twister",
+      .RNG.seed = as.integer(control$seed %||% sample.int(1e6, 1)) + ch)))
+    f <- R2jags::jags(data = data, inits = jinits, parameters.to.save = params,
                       model.file = file, n.chains = control$chains, n.iter = iter,
                       n.burnin = control$iter_warmup, n.thin = 1, DIC = FALSE,
                       jags.seed = control$seed, progress.bar = "none", quiet = TRUE)

@@ -242,14 +242,17 @@ simulate.regcomp_fit <- function(object, nsim = 1, seed = NULL, newdata = NULL,
 #'
 #' @param object A fitted model.
 #' @param newdata Optional data frame containing the response.
+#' @param re `"conditional"` uses the fitted random effects, `"zero"` sets
+#'   them to zero.
 #' @param ... Unused.
 #' @return Numeric vector or matrix.
 #' @export
-log_lik <- function(object, newdata = NULL, ...) {
+log_lik <- function(object, newdata = NULL, re = c("conditional", "zero"), ...) {
+  re <- match.arg(re)
   spec <- if (is.null(newdata)) object$spec else {
     new_spec(object, newdata, response = TRUE)
   }
-  f <- function(beta, u) obs_loglik(spec$fam, spec$y, pars_from(spec, beta, u, "conditional"), spec$cmat)
+  f <- function(beta, u) obs_loglik(spec$fam, spec$y, pars_from(spec, beta, u, re), spec$cmat)
   if (object$inference == "bayesian") {
     S <- nrow(object$draws)
     out <- matrix(NA_real_, S, spec$n)

@@ -53,6 +53,12 @@ bugs_program <- function(spec, priors = NULL, dialect = "jags") {
   # log masses are at most 0, continuous log densities have no bound.
   if ((useweights || is.null(bg$native)) && !fam$discrete)
     stop_unsupported("Weights or a non native likelihood for a continuous family in the BUGS engines (use a Stan runner)", fam$id)
+  for (b in spec$blocks) {
+    if (b$type == "re" && (!b$struct %in% c("us", "diag") || !is.null(b$W) || !is.null(b$coords)))
+      stop_unsupported(sprintf("The random effect structure '%s' in the BUGS engines (use a Stan runner)", b$label), fam$id)
+    if (b$type == "re" && b$corr && any(vapply(priors, function(p) p$class %in% c("sd", "cor"), TRUE)))
+      stop_unsupported("Standard deviation or correlation priors for correlated random effects in the BUGS engines (they use a Wishart prior; use a Stan runner)", fam$id)
+  }
   L <- c("model {", "  for (i in 1:N) {")
   for (k in spec$rpars) {
     e <- sprintf("inprod(X_%s[i, ], b_%s[]) + off_%s[i]", k, k, k)

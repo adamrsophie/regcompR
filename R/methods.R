@@ -58,9 +58,10 @@ ranef_regcomp <- function(object, ...) {
     b <- spec$blocks[[j]]
     uj <- u[spec$u_idx[[j]]]
     m <- matrix(uj, ncol = b$q, byrow = TRUE, dimnames = list(b$levels, b$terms))
-    eff[[b$label]] <- as.data.frame(m)
+    lab <- paste0(b$par, ":", b$label)
+    eff[[lab]] <- as.data.frame(m)
     S <- block_cov(b, th[spec$theta_idx[[j]]])
-    vc[[b$label]] <- list(sd = sqrt(diag(S)), cor = stats::cov2cor(S))
+    vc[[lab]] <- list(sd = sqrt(diag(S)), cor = stats::cov2cor(S))
   }
   list(effects = eff, varcorr = vc)
 }

@@ -120,6 +120,7 @@ mv_support <- function(fam, y) {
   if (fam$discrete) ok <- ok & !apply(!is.na(Y) & (Y < 0 | abs(Y - round(Y)) > 1e-9), 1, any)
   if (vt == "unit_vector") ok <- ok & abs(sqrt(rowSums(Y^2)) - 1) < 1e-6
   if (fam$id %in% c("dirichlet", "continuous_categorical")) ok <- ok & rowSums(Y <= 0) == 0 & abs(rowSums(Y) - 1) < 1e-8
+  if (grepl("binary", fam$id)) ok <- ok & rowSums(Y != 0 & Y != 1) == 0
   ok
 }
 
@@ -569,7 +570,7 @@ score.regcomp_dist <- function(x, y, ...) {
   y <- r$.y; p <- r[-1]
   out <- matrix(NA_real_, length(y), length(free), dimnames = list(NULL, free))
   for (k in free) {
-    h <- 1e-5 * pmax(abs(p[[k]]), 1e-3)
+    h <- 1e-5 * ifelse(p[[k]] == 0, 1e-3, abs(p[[k]]))
     up <- p; dn <- p
     up[[k]] <- p[[k]] + h; dn[[k]] <- p[[k]] - h
     out[, k] <- (eval_lpdf(fam, y, up) - eval_lpdf(fam, y, dn)) / (2 * h)
@@ -590,7 +591,7 @@ hessian.regcomp_dist <- function(x, y, ...) {
   K <- length(free)
   out <- array(NA_real_, c(length(y), K, K), list(NULL, free, free))
   f <- function(pp) eval_lpdf(fam, y, pp)
-  h <- lapply(p[free], function(v) 1e-4 * pmax(abs(v), 1e-2))
+  h <- lapply(p[free], function(v) 1e-4 * ifelse(v == 0, 1e-2, abs(v)))
   for (a in seq_len(K)) for (b in a:K) {
     ka <- free[a]; kb <- free[b]
     shift <- function(sa, sb) {

@@ -21,7 +21,7 @@
 #' supports("poisson", backend = "stan")
 capabilities <- function(x) {
   fam <- capability_family(x)
-  scalar <- fam$variate_type == "scalar"
+  scalar <- fam$variate_type == "scalar" || scalar_vecpar(fam)
   op <- function(slot, fallback) {
     if (!is.null(fam[[slot]])) "analytic" else if (fallback) "numeric" else "unavailable"
   }
@@ -42,7 +42,7 @@ capabilities <- function(x) {
     regression = length(regression_pars(fam)) > 0 &&
       !isTRUE(fam$extra$no_regression),
     ml = length(regression_pars(fam)) > 0 && !isTRUE(fam$extra$no_regression),
-    stan = if (is.null(fam$stan)) "unavailable"
+    stan = if (is.null(fam$stan) || !fam$variate_type %in% c("scalar", "categorical") && is.null(fam$stan$vector)) "unavailable"
            else if (isTRUE(fam$stan$native)) "native" else "generated",
     tmb = if (is.null(tmb_family_key(fam))) "unavailable" else "available",
     bugs = if (is.null(fam$bugs)) "unavailable"

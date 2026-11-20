@@ -49,6 +49,9 @@ posfam("phase_type", "Continuous phase-type", list(P("alpha", "unit_closed", rol
 hw_theta <- function(r, t) if (t < 0.15) 0 else r / sqrt(2 * pi^3 * t) * exp(pi^2 / (2 * t)) * stats::integrate(function(x)
   exp(-x^2 / (2 * t) - r * cosh(x) + log(sinh(x))) * sin(pi * x / t), 0, acosh(1 + 800 / r), subdivisions = 5000L, rel.tol = 1e-12, stop.on.error = FALSE)$value
 posfam("hartman_watson", "Hartman-Watson", list(P("r", "positive", role = "shape")),
+  # ponytail: the t < 0.15 cutoff drops real mass once r > 3 (it moves to
+  # t near 1/r); a small t asymptotic expansion would lift the limit.
+  check = function(p) if (any(p$r > 3)) "The Hartman-Watson implementation is accurate only for r <= 3.",
   formula = "f_r(t) = theta(r, t) / I0(r), theta(r, t) = r (2 pi^3 t)^(-1/2) e^(pi^2/(2t)) int_0^inf e^(-x^2/(2t) - r cosh x) sinh(x) sin(pi x / t) dx",
   lpdf = function(y, p) log(pmax(pervec(y, p, function(t, pp) hw_theta(pp$r, t)), 0)) - log(besselI(p$r, 0)),
   cdf = function(q, p) pervec(q, p, function(t, pp) { if (t <= 0.15) return(0)
@@ -60,7 +63,7 @@ posfam("hartman_watson", "Hartman-Watson", list(P("r", "positive", role = "shape
   references = "Hartman and Watson (1974), 'Normal' distribution functions on spheres and the modified Bessel functions. Ann. Probab., 2, 593-607.",
   reference = ref_impl("Laplace transform I_|u|(r) / I0(r)", function(y, p) log(pervec(y, p, function(t, pp) hw_theta(pp$r, t))) - log(besselI(p$r, 0)),
     note = "Checked through total mass and the Laplace transform identity."),
-  status = "validated")
+  status = "experimental")
 
 # Real line additions ----------------------------------------------------------------
 # exp(-2 x^3/3) (x Ai(x^2) - Ai'(x^2)) with Ai(z) = sqrt(z/3) K_{1/3}(zeta)/pi and
@@ -304,6 +307,14 @@ jqpd_core <- function(p, bounded) {
   cc <- stats::qnorm(1 - p$alpha)
   if (bounded) { tr <- function(x) stats::qnorm((x - p$l) / (p$u - p$l)) } else tr <- function(x) log(x - p$l)
   L <- tr(p$xl); B <- tr(p$xm); H <- tr(p$xh); n <- sign(L + H - 2 * B)
+  # Symmetric quantiles (delta = 0): the limits lambda sinh(delta z) -> s z.
+  if (abs(L + H - 2 * B) < 1e-12 * (1 + abs(H - L))) {
+    s <- (H - B) / cc
+    if (bounded) return(list(Q = function(z) p$l + (p$u - p$l) * stats::pnorm(B + s * z),
+                             dQ = function(z) (p$u - p$l) * stats::dnorm(B + s * z) * s))
+    th <- p$xm - p$l
+    return(list(Q = function(z) p$l + th * exp(s * z), dQ = function(z) th * s * exp(s * z)))
+  }
   if (bounded) {
     xi <- ifelse(n == 1, L, ifelse(n == 0, B, H)); delta <- acosh((H - L) / (2 * pmin(B - L, H - B))) / cc
     lam <- (H - L) / sinh(2 * delta * cc)

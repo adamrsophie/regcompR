@@ -36,7 +36,14 @@ scoring_rule <- function(object, newdata = NULL, rule = c("log", "crps", "dss", 
   pars <- pars_from(spec, unname(beta), u, re)
   y <- spec$y; fam <- spec$fam
   d <- structure(list(family = fam, pars = pars), class = "regcomp_dist")
-  if (rule == "log") return(-obs_loglik(fam, y, pars, spec$cmat))
+  if (rule == "log") {
+    # Bayesian fits: the posterior predictive density, log mean over draws.
+    if (object$inference == "bayesian") {
+      ll <- log_lik(object, newdata, re = re)
+      return(-apply(ll, 2, function(v) log_sum_exp(v) - log(length(v))))
+    }
+    return(-obs_loglik(fam, y, pars, spec$cmat))
+  }
   if (!is.null(spec$cmat) && any(spec$cmat[, "lower"] != spec$cmat[, "upper"], na.rm = TRUE))
     stop_unsupported(sprintf("The '%s' score for censored observations", rule))
   if (rule %in% c("crps", "dss") && !is.null(spec$cmat) && any(is.finite(spec$cmat[, c("tlower", "tupper")])))
@@ -61,9 +68,11 @@ scoring_rule <- function(object, newdata = NULL, rule = c("log", "crps", "dss", 
       k <- seq(min(lo, y[i]), max(hi, y[i]))
       return(sum((Fz(k) - (y[i] <= k))^2))
     }
-    a <- min(lo, y[i]); b <- max(hi, y[i])
-    stats::integrate(function(z) Fz(z)^2, a, y[i], rel.tol = 1e-8, stop.on.error = FALSE)$value +
-      stats::integrate(function(z) (1 - Fz(z))^2, y[i], b, rel.tol = 1e-8, stop.on.error = FALSE)$value
+    # Integrate over the whole support: finite cutoffs at extreme quantiles
+    # make the quadrature miss the mass of heavy tails.
+    sp <- fam$support(pi); a <- min(sp$lower, y[i]); b <- max(sp$upper, y[i])
+    stats::integrate(function(z) Fz(z)^2, a, y[i], rel.tol = 1e-8, subdivisions = 1000L, stop.on.error = FALSE)$value +
+      stats::integrate(function(z) (1 - Fz(z))^2, y[i], b, rel.tol = 1e-8, subdivisions = 1000L, stop.on.error = FALSE)$value
   }, 0)
 }
 

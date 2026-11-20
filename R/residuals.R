@@ -61,6 +61,9 @@ pit_values <- function(fam, y, pars, cmat = NULL) {
     Ftu <- ifelse(is.finite(tu), family_cdf(fam, ifelse(is.finite(tu), tu, 0), pars), 1)
     Fup <- (Fup - Ftl) / (Ftu - Ftl); Flo <- (Flo - Ftl) / (Ftu - Ftl)
   }
-  u <- Flo + stats::runif(n) * (Fup - Flo)
+  # Draw uniforms only where there is a jump to randomize over.
+  jmp <- which(!is.na(Fup) & !is.na(Flo) & Fup > Flo)
+  u <- Fup
+  if (length(jmp)) u[jmp] <- Flo[jmp] + stats::runif(length(jmp)) * (Fup[jmp] - Flo[jmp])
   pmin(pmax(u, 1e-12), 1 - 1e-12)
 }

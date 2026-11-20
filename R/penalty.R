@@ -171,6 +171,7 @@ make_penalty <- function(pen, spec) {
     if (length(pen$groups) != length(idx)) stop_input(sprintf("groups must have %d entries, one per penalized coefficient.", length(idx)))
     grp <- as.character(pen$groups)
   }
+  pen$prior_scale <- pen$scale
   pen$idx <- idx; pen$scale <- scale; pen$group <- grp
   pen$w <- rep(1, length(idx))
   lam <- pen$lambda; al <- pen$alpha
@@ -178,7 +179,7 @@ make_penalty <- function(pen, spec) {
   pen$value <- switch(pen$type,
     firth = , flic = function(beta) -0.5 * safe_logdet(info_matrix(spec, beta)),
     log_f = function(beta) { b <- beta[idx]; -sum(pen$m / 2 * b - pen$m * log1pexp(b)) },
-    cauchy = function(beta) sum(log1p((beta[idx] / pen$scale)^2)),
+    cauchy = function(beta) sum(log1p((beta[idx] / pen$prior_scale)^2)),
     function(beta) { b <- beta[idx] * scale
       lam * (al * sum(pen$w * abs(b)) + (1 - al) / 2 * sum(b^2)) })
   pen$grad <- switch(pen$type,
@@ -186,7 +187,7 @@ make_penalty <- function(pen, spec) {
     log_f = function(beta) { g <- numeric(length(beta)); b <- beta[idx]
       g[idx] <- -(pen$m / 2 - pen$m * stats::plogis(b)); g },
     cauchy = function(beta) { g <- numeric(length(beta)); b <- beta[idx]
-      g[idx] <- 2 * b / (pen$scale^2 + b^2); g },
+      g[idx] <- 2 * b / (pen$prior_scale^2 + b^2); g },
     function(beta) { g <- numeric(length(beta))
       g[idx] <- lam * (1 - al) * beta[idx] * scale^2; g })
   pen

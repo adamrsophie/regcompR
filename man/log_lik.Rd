@@ -4,12 +4,15 @@
 \alias{log_lik}
 \title{Pointwise log likelihood}
 \usage{
-log_lik(object, newdata = NULL, ...)
+log_lik(object, newdata = NULL, re = c("conditional", "zero"), ...)
 }
 \arguments{
 \item{object}{A fitted model.}
 
 \item{newdata}{Optional data frame containing the response.}
+
+\item{re}{\code{"conditional"} uses the fitted random effects, \code{"zero"} sets
+them to zero.}
 
 \item{...}{Unused.}
 }
