@@ -66,7 +66,7 @@ fs <- step_regcomp(f0, scope = ~ x1 + x2 + x3, direction = "forward", criterion 
 formula(fs)
 #> $lambda
 #> y ~ x1
-#> <environment: 0x560d7330d088>
+#> <environment: 0x61e1beeb5240>
 #> 
 #> attr(,"given")
 #> [1] "lambda"
