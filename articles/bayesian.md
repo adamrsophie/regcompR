@@ -249,3 +249,19 @@ family_capabilities("generalized_poisson")[c("stan", "tmb", "bugs")]
 supports(hurdle("gamma"), backend = "stan")
 #> [1] TRUE
 ```
+
+## Marginal likelihoods and Bayes factors
+
+[`bridge_regcomp()`](https://adamrsophie.github.io/regcompR/reference/bridge_regcomp.md)
+estimates the log marginal likelihood of a Stan fit by bridge sampling
+and
+[`bayes_factor_regcomp()`](https://adamrsophie.github.io/regcompR/reference/bridge_regcomp.md)
+compares two fits. The model is rewritten with all normalizing
+constants, so the estimates match direct numerical integration (for
+example, -51.941 against -51.940 for a Poisson regression with normal
+priors). Use long chains.
+
+``` r
+
+bayes_factor_regcomp(fit_with_x, fit_without_x)
+```

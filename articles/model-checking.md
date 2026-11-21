@@ -187,20 +187,20 @@ d$grp <- factor(sample(c("a", "b", "c"), n, TRUE))
 fe <- regcomp(y ~ x + grp + (1 | g), family = "nb2", data = d)
 avg_effects(fe)
 #>   term contrast  estimate std_error statistic      p_value      lower    upper
-#> 1    x    dY/dX 1.2098679 0.1950798  6.201912 5.578116e-10 0.82751852 1.592217
-#> 2  grp    b - a 0.9147995 0.3707427  2.467478 1.360685e-02 0.18815718 1.641442
-#> 3  grp    c - a 0.7409931 0.3584592  2.067162 3.871891e-02 0.03842604 1.443560
+#> 1    x    dY/dX 1.2098680 0.1950798  6.201912 5.578125e-10 0.82751855 1.592217
+#> 2  grp    b - a 0.9148007 0.3707428  2.467481 1.360675e-02 0.18815817 1.641443
+#> 3  grp    c - a 0.7409936 0.3584592  2.067163 3.871880e-02 0.03842646 1.443561
 marginal_means(fe, "grp")
 #>   grp estimate std_error statistic      p_value    lower    upper
-#> 1   a 2.191969 0.2313372  9.475210 2.662251e-21 1.738556 2.645382
-#> 2   b 3.106768 0.3151544  9.857926 6.334413e-23 2.489077 3.724460
-#> 3   c 2.932962 0.2972091  9.868346 5.709826e-23 2.350443 3.515481
+#> 1   a 2.191969 0.2313372  9.475211 2.662230e-21 1.738556 2.645382
+#> 2   b 3.106770 0.3151545  9.857927 6.334393e-23 2.489078 3.724461
+#> 3   c 2.932962 0.2972091  9.868347 5.709788e-23 2.350443 3.515482
 r2(fe)
 #>    mcfadden   cox_snell  nagelkerke    marginal conditional 
-#>  0.04498657  0.17757410  0.17990618  0.24514885  0.27529060
+#>  0.04498657  0.17757410  0.17990618  0.24514887  0.27529063
 icc(fe)
 #>    adjusted conditional 
-#>  0.03993071  0.03014174
+#>  0.03993073  0.03014176
 ```
 
 ## Tests, simple slopes and collinearity
@@ -281,7 +281,7 @@ attr(fs, "steps")
 
 identifiability_check(fnb)
 #> $condition_number
-#> [1] 8.593194
+#> [1] 8.593197
 #> 
 #> $weak_directions
 #> list()
@@ -444,4 +444,33 @@ skovgaard_test(regcomp(y ~ x, family = "poisson", data = sm), "lambda:x", R = 50
 #> Wald  2.559985 0.010467655
 #> r     2.742970 0.006088617
 #> r*    2.717801 0.006571741
+```
+
+## Shrinkage and mediation
+
+[`shrink_regcomp()`](https://adamrsophie.github.io/regcompR/reference/shrink_regcomp.md)
+shrinks slopes by the heuristic factor of van Houwelingen and le Cessie,
+then re-estimates the intercept and the other parameters.
+[`mediate_regcomp()`](https://adamrsophie.github.io/regcompR/reference/mediate_regcomp.md)
+estimates causal mediation effects from a mediator and an outcome model
+of any families.
+
+``` r
+
+md <- data.frame(t = rbinom(300, 1, 0.5), x = rnorm(300))
+md$m <- rnorm(300, 0.5 * md$t + 0.3 * md$x); md$y <- rbinom(300, 1, plogis(-0.3 + 0.6 * md$m + 0.3 * md$t))
+mm <- regcomp(m ~ t + x, family = "normal", data = md)
+my <- regcomp(y ~ t + m + x, family = "bernoulli", data = md)
+mediate_regcomp(mm, my, "t", "m", sims = 300)
+#>                  estimate       lower      upper   p_value
+#> ACME (control) 0.05341190  0.01769099 0.09895634 0.0000000
+#> ACME (treated) 0.05382427  0.01786952 0.09952638 0.0000000
+#> ADE (control)  0.04954317 -0.06779743 0.15431816 0.3866667
+#> ADE (treated)  0.04995555 -0.06801358 0.15411206 0.3866667
+#> Total effect   0.10336744 -0.01264892 0.21463850 0.1133333
+#> ACME (average) 0.05361808  0.01786769 0.09923650 0.0000000
+#> ADE (average)  0.04974936 -0.06790551 0.15418552 0.3866667
+#> Prop. mediated 0.46097714 -3.97664124 2.99945795 0.1133333
+attr(shrink_regcomp(my), "shrinkage")
+#> [1] 0.8481455
 ```

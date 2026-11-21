@@ -224,12 +224,17 @@ is the BYM model.</p></li>
 <li><p><code>spacetime(region + time | 1, W)</code>: a separable space time effect, the
 Kronecker product of a Leroux spatial and an AR(1) temporal
 correlation (time a factor of equally spaced periods).</p></li>
+<li><p><code>spde(x + y | 1, mesh)</code>: a Matern field (smoothness 1) by the SPDE
+approach of Lindgren, Rue and Lindstrom (2011) on an fmesher
+triangulation, with parameters <code>log_sd</code> and <code>log_range</code>. The precision
+is sparse but the current engines use it densely, so meshes of up to a
+few hundred nodes are practical.</p></li>
 </ul><p>A group other than <code>1</code> on the right of the bar gives independent
 replicates of the field (one per year, say).</p>
 <p>Structured random effects are available in every parameter and for every
 family, so a latent autoregressive process can enter a count, survival or
-ordinal model. The TMB engine does not support <code>car()</code>, <code>leroux()</code> and
-<code>spacetime()</code>; Stan does not support <code>spacetime()</code>.</p>
+ordinal model. The TMB engine does not support <code>car()</code>, <code>leroux()</code>,
+<code>spacetime()</code> and <code>spde()</code>; Stan does not support <code>spacetime()</code> and <code>spde()</code>.</p>
     </div>
     <div class="section level2">
     <h2 id="engines">Engines<a class="anchor" aria-label="anchor" href="#engines"></a></h2>

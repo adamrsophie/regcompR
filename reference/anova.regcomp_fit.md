@@ -11,7 +11,7 @@ Self and Liang 1987).
 
 ``` r
 # S3 method for class 'regcomp_fit'
-anova(object, ...)
+anova(object, ..., boundary = FALSE)
 ```
 
 ## Arguments
@@ -19,6 +19,12 @@ anova(object, ...)
 - object, ...:
 
   Fitted models.
+
+- boundary:
+
+  If `TRUE`, p values for an added variance component use the 50:50
+  mixture of chi squares with `df - 1` and `df` degrees of freedom (Self
+  and Liang 1987), as the variance lies on its boundary.
 
 ## Value
 

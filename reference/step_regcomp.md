@@ -66,12 +66,12 @@ fs <- step_regcomp(f0, scope = ~ x1 + x2 + x3, direction = "forward", criterion 
 formula(fs)
 #> $lambda
 #> y ~ x1
-#> <environment: 0x5ebc5a32ac78>
+#> <environment: 0x560d7330d088>
 #> 
 #> attr(,"given")
 #> [1] "lambda"
 attr(fs, "steps")
 #>       step      BIC
-#> 1    start 669.4252
-#> + x1  + x1 637.4517
+#> 1    start 660.1694
+#> + x1  + x1 631.6967
 ```

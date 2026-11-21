@@ -53,8 +53,8 @@ asymptotics. Scand. J. Statist., 28, 3-32.
 d <- data.frame(x = rnorm(15)); d$y <- rpois(15, exp(0.5 + 0.4 * d$x))
 f <- regcomp(y ~ x, family = "poisson", data = d)
 skovgaard_test(f, "lambda:x", R = 500)
-#>      statistic   p_value
-#> Wald  1.395040 0.1630036
-#> r     1.418383 0.1560790
-#> r*    1.406684 0.1595212
+#>      statistic     p_value
+#> Wald  2.559293 0.010488532
+#> r     2.735483 0.006228873
+#> r*    2.711145 0.006705129
 ```

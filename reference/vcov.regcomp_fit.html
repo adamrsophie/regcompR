@@ -16,7 +16,10 @@ binomial or Poisson, whose estimates are the same.
 the number of coefficients; &quot;HC2&quot; and &quot;HC3&quot; divide each score by
 sqrt(1 - h_i) and 1 - h_i, with leverages h_i the diagonal of the
 weighted hat matrix (MacKinnon and White 1985). For a one parameter GLM
-(Poisson, binomial) they equal sandwich::vcovHC()."><meta property="og:description" content="type = &quot;model&quot; gives the inverse observed information (or the
+(Poisson, binomial) they equal sandwich::vcovHC(). &quot;HAC&quot; is the
+Newey-West covariance for serially correlated rows (in data order), with
+Bartlett weights 1 - l / (lag + 1); it equals
+sandwich::NeweyWest(prewhite = FALSE, adjust = FALSE)."><meta property="og:description" content="type = &quot;model&quot; gives the inverse observed information (or the
 posterior covariance of a Bayesian fit). type = &quot;sandwich&quot; gives the
 robust covariance V M V of Huber and White, where V is the model
 covariance and M the summed outer products of score contributions;
@@ -33,7 +36,10 @@ binomial or Poisson, whose estimates are the same.
 the number of coefficients; &quot;HC2&quot; and &quot;HC3&quot; divide each score by
 sqrt(1 - h_i) and 1 - h_i, with leverages h_i the diagonal of the
 weighted hat matrix (MacKinnon and White 1985). For a one parameter GLM
-(Poisson, binomial) they equal sandwich::vcovHC()."><meta property="og:image" content="https://adamrsophie.github.io/regcompR/logo.svg"></head><body>
+(Poisson, binomial) they equal sandwich::vcovHC(). &quot;HAC&quot; is the
+Newey-West covariance for serially correlated rows (in data order), with
+Bartlett weights 1 - l / (lag + 1); it equals
+sandwich::NeweyWest(prewhite = FALSE, adjust = FALSE)."><meta property="og:image" content="https://adamrsophie.github.io/regcompR/logo.svg"></head><body>
     <a href="#main" class="visually-hidden-focusable">Skip to contents</a>
 
 
@@ -104,7 +110,10 @@ binomial or Poisson, whose estimates are the same.
 the number of coefficients; <code>"HC2"</code> and <code>"HC3"</code> divide each score by
 <code>sqrt(1 - h_i)</code> and <code>1 - h_i</code>, with leverages <code>h_i</code> the diagonal of the
 weighted hat matrix (MacKinnon and White 1985). For a one parameter GLM
-(Poisson, binomial) they equal <code><a href="https://zeileis.codeberg.page/sandwich/reference/vcovHC.html" class="external-link">sandwich::vcovHC()</a></code>.</p>
+(Poisson, binomial) they equal <code><a href="https://zeileis.codeberg.page/sandwich/reference/vcovHC.html" class="external-link">sandwich::vcovHC()</a></code>. <code>"HAC"</code> is the
+Newey-West covariance for serially correlated rows (in data order), with
+Bartlett weights <code>1 - l / (lag + 1)</code>; it equals
+<code>sandwich::NeweyWest(prewhite = FALSE, adjust = FALSE)</code>.</p>
     </div>
 
     <div class="section level2">
@@ -112,8 +121,9 @@ weighted hat matrix (MacKinnon and White 1985). For a one parameter GLM
     <div class="sourceCode"><pre class="sourceCode r"><code><span><span class="co"># S3 method for class 'regcomp_fit'</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/stats/vcov.html" class="external-link">vcov</a></span><span class="op">(</span></span>
 <span>  <span class="va">object</span>,</span>
-<span>  type <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"model"</span>, <span class="st">"sandwich"</span>, <span class="st">"quasi"</span>, <span class="st">"HC0"</span>, <span class="st">"HC1"</span>, <span class="st">"HC2"</span>, <span class="st">"HC3"</span><span class="op">)</span>,</span>
+<span>  type <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"model"</span>, <span class="st">"sandwich"</span>, <span class="st">"quasi"</span>, <span class="st">"HC0"</span>, <span class="st">"HC1"</span>, <span class="st">"HC2"</span>, <span class="st">"HC3"</span>, <span class="st">"HAC"</span><span class="op">)</span>,</span>
 <span>  cluster <span class="op">=</span> <span class="cn">NULL</span>,</span>
+<span>  lag <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  <span class="va">...</span></span>
 <span><span class="op">)</span></span></code></pre></div>
     </div>
@@ -127,12 +137,17 @@ weighted hat matrix (MacKinnon and White 1985). For a one parameter GLM
 
 
 <dt id="arg-type">type<a class="anchor" aria-label="anchor" href="#arg-type"></a></dt>
-<dd><p><code>"model"</code>, <code>"sandwich"</code> (<code>"HC0"</code>), <code>"HC1"</code>, <code>"HC2"</code>, <code>"HC3"</code> or <code>"quasi"</code>.</p></dd>
+<dd><p><code>"model"</code>, <code>"sandwich"</code> (<code>"HC0"</code>), <code>"HC1"</code>, <code>"HC2"</code>, <code>"HC3"</code>, <code>"HAC"</code> or <code>"quasi"</code>.</p></dd>
 
 
 <dt id="arg-cluster">cluster<a class="anchor" aria-label="anchor" href="#arg-cluster"></a></dt>
 <dd><p>Optional cluster identifier: a vector, or a one sided
 formula evaluated in the model data.</p></dd>
+
+
+<dt id="arg-lag">lag<a class="anchor" aria-label="anchor" href="#arg-lag"></a></dt>
+<dd><p>Maximum lag of the HAC covariance (default
+<code>floor(4 (n / 100)^(2 / 9))</code>).</p></dd>
 
 
 <dt id="arg--">...<a class="anchor" aria-label="anchor" href="#arg--"></a></dt>

@@ -123,7 +123,7 @@ dat$z <- rnorm(G * m, 1 + dat$x + u[dat$g], exp(-0.5 + v[dat$g]))
 fit2 <- regcomp(z ~ x + (1 | g), sigma ~ 1 + (1 | g), family = "normal", data = dat)
 fit2$theta
 #>    mu:1 | g:log_sd((Intercept)) sigma:1 | g:log_sd((Intercept)) 
-#>                      -0.7109182                      -1.2369327
+#>                      -0.7109173                      -1.2369517
 ```
 
 ## Covariance structures for longitudinal data
@@ -205,6 +205,51 @@ plogis(fl$theta[2])   # Leroux spatial dependence
 #>                         0.7022909
 ```
 
+### Matern fields by the SPDE approach
+
+`spde(x + y | 1, mesh)` places a Matern field on an fmesher
+triangulation; its parameters are the marginal standard deviation and
+the range.
+
+``` r
+
+gs <- data.frame(sx = runif(80), sy = runif(80), x = rnorm(80))
+gs$y <- 1 + 0.5 * gs$x + sin(3 * gs$sx) + cos(2 * gs$sy) + rnorm(80, 0, 0.3)
+mesh <- fmesher::fm_mesh_2d(loc = as.matrix(gs[, 1:2]), max.edge = c(0.2, 0.5), cutoff = 0.05)
+fsp <- regcomp(y ~ x + spde(sx + sy | 1, mesh), family = "normal", data = gs)
+exp(fsp$theta)
+```
+
+## Non-normal random effects and PQL
+
+[`re_nongauss()`](https://adamrsophie.github.io/regcompR/reference/re_nongauss.md)
+fits a random intercept with a gamma (frailty), t, logistic or Laplace
+law by adaptive quadrature, and
+[`pql_regcomp()`](https://adamrsophie.github.io/regcompR/reference/pql_regcomp.md)
+fits a GLMM by penalized quasi-likelihood, as
+[`MASS::glmmPQL()`](https://rdrr.io/pkg/MASS/man/glmmPQL.html).
+
+``` r
+
+fr <- data.frame(g = factor(rep(1:30, each = 5)), x = rnorm(150))
+fr$y <- rpois(150, exp(0.3 + 0.4 * fr$x) * rgamma(30, 2, 2)[fr$g])
+re_nongauss(y ~ x, ~ g, family = "poisson", data = fr, re = "gamma")
+#> <regcomp_nongauss> poisson model with a gamma random intercept, n = 150
+#>                    estimate std_error       z
+#> lambda:(Intercept)   0.0854    0.1472  0.5803
+#> lambda:x             0.5089    0.0888  5.7323
+#> re:log_v            -0.8206    0.3594 -2.2835
+#> log likelihood -203.719, AIC 413.439
+pql_regcomp(y ~ x + (1 | g), family = poisson(), data = fr)
+#> <regcomp_pql> poisson (log link) GLMM by penalized quasi-likelihood, 5 iterations, n = 150
+#>             estimate std_error       z
+#> (Intercept)  -0.0878    0.1531 -0.5734
+#> x             0.5060    0.0784  6.4530
+#> Random effect parameters:
+#> mu:1 | g:log_sd((Intercept)) 
+#>                      -0.3777
+```
+
 ## Smooth terms
 
 Smooth terms from mgcv enter any parameter through their mixed model
@@ -220,23 +265,25 @@ parameters; the fits agree with
 sm <- data.frame(x = runif(300), w = runif(300), f = factor(sample(c("a", "b"), 300, TRUE)))
 sm$y <- ifelse(sm$f == "a", sin(2 * pi * sm$x), cos(2 * pi * sm$x)) + rnorm(300, 0, 0.3)
 fs <- regcomp(y ~ f + s(x, by = f, k = 8), sigma ~ s(w, k = 5), family = "normal", data = sm)
+#> Warning: The Hessian is not positive definite; standard errors are unavailable
+#> or unreliable.
 fs$theta
 #> mu:s(x, by = f, k = 8):s(x):fa:log_sd(smooth) 
-#>                                     1.0368475 
+#>                                     1.1591035 
 #> mu:s(x, by = f, k = 8):s(x):fb:log_sd(smooth) 
-#>                                     0.8717579 
+#>                                     0.7913796 
 #>              sigma:s(w, k = 5):log_sd(smooth) 
-#>                                   -10.6450627
+#>                                   -10.4419944
 plot(fs, which = "effects", variable = "x")
 ```
 
-![](hierarchical-longitudinal_files/figure-html/unnamed-chunk-9-1.png)
+![](hierarchical-longitudinal_files/figure-html/unnamed-chunk-11-1.png)
 
 ``` r
 
 ft <- regcomp(y ~ t2(x, w, k = 4), family = "normal", data = sm)
 logLik(ft)
-#> 'log Lik.' -283.1154 (df=8)
+#> 'log Lik.' -278.038 (df=8)
 ```
 
 ## Multiple membership
@@ -253,7 +300,7 @@ mmd$y <- rnorm(200, 1 + mmd$x + 0.6 * eff[mmd$s1] + 0.4 * eff[mmd$s2], 1)
 fmm <- regcomp(y ~ x + (1 | mm(s1, s2, weights = cbind(w1, w2))), family = "normal", data = mmd)
 fmm$theta
 #> mu:1 | mm(s1, s2, weights = cbind(w1, w2)):log_sd((Intercept)) 
-#>                                                     -0.7109981
+#>                                                     -0.4683939
 ```
 
 ## Marginal models
@@ -300,7 +347,7 @@ pp <- person_period(sd0, "t", "d")
 fh <- regcomp(event ~ factor(period) + x + (1 | cl), family = "bernoulli", data = pp)
 coef(fh)["prob:x"]
 #>    prob:x 
-#> 0.4880301
+#> 0.5453171
 ```
 
 ## Nonlinear models

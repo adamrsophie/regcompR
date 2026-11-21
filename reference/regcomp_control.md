@@ -17,7 +17,7 @@ regcomp_control(
   iter_warmup = 1000,
   iter_sampling = 1000,
   seed = 1,
-  runner = c("bayescompR", "cmdstanr", "rstan", "jags", "openbugs"),
+  runner = NULL,
   cores = 1,
   adapt_delta = 0.8,
   start = NULL,
@@ -63,6 +63,8 @@ regcomp_control(
   Bayesian settings: chains, iterations, seed, the runner
   (`"bayescompR"`, `"cmdstanr"` or `"rstan"` for Stan, `"jags"` through
   'R2jags' or `"openbugs"` through 'R2OpenBUGS') and parallel chains.
+  The default runner is the first installed of bayescompR (available
+  from GitHub), cmdstanr and rstan.
 
 - adapt_delta:
 
@@ -129,7 +131,7 @@ regcomp_control(maxit = 500)
 #> [1] 1
 #> 
 #> $runner
-#> [1] "bayescompR"
+#> [1] "rstan"
 #> 
 #> $cores
 #> [1] 1

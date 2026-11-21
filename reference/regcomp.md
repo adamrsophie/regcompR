@@ -159,13 +159,20 @@ A bar term may be wrapped in a covariance structure:
   Kronecker product of a Leroux spatial and an AR(1) temporal
   correlation (time a factor of equally spaced periods).
 
+- `spde(x + y | 1, mesh)`: a Matern field (smoothness 1) by the SPDE
+  approach of Lindgren, Rue and Lindstrom (2011) on an fmesher
+  triangulation, with parameters `log_sd` and `log_range`. The precision
+  is sparse but the current engines use it densely, so meshes of up to a
+  few hundred nodes are practical.
+
 A group other than `1` on the right of the bar gives independent
 replicates of the field (one per year, say).
 
 Structured random effects are available in every parameter and for every
 family, so a latent autoregressive process can enter a count, survival
-or ordinal model. The TMB engine does not support `car()`, `leroux()`
-and `spacetime()`; Stan does not support `spacetime()`.
+or ordinal model. The TMB engine does not support `car()`, `leroux()`,
+`spacetime()` and `spde()`; Stan does not support `spacetime()` and
+`spde()`.
 
 ## Engines
 

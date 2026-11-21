@@ -179,6 +179,17 @@
   : Power by simulation
 - [`skovgaard_test()`](https://adamrsophie.github.io/regcompR/reference/skovgaard_test.md)
   : Skovgaard's modified directed likelihood ratio
+- [`shrink_regcomp()`](https://adamrsophie.github.io/regcompR/reference/shrink_regcomp.md)
+  : Predictive shrinkage of regression coefficients
+- [`mediate_regcomp()`](https://adamrsophie.github.io/regcompR/reference/mediate_regcomp.md)
+  : Causal mediation analysis
+- [`pql_regcomp()`](https://adamrsophie.github.io/regcompR/reference/pql_regcomp.md)
+  : Penalized quasi-likelihood for generalized linear mixed models
+- [`re_nongauss()`](https://adamrsophie.github.io/regcompR/reference/re_nongauss.md)
+  : Random intercepts with non-normal distributions
+- [`bridge_regcomp()`](https://adamrsophie.github.io/regcompR/reference/bridge_regcomp.md)
+  [`bayes_factor_regcomp()`](https://adamrsophie.github.io/regcompR/reference/bridge_regcomp.md)
+  : Marginal likelihood and Bayes factors by bridge sampling
 - [`uplift()`](https://adamrsophie.github.io/regcompR/reference/uplift.md)
   : Individual uplift predictions
 - [`qini()`](https://adamrsophie.github.io/regcompR/reference/qini.md) :
@@ -243,5 +254,4 @@
   : Conditions raised by regcompR
 - [`regcompR`](https://adamrsophie.github.io/regcompR/reference/regcompR-package.md)
   [`regcompR-package`](https://adamrsophie.github.io/regcompR/reference/regcompR-package.md)
-  : regcompR: Distributional Regression with a Verified Registry of
-  Probability Distributions
+  : regcompR: Distributional Regression with a Registry of Distributions

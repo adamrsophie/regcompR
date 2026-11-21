@@ -23,6 +23,7 @@
 <url><loc>https://adamrsophie.github.io/regcompR/reference/avg_effects.html</loc></url>
 <url><loc>https://adamrsophie.github.io/regcompR/reference/best_subset.html</loc></url>
 <url><loc>https://adamrsophie.github.io/regcompR/reference/boot_regcomp.html</loc></url>
+<url><loc>https://adamrsophie.github.io/regcompR/reference/bridge_regcomp.html</loc></url>
 <url><loc>https://adamrsophie.github.io/regcompR/reference/bugs_code.html</loc></url>
 <url><loc>https://adamrsophie.github.io/regcompR/reference/cens.html</loc></url>
 <url><loc>https://adamrsophie.github.io/regcompR/reference/censor.html</loc></url>
@@ -53,6 +54,7 @@
 <url><loc>https://adamrsophie.github.io/regcompR/reference/link.html</loc></url>
 <url><loc>https://adamrsophie.github.io/regcompR/reference/log_lik.html</loc></url>
 <url><loc>https://adamrsophie.github.io/regcompR/reference/marginal_means.html</loc></url>
+<url><loc>https://adamrsophie.github.io/regcompR/reference/mediate_regcomp.html</loc></url>
 <url><loc>https://adamrsophie.github.io/regcompR/reference/mixture.html</loc></url>
 <url><loc>https://adamrsophie.github.io/regcompR/reference/moments.html</loc></url>
 <url><loc>https://adamrsophie.github.io/regcompR/reference/numerics.html</loc></url>
@@ -65,6 +67,7 @@
 <url><loc>https://adamrsophie.github.io/regcompR/reference/plot.regcomp_dist.html</loc></url>
 <url><loc>https://adamrsophie.github.io/regcompR/reference/plot.regcomp_fit.html</loc></url>
 <url><loc>https://adamrsophie.github.io/regcompR/reference/power_sim.html</loc></url>
+<url><loc>https://adamrsophie.github.io/regcompR/reference/pql_regcomp.html</loc></url>
 <url><loc>https://adamrsophie.github.io/regcompR/reference/predict.regcomp_fit.html</loc></url>
 <url><loc>https://adamrsophie.github.io/regcompR/reference/prior.html</loc></url>
 <url><loc>https://adamrsophie.github.io/regcompR/reference/probability-interface.html</loc></url>
@@ -74,6 +77,7 @@
 <url><loc>https://adamrsophie.github.io/regcompR/reference/quantile_param.html</loc></url>
 <url><loc>https://adamrsophie.github.io/regcompR/reference/r2.html</loc></url>
 <url><loc>https://adamrsophie.github.io/regcompR/reference/ranef_regcomp.html</loc></url>
+<url><loc>https://adamrsophie.github.io/regcompR/reference/re_nongauss.html</loc></url>
 <url><loc>https://adamrsophie.github.io/regcompR/reference/regcomp-conditions.html</loc></url>
 <url><loc>https://adamrsophie.github.io/regcompR/reference/regcomp.html</loc></url>
 <url><loc>https://adamrsophie.github.io/regcompR/reference/regcompR-package.html</loc></url>
@@ -83,6 +87,7 @@
 <url><loc>https://adamrsophie.github.io/regcompR/reference/residuals.regcomp_fit.html</loc></url>
 <url><loc>https://adamrsophie.github.io/regcompR/reference/score.html</loc></url>
 <url><loc>https://adamrsophie.github.io/regcompR/reference/scoring_rule.html</loc></url>
+<url><loc>https://adamrsophie.github.io/regcompR/reference/shrink_regcomp.html</loc></url>
 <url><loc>https://adamrsophie.github.io/regcompR/reference/simple_slopes.html</loc></url>
 <url><loc>https://adamrsophie.github.io/regcompR/reference/simulate.regcomp_fit.html</loc></url>
 <url><loc>https://adamrsophie.github.io/regcompR/reference/sine_skew.html</loc></url>

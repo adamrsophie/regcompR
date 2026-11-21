@@ -153,7 +153,7 @@ st[!grepl("period", rownames(st)), c("estimate", "std_error")]
 #>                                        estimate    std_error
 #> lambda:age                           0.01700007 9.222569e-03
 #> lambda:sex                          -0.51099724 1.676826e-01
-#> lambda:1 | inst:log_sd((Intercept)) -9.78357381 1.901896e+03
+#> lambda:1 | inst:log_sd((Intercept)) -9.78357380 1.901896e+03
 ```
 
 ## Discrete time and frailty

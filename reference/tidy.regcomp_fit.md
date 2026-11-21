@@ -87,11 +87,11 @@ if (requireNamespace("generics", quietly = TRUE)) {
   print(generics::glance(f))
 }
 #>          term component effect estimate std.error statistic      p.value
-#> 1 (Intercept)    lambda  fixed 1.712853 0.1359888  6.778428 1.214909e-11
-#> 2           x    lambda  fixed 1.466126 0.1162242  4.826659 1.388424e-06
+#> 1 (Intercept)    lambda  fixed 1.614615 0.1324938  5.838433 5.269420e-09
+#> 2           x    lambda  fixed 1.521487 0.1276337  5.002996 5.644616e-07
 #>   conf.low conf.high
-#> 1 1.466023  2.001243
-#> 2 1.255146  1.712571
+#> 1 1.374739  1.896347
+#> 2 1.290813  1.793385
 #>    family engine nobs df    logLik      AIC      BIC converged
-#> 1 Poisson     ml  100  2 -160.1507 324.3014 329.5118      TRUE
+#> 1 Poisson     ml  100  2 -158.1277 320.2554 325.4657      TRUE
 ```

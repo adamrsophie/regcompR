@@ -20,6 +20,9 @@ divide each score by `sqrt(1 - h_i)` and `1 - h_i`, with leverages `h_i`
 the diagonal of the weighted hat matrix (MacKinnon and White 1985). For
 a one parameter GLM (Poisson, binomial) they equal
 [`sandwich::vcovHC()`](https://zeileis.codeberg.page/sandwich/reference/vcovHC.html).
+`"HAC"` is the Newey-West covariance for serially correlated rows (in
+data order), with Bartlett weights `1 - l / (lag + 1)`; it equals
+`sandwich::NeweyWest(prewhite = FALSE, adjust = FALSE)`.
 
 ## Usage
 
@@ -27,8 +30,9 @@ a one parameter GLM (Poisson, binomial) they equal
 # S3 method for class 'regcomp_fit'
 vcov(
   object,
-  type = c("model", "sandwich", "quasi", "HC0", "HC1", "HC2", "HC3"),
+  type = c("model", "sandwich", "quasi", "HC0", "HC1", "HC2", "HC3", "HAC"),
   cluster = NULL,
+  lag = NULL,
   ...
 )
 ```
@@ -41,13 +45,18 @@ vcov(
 
 - type:
 
-  `"model"`, `"sandwich"` (`"HC0"`), `"HC1"`, `"HC2"`, `"HC3"` or
-  `"quasi"`.
+  `"model"`, `"sandwich"` (`"HC0"`), `"HC1"`, `"HC2"`, `"HC3"`, `"HAC"`
+  or `"quasi"`.
 
 - cluster:
 
   Optional cluster identifier: a vector, or a one sided formula
   evaluated in the model data.
+
+- lag:
+
+  Maximum lag of the HAC covariance (default
+  `floor(4 (n / 100)^(2 / 9))`).
 
 - ...:
 

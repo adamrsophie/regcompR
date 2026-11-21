@@ -3,6 +3,25 @@
 ## regcompR 0.1.0
 
 - First release.
+- [`pql_regcomp()`](https://adamrsophie.github.io/regcompR/reference/pql_regcomp.md)
+  (penalized quasi-likelihood, equal to MASS::glmmPQL),
+  [`re_nongauss()`](https://adamrsophie.github.io/regcompR/reference/re_nongauss.md)
+  (gamma, t, logistic and Laplace random intercepts by adaptive
+  quadrature), `spde()` Matern fields on fmesher meshes, and
+  [`bridge_regcomp()`](https://adamrsophie.github.io/regcompR/reference/bridge_regcomp.md)
+  /
+  [`bayes_factor_regcomp()`](https://adamrsophie.github.io/regcompR/reference/bridge_regcomp.md)
+  (marginal likelihoods of Stan fits by bridge sampling, with all
+  normalizing constants). Offsets are allowed in log scale parameters
+  (variance weights).
+- `panel_within(y ~ x | z)` gives the within instrumental variable
+  estimator (equal to plm); `vcov(type = "HAC")` (Newey-West, equal to
+  sandwich); `anova(boundary = TRUE)` for variance components on their
+  boundary;
+  [`shrink_regcomp()`](https://adamrsophie.github.io/regcompR/reference/shrink_regcomp.md)
+  (predictive shrinkage, any family including beta regression);
+  [`mediate_regcomp()`](https://adamrsophie.github.io/regcompR/reference/mediate_regcomp.md)
+  (causal mediation, as mediation).
 - [`summary_param()`](https://adamrsophie.github.io/regcompR/reference/summary_param.md)
   reparameterizes a family by its mean, mode, geometric or harmonic
   mean;

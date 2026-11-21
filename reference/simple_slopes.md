@@ -51,8 +51,8 @@ A data frame with one row per moderator value.
 d <- data.frame(x = rnorm(300), z = rnorm(300))
 d$y <- rpois(300, exp(0.5 + 0.3 * d$x + 0.2 * d$x * d$z))
 simple_slopes(regcomp(y ~ x * z, family = "poisson", data = d), "x", "z")
-#>             z     slope  std_error statistic      p_value
-#> 1 -1.13100134 0.2142504 0.06307503  3.396754 6.819015e-04
-#> 2 -0.08128138 0.3122955 0.04111748  7.595201 3.073155e-14
-#> 3  0.96843858 0.4103406 0.05216571  7.866099 3.658718e-15
+#>              z     slope  std_error statistic      p_value
+#> 1 -1.051637268 0.1214377 0.06495702  1.869508 6.155218e-02
+#> 2 -0.004822594 0.2677710 0.04088384  6.549556 5.770844e-11
+#> 3  1.041992080 0.4141044 0.05313794  7.793008 6.543245e-15
 ```

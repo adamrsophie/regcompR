@@ -1,4 +1,4 @@
-# regcompR: Distributional Regression with a Verified Registry of Probability Distributions
+# regcompR: Distributional Regression with a Registry of Distributions
 
 A framework for distributional regression in which every parameter of a
 response distribution can depend on covariates through its own formula
@@ -18,9 +18,9 @@ maximum or penalized likelihood with a Laplace approximation for random
 effects and smooth terms, optionally through 'TMB' (Kristensen et al.
 2016 [doi:10.18637/jss.v070.i05](https://doi.org/10.18637/jss.v070.i05)
 ), or by Bayesian inference through generated 'Stan' programs run by
-'bayescompR', 'cmdstanr' or 'rstan'. Predictions, quantiles, event
-probabilities, randomized quantile residuals, proper scoring rules,
-cross validation, and plots for every distribution and fit are included.
+'cmdstanr' or 'rstan'. Predictions, quantiles, event probabilities,
+randomized quantile residuals, proper scoring rules, cross validation,
+and plots for every distribution and fit are included.
 
 ## See also
 

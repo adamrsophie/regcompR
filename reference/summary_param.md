@@ -47,6 +47,6 @@ gm <- summary_param("gamma", type = "mode")
 d <- data.frame(x = runif(200)); d$y <- rgamma(200, shape = 3, scale = exp(1 + d$x) / 2)
 coef(regcomp(y ~ x, family = gm, data = d))
 #>     q:(Intercept)               q:x sigma:(Intercept) 
-#>         1.0546571         1.0990234        -0.6016625 
+#>         0.9738637         1.1334388        -0.6153099 
 # }
 ```
