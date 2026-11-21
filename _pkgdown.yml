@@ -61,6 +61,7 @@ reference:
   - link
   - links
   - quantile_param
+  - summary_param
 - title: Operators
   contents:
   - inflate
@@ -104,6 +105,9 @@ reference:
   - vuong_test
   - boot_regcomp
   - power_sim
+  - skovgaard_test
+  - uplift
+  - qini
 - title: Econometrics
   contents:
   - iv_regcomp

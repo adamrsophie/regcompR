@@ -396,16 +396,7 @@ quantile_param <- function(base, par = names(get_family(base)$pars)[1], tau = 0.
   if (base$discrete) stop_unsupported("Quantile parameterization of a discrete law", base$id)
   ps <- base$pars[[par]]; lk <- link(ps$link)
   others <- setdiff(names(base$pars), par)
-  solve_par <- function(p) {
-    n <- max(lengths(p))
-    vapply(seq_len(n), function(i) {
-      pi_ <- lapply(p, function(v) v[(i - 1) %% length(v) + 1])
-      f <- function(e) { q <- pi_[others]; q[[par]] <- lk$linkinv(e); family_quantile(base, tau, q[names(base$pars)]) - pi_$q }
-      lo <- -2; hi <- 2; s0 <- sign(f(0))
-      for (j in 1:60) { if (sign(f(lo)) != sign(f(hi))) break; lo <- lo * 1.6; hi <- hi * 1.6 }
-      lk$linkinv(stats::uniroot(f, c(lo, hi), tol = 1e-12)$root) }, 0)
-  }
-  full <- function(p) { q <- p[others]; q[[par]] <- solve_par(p); q[names(base$pars)] }
+  full <- solve_for_par(base, par, function(q) family_quantile(base, tau, q))
   qpar <- P("q", if (base$category == "bounded") "unit" else if (base$category == "positive") "positive" else "real",
             role = "quantile", offset_allowed = TRUE)
   pars <- c(list(q = qpar), base$pars[others])
@@ -416,4 +407,114 @@ quantile_param <- function(base, par = names(get_family(base)$pars)[1], tau = 0.
             quantile = function(pr, p) family_quantile(base, pr, full(p)),
             operator = list(type = "quantile_param", base = base, par = par, tau = tau),
             formula = sprintf("%s chosen so that Q(%s) = q", par, tau))
+}
+
+# For each row, the value of `par` (found on its link scale) that makes the
+# functional `fun` of the law equal the new first parameter `q`; returns the
+# function mapping the new parameters to the base parameters.
+solve_for_par <- function(base, par, fun) {
+  lk <- link(base$pars[[par]]$link); others <- setdiff(names(base$pars), par)
+  solve_par <- function(p) {
+    n <- max(lengths(p))
+    vapply(seq_len(n), function(i) {
+      pi_ <- lapply(p, function(v) v[(i - 1) %% length(v) + 1])
+      f <- function(e) { q <- pi_[others]; q[[par]] <- lk$linkinv(e); fun(q[names(base$pars)]) - pi_$q }
+      lo <- -2; hi <- 2
+      for (j in 1:60) { if (sign(f(lo)) != sign(f(hi))) break; lo <- lo * 1.6; hi <- hi * 1.6 }
+      lk$linkinv(stats::uniroot(f, c(lo, hi), tol = 1e-12)$root) }, 0)
+  }
+  function(p) { q <- p[others]; q[[par]] <- solve_par(p); q[names(base$pars)] }
+}
+
+# Vectorized root finding (Illinois regula falsi) of f on brackets [lo, hi]
+# with f(lo) and f(hi) of opposite signs.
+vroot <- function(f, lo, hi, tol = 1e-12, maxit = 200) {
+  flo <- f(lo); fhi <- f(hi); x <- lo; side <- integer(length(lo))
+  for (it in seq_len(maxit)) {
+    x <- (lo * fhi - hi * flo) / (fhi - flo)
+    bad <- !is.finite(x); x[bad] <- ((lo + hi) / 2)[bad]
+    fx <- f(x)
+    if (all(abs(hi - lo) < tol * (1 + abs(x)) | fx == 0)) break
+    up <- sign(fx) == sign(flo)
+    lo[up] <- x[up]; flo[up] <- fx[up]; fhi[up & side == 1] <- fhi[up & side == 1] / 2
+    hi[!up] <- x[!up]; fhi[!up] <- fx[!up]; flo[!up & side == -1] <- flo[!up & side == -1] / 2
+    side <- ifelse(up, 1L, -1L)
+  }
+  x
+}
+
+#' Mean, mode, geometric and harmonic mean parameterizations
+#'
+#' Replace a parameter of a continuous family by a summary of the law, so
+#' that the regression is on that summary: the mean, the mode, the
+#' geometric mean `exp(E log Y)` or the harmonic mean `1 / E(1 / Y)`. For
+#' given values of the other parameters the original parameter is found by
+#' root finding, as in [quantile_param()] (which covers the median and
+#' other quantiles). Expectations use 40 point Gauss-Hermite quadrature
+#' over `Y = Q(Phi(z))`, exact for log normal laws; the mode is the root of
+#' the derivative of the log density (or the lower end of the support).
+#'
+#' @param base Base family.
+#' @param par Parameter to replace (default: the first one).
+#' @param type `"mean"`, `"mode"`, `"geometric_mean"` or `"harmonic_mean"`.
+#' @return A `regcomp_family` whose first parameter `q` is the summary.
+#' @export
+#' @examples
+#' gm <- summary_param("gamma", type = "mode")
+#' d <- data.frame(x = runif(200)); d$y <- rgamma(200, shape = 3, scale = exp(1 + d$x) / 2)
+#' coef(regcomp(y ~ x, family = gm, data = d))
+summary_param <- function(base, par = names(get_family(base)$pars)[1],
+                          type = c("mean", "mode", "geometric_mean", "harmonic_mean")) {
+  type <- match.arg(type); base <- get_family(base)
+  if (base$discrete) stop_unsupported("Summary parameterization of a discrete law", base$id)
+  if (!par %in% names(base$pars)) stop_input(sprintf("'%s' is not a parameter of %s.", par, base$id))
+  if (type %in% c("geometric_mean", "harmonic_mean") && !base$category %in% c("positive", "bounded"))
+    stop_unsupported(sprintf("The %s of a law on the real line", sub("_", " ", type)), base$id)
+  bn <- names(base$pars); others <- setdiff(bn, par); lk <- link(base$pars[[par]]$link)
+  # Nodes whose probability rounds to 0 or 1 carry weights below 1e-25.
+  u <- stats::pnorm(sqrt(2) * gh40$x); keep <- u > 1e-15 & u < 1 - 1e-15
+  w <- gh40$w[keep] / sqrt(pi); u <- u[keep]; m <- length(u)
+  quad <- function(q, g) {
+    n <- max(lengths(q)); Q <- family_quantile(base, rep(u, each = n), lapply(q, function(v) rep(rep_len(v, n), m)), grid = FALSE)
+    drop(g(matrix(Q, n)) %*% w)
+  }
+  # Each summary is vectorized over rows of parameters.
+  fun <- switch(type,
+    mean = function(q) family_moment(base, "mean", q, quiet = TRUE),
+    geometric_mean = function(q) exp(quad(q, log)),
+    harmonic_mean = function(q) 1 / quad(q, function(x) 1 / x),
+    mode = function(q) {
+      g <- function(y) { h <- 1e-5 * pmax(abs(y), 1e-3); (eval_lpdf(base, y + h, q) - eval_lpdf(base, y - h, q)) / (2 * h) }
+      a <- family_quantile(base, 1e-6, q, grid = FALSE); b <- family_quantile(base, 1 - 1e-6, q, grid = FALSE)
+      ga <- g(a); out <- rep_len(base$support(q)$lower, length(a))
+      ok <- is.finite(ga) & ga > 0
+      if (any(ok)) { qq <- lapply(q, function(v) rep_len(v, length(a))[ok])
+        gk <- function(y) { h <- 1e-5 * pmax(abs(y), 1e-3); (eval_lpdf(base, y + h, qq) - eval_lpdf(base, y - h, qq)) / (2 * h) }
+        out[ok] <- vroot(gk, a[ok], b[ok]) }
+      out
+    })
+  full <- function(p) {
+    n <- max(lengths(p)); p <- lapply(p, rep_len, n)
+    f <- function(e) { q <- p[others]; q[[par]] <- lk$linkinv(e); fun(q[bn]) - p$q }
+    lo <- rep(-2, n); hi <- rep(2, n)
+    for (j in 1:40) { s <- sign(f(lo)) != sign(f(hi)); if (all(s, na.rm = TRUE)) break
+      lo[!s] <- lo[!s] * 1.6; hi[!s] <- hi[!s] * 1.6 }
+    q <- p[others]; q[[par]] <- lk$linkinv(vroot(f, lo, hi)); q[bn]
+  }
+  qpar <- P("q", if (base$category == "bounded") "unit" else if (base$category == "positive") "positive" else "real",
+            role = sub("_", " ", type), offset_allowed = TRUE)
+  f <- op_family(base, sprintf("summary_param(%s, %s, %s)", base$id, par, type),
+            sprintf("%s (%s parameterization)", base$display_name, sub("_", " ", type)),
+            c(list(q = qpar), base$pars[others]),
+            function(y, p) eval_lpdf(base, y, full(p)),
+            cdf = if (!is.null(base$cdf)) function(q, p) family_cdf(base, q, full(p)),
+            quantile = function(pr, p) family_quantile(base, pr, full(p)),
+            operator = list(type = "summary_param", base = base, par = par, summary = type),
+            formula = sprintf("%s chosen so that the %s is q", par, sub("_", " ", type)))
+  # Start at the base family's start, expressed through the summary.
+  if (!is.null(base$start)) f$start <- function(y) {
+    p <- base$start(y); q <- tryCatch(fun(p[bn]), error = function(e) NA_real_)
+    c(list(q = if (length(q) == 1 && is.finite(q)) q else stats::median(y)), p[others])
+  }
+  f
 }

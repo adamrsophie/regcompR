@@ -227,3 +227,63 @@ info_criterion <- function(f, criterion) {
   switch(criterion, AIC = -2 * ll + 2 * k, BIC = -2 * ll + log(n) * k,
          AICc = -2 * ll + 2 * k + 2 * k * (k + 1) / max(n - k - 1, 1e-8), HQ = -2 * ll + 2 * k * log(log(n)))
 }
+
+#' Skovgaard's modified directed likelihood ratio
+#'
+#' Higher order inference on one coefficient: the signed root of the
+#' likelihood ratio statistic `r` and Skovgaard's (1996) modification
+#' `r* = r + log(u / r) / r + log(C) / r`, whose normal approximation has
+#' relative error of third order. The sample space derivatives are
+#' approximated by covariances of the score and of the log likelihood
+#' ratio over `R` responses simulated from the fit (Skovgaard 2001), as in
+#' `likelihoodAsy::rstar()`. For models without random effects.
+#'
+#' @param object A fitted model (frequentist, no random effects).
+#' @param term Coefficient name as in `coef(object)`.
+#' @param value Value of the coefficient under the null hypothesis.
+#' @param R Number of simulated samples.
+#' @param seed Random seed.
+#' @return A data frame with the Wald statistic, `r` and `r*` and their two
+#'   sided normal p values.
+#' @references Skovgaard (1996), An explicit large-deviation approximation
+#'   to one-parameter tests. Bernoulli, 2, 145-165. Skovgaard (2001),
+#'   Likelihood asymptotics. Scand. J. Statist., 28, 3-32.
+#' @export
+#' @examples
+#' d <- data.frame(x = rnorm(15)); d$y <- rpois(15, exp(0.5 + 0.4 * d$x))
+#' f <- regcomp(y ~ x, family = "poisson", data = d)
+#' skovgaard_test(f, "lambda:x", R = 500)
+skovgaard_test <- function(object, term, value = 0, R = 1000, seed = 1) {
+  if (object$inference != "frequentist") stop_unsupported("Skovgaard's statistic for a Bayesian fit")
+  spec <- object$spec
+  if (spec$Q > 0 || length(spec$aux)) stop_unsupported("Skovgaard's statistic for models with random effects, smooths or thresholds")
+  k <- match(term, names(object$coefficients))
+  if (is.na(k)) stop_input(sprintf("Unknown coefficient '%s'.", term))
+  bh <- unname(object$coefficients); p <- length(bh); bs <- coef_scale(spec, object$coefficients)
+  info <- function(sp, b) { H <- num_jacobian(function(x) ml_gradient(sp, x), b, bs); -(H + t(H)) / 2 }
+  # Constrained fit with the coefficient held at value.
+  b0 <- bh; b0[k] <- value
+  full <- function(z) { b <- b0; b[-k] <- z; b }
+  o <- stats::nlminb(bh[-k], function(z) -ml_objective(spec, full(z)), function(z) -ml_gradient(spec, full(z))[-k],
+                     scale = 1 / bs[-k], control = list(eval.max = 1000, iter.max = 1000, rel.tol = 1e-12))
+  bt <- full(o$par)
+  r <- sign(bh[k] - value) * sqrt(max(2 * (ml_objective(spec, bh) - ml_objective(spec, bt)), 0))
+  jh <- info(spec, bh); jt <- info(spec, bt)
+  local_seed(seed)
+  sims <- simulate(object, nsim = R)
+  U <- t(vapply(seq_len(R), function(s) {
+    sp <- spec; sp$y <- if (is.matrix(spec$y)) matrix(sims[, s], nrow(spec$y)) else sims[, s]
+    c(ml_gradient(sp, bh), ml_gradient(sp, bt), ml_objective(sp, bh) - ml_objective(sp, bt))
+  }, numeric(2 * p + 1)))
+  C <- stats::cov(U)
+  S <- C[1:p, p + 1:p, drop = FALSE]; ih <- C[1:p, 1:p, drop = FALSE]; q <- C[2 * p + 1, 1:p]
+  iinv <- qr.solve(ih, tol = 1e-20)
+  SS2 <- t(S) %*% iinv %*% jh; SS1 <- drop(q %*% iinv %*% jh)
+  num <- SS1[k] - if (p > 1) drop(SS2[-k, k] %*% solve(t(SS2[-k, -k, drop = FALSE]), SS1[-k])) else 0
+  u <- num * sqrt(solve(jh)[k, k])
+  Cp <- if (p > 1) det(SS2[-k, -k, drop = FALSE]) / sqrt(det(jt[-k, -k, drop = FALSE]) * det(jh[-k, -k, drop = FALSE])) else 1
+  rs <- r + log(Cp) / r + log(u / r) / r
+  w <- (bh[k] - value) * sqrt(1 / solve(jh)[k, k])
+  st <- c(Wald = w, r = r, `r*` = rs)
+  data.frame(statistic = st, p_value = 2 * stats::pnorm(-abs(st)), row.names = names(st))
+}

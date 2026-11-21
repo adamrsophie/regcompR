@@ -1,6 +1,10 @@
 # regcompR 0.1.0
 
 * First release.
+* `summary_param()` reparameterizes a family by its mean, mode, geometric
+  or harmonic mean; `uplift()` and `qini()` (equal to tools4uplift) for
+  uplift models; `skovgaard_test()` gives Skovgaard's modified directed
+  likelihood ratio r* (equal to likelihoodAsy::rstar()).
 * Inference: `vcov(type = "HC1")` to `"HC3"` (equal to sandwich::vcovHC),
   `boot_regcomp()` (parametric and case bootstrap, clustered),
   `power_sim()` (power by simulation), `vuong_test()` and `best_subset()`;

@@ -240,3 +240,19 @@ power_sim(fp, "lambda:x1", nsim = 50, coefficients = c("lambda:x1" = 0.2))
 vuong_test(fp, regcomp(y ~ x1 + x2, family = "negative_binomial_nb2", data = pw))
 best_subset(fp, criterion = "AICc")
 ```
+
+## Uplift models and higher order inference
+
+`uplift()` gives individual treatment effects of a model with treatment
+by covariate interactions and `qini()` evaluates them (the Qini curve and
+coefficient, as tools4uplift). `skovgaard_test()` refines the likelihood
+ratio test of one coefficient for small samples.
+
+```{r}
+up <- data.frame(t = rbinom(400, 1, 0.5), x = rnorm(400))
+up$y <- rbinom(400, 1, plogis(-0.5 + 0.3 * up$x + up$t * (0.2 + 0.8 * up$x)))
+fu <- regcomp(y ~ t * x, family = "bernoulli", data = up)
+attr(qini(uplift(fu, "t"), up$t, up$y), "qini")
+sm <- data.frame(x = rnorm(15)); sm$y <- rpois(15, exp(0.5 + 0.4 * sm$x))
+skovgaard_test(regcomp(y ~ x, family = "poisson", data = sm), "lambda:x", R = 500)
+```
