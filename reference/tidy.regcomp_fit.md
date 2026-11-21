@@ -86,12 +86,12 @@ if (requireNamespace("generics", quietly = TRUE)) {
   print(generics::tidy(f, exponentiate = TRUE))
   print(generics::glance(f))
 }
-#>          term component effect estimate  std.error statistic      p.value
-#> 1 (Intercept)    lambda  fixed  1.65410 0.13076513  6.365893 1.941562e-10
-#> 2           x    lambda  fixed  1.30113 0.08775243  3.903032 9.499524e-05
+#>          term component effect estimate std.error statistic      p.value
+#> 1 (Intercept)    lambda  fixed 1.712853 0.1359888  6.778428 1.214909e-11
+#> 2           x    lambda  fixed 1.466126 0.1162242  4.826659 1.388424e-06
 #>   conf.low conf.high
-#> 1 1.416674  1.931317
-#> 2 1.140021  1.485007
-#>    family engine nobs df    logLik      AIC     BIC converged
-#> 1 Poisson     ml  100  2 -162.1773 328.3546 333.565      TRUE
+#> 1 1.466023  2.001243
+#> 2 1.255146  1.712571
+#>    family engine nobs df    logLik      AIC      BIC converged
+#> 1 Poisson     ml  100  2 -160.1507 324.3014 329.5118      TRUE
 ```

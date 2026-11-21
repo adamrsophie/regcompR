@@ -19,7 +19,7 @@ links, moments and references.
 ``` r
 
 length(families())
-#> [1] 279
+#> [1] 282
 head(families("count"), 10)
 #>  [1] "bell"                        "beta_negative_binomial"     
 #>  [3] "borel"                       "borel_tanner"               

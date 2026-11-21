@@ -144,10 +144,28 @@ A bar term may be wrapped in a covariance structure:
   correlation in the coordinates on the left of the bar, for spatial
   effects. One random effect is created per distinct coordinate.
 
+- `relmat(id | 1, K)`: effects over the levels of `id` with a known
+  relatedness (kinship, genomic or phylogenetic) matrix `K` whose rows
+  are the levels (by row name, else in level order).
+
+- `car(region | 1, W)`, `leroux(region | 1, W)` and
+  `icar(region | 1, W)`: areal effects from a symmetric adjacency matrix
+  `W`: the proper CAR model (precision `D - rho W`), the Leroux model
+  (precision `(1 - rho) I + rho (D - W)`) and the intrinsic CAR (sum to
+  zero, scaled to unit geometric mean variance). `icar()` plus
+  `(1 | region)` is the BYM model.
+
+- `spacetime(region + time | 1, W)`: a separable space time effect, the
+  Kronecker product of a Leroux spatial and an AR(1) temporal
+  correlation (time a factor of equally spaced periods).
+
+A group other than `1` on the right of the bar gives independent
+replicates of the field (one per year, say).
+
 Structured random effects are available in every parameter and for every
 family, so a latent autoregressive process can enter a count, survival
-or ordinal model. The Bayesian engine supports `us` and `diag`
-structures.
+or ordinal model. The TMB engine does not support `car()`, `leroux()`
+and `spacetime()`; Stan does not support `spacetime()`.
 
 ## Engines
 

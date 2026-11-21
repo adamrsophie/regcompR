@@ -28,13 +28,13 @@ tab <- registry_table()
 table(tab$category)
 #> 
 #>                bounded            categorical               circular 
-#>                     35                      3                     10 
+#>                     35                      4                     10 
 #>                  count            directional        finite_discrete 
 #>                     51                      4                     16 
 #>                  mixed           multivariate                ordinal 
 #>                      2                     22                     10 
 #>               positive quantile_parameterized                   real 
-#>                     65                      5                     56 
+#>                     65                      5                     58 
 head(tab[, c("id", "status", "cdf", "quantile", "stan")])
 #>                        id    status         cdf    quantile        stan
 #> 1 adjacent_category_logit validated unavailable unavailable   generated

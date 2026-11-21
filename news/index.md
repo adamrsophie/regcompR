@@ -3,6 +3,47 @@
 ## regcompR 0.1.0
 
 - First release.
+- [`summary_param()`](https://adamrsophie.github.io/regcompR/reference/summary_param.md)
+  reparameterizes a family by its mean, mode, geometric or harmonic
+  mean;
+  [`uplift()`](https://adamrsophie.github.io/regcompR/reference/uplift.md)
+  and
+  [`qini()`](https://adamrsophie.github.io/regcompR/reference/qini.md)
+  (equal to tools4uplift) for uplift models;
+  [`skovgaard_test()`](https://adamrsophie.github.io/regcompR/reference/skovgaard_test.md)
+  gives Skovgaard’s modified directed likelihood ratio r\* (equal to
+  likelihoodAsy::rstar()).
+- Inference: `vcov(type = "HC1")` to `"HC3"` (equal to
+  sandwich::vcovHC),
+  [`boot_regcomp()`](https://adamrsophie.github.io/regcompR/reference/boot_regcomp.md)
+  (parametric and case bootstrap, clustered),
+  [`power_sim()`](https://adamrsophie.github.io/regcompR/reference/power_sim.md)
+  (power by simulation),
+  [`vuong_test()`](https://adamrsophie.github.io/regcompR/reference/vuong_test.md)
+  and
+  [`best_subset()`](https://adamrsophie.github.io/regcompR/reference/best_subset.md);
+  [`step_regcomp()`](https://adamrsophie.github.io/regcompR/reference/step_regcomp.md)
+  and
+  [`best_subset()`](https://adamrsophie.github.io/regcompR/reference/best_subset.md)
+  also use AICc and Hannan-Quinn.
+- Random effect structures `relmat()` (known relatedness matrix),
+  `car()`, `leroux()` and `icar()` (areal models; `icar()` plus an iid
+  term is BYM) and `spacetime()` (separable Leroux by AR(1)); exact
+  normal marginal likelihoods checked against direct computation.
+- Econometrics:
+  [`iv_regcomp()`](https://adamrsophie.github.io/regcompR/reference/iv_regcomp.md)
+  (two stage least squares with weak instrument, Wu-Hausman and Sargan
+  tests; equal to ivreg),
+  [`panel_within()`](https://adamrsophie.github.io/regcompR/reference/panel_within.md)
+  (fixed effects within estimator; equal to plm) and
+  [`hausman_test()`](https://adamrsophie.github.io/regcompR/reference/hausman_test.md)
+  (equal to plm::phtest).
+- Families: `huber` (its ML estimate with fixed scale is the Huber M
+  estimate of MASS::rlm), `stochastic_frontier` (normal minus half
+  normal), `multinomial_probit` (independent errors) and
+  [`partial_odds()`](https://adamrsophie.github.io/regcompR/reference/partial_odds.md)
+  (partial proportional odds; equal to ordinal::clm with nominal
+  effects).
 - Nonlinear formulas: `y ~ nl(expr)` with a formula for each nonlinear
   parameter (covariates and random effects allowed) for any family,
   fitted by `engine = "ml"` (equal to

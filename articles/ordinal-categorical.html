@@ -206,6 +206,44 @@ rows is ignored); the main formula is the outcome equation and
 <span><span class="co">#&gt; rho:(Intercept) </span></span>
 <span><span class="co">#&gt;       0.3267187</span></span></code></pre></div>
 </div>
+<div class="section level2">
+<h2 id="partial-proportional-odds-and-multinomial-probit">Partial proportional odds and multinomial probit<a class="anchor" aria-label="anchor" href="#partial-proportional-odds-and-multinomial-probit"></a>
+</h2>
+<p><code>partial_odds(~ z)</code> relaxes proportional odds for the
+covariates <code>z</code>: their effects shift each threshold separately
+(parameters <code>d1</code>, <code>d2</code>, …), as the nominal effects
+of <code><a href="https://rdrr.io/pkg/ordinal/man/clm.html" class="external-link">ordinal::clm()</a></code>.</p>
+<div class="sourceCode" id="cb10"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">po</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span>x <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/stats/Normal.html" class="external-link">rnorm</a></span><span class="op">(</span><span class="fl">400</span><span class="op">)</span>, z <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/stats/Normal.html" class="external-link">rnorm</a></span><span class="op">(</span><span class="fl">400</span><span class="op">)</span><span class="op">)</span>; <span class="va">u</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/stats/Uniform.html" class="external-link">runif</a></span><span class="op">(</span><span class="fl">400</span><span class="op">)</span></span>
+<span><span class="va">po</span><span class="op">$</span><span class="va">y</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/factor.html" class="external-link">factor</a></span><span class="op">(</span><span class="fl">1</span> <span class="op">+</span> <span class="op">(</span><span class="va">u</span> <span class="op">&gt;</span> <span class="fu"><a href="https://rdrr.io/r/stats/Logistic.html" class="external-link">plogis</a></span><span class="op">(</span><span class="op">-</span><span class="fl">1</span> <span class="op">-</span> <span class="fl">0.8</span> <span class="op">*</span> <span class="va">po</span><span class="op">$</span><span class="va">x</span><span class="op">)</span><span class="op">)</span> <span class="op">+</span> <span class="op">(</span><span class="va">u</span> <span class="op">&gt;</span> <span class="fu"><a href="https://rdrr.io/r/stats/Logistic.html" class="external-link">plogis</a></span><span class="op">(</span><span class="fl">1</span> <span class="op">+</span> <span class="fl">0.5</span> <span class="op">*</span> <span class="va">po</span><span class="op">$</span><span class="va">z</span> <span class="op">-</span> <span class="fl">0.8</span> <span class="op">*</span> <span class="va">po</span><span class="op">$</span><span class="va">x</span><span class="op">)</span><span class="op">)</span><span class="op">)</span></span>
+<span><span class="va">fpo</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/regcomp.html">regcomp</a></span><span class="op">(</span><span class="va">y</span> <span class="op">~</span> <span class="va">x</span>, family <span class="op">=</span> <span class="fu"><a href="../reference/partial_odds.html">partial_odds</a></span><span class="op">(</span><span class="op">~</span> <span class="va">z</span><span class="op">)</span>, data <span class="op">=</span> <span class="va">po</span><span class="op">)</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/stats/coef.html" class="external-link">coef</a></span><span class="op">(</span><span class="va">fpo</span><span class="op">)</span></span>
+<span><span class="co">#&gt;       mu:x       d1:z       d2:z   cuts:1|2   cuts:2|3 </span></span>
+<span><span class="co">#&gt;  0.8858083 -0.2667663  0.2123071 -1.0016558  0.9846142</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/stats/anova.html" class="external-link">anova</a></span><span class="op">(</span><span class="fu"><a href="../reference/regcomp.html">regcomp</a></span><span class="op">(</span><span class="va">y</span> <span class="op">~</span> <span class="va">x</span> <span class="op">+</span> <span class="va">z</span>, family <span class="op">=</span> <span class="st">"cumulative_logit"</span>, data <span class="op">=</span> <span class="va">po</span><span class="op">)</span>, <span class="va">fpo</span><span class="op">)</span></span>
+<span><span class="co">#&gt; Likelihood ratio tests</span></span>
+<span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt;                                                            df  logLik    AIC</span></span>
+<span><span class="co">#&gt; regcomp(y ~ x + z, family = "cumulative_logit", data = po)  4 -391.99 791.99</span></span>
+<span><span class="co">#&gt; fpo                                                         5 -385.07 780.15</span></span>
+<span><span class="co">#&gt;                                                             Chisq Chi Df</span></span>
+<span><span class="co">#&gt; regcomp(y ~ x + z, family = "cumulative_logit", data = po)              </span></span>
+<span><span class="co">#&gt; fpo                                                        13.842      1</span></span>
+<span><span class="co">#&gt;                                                            Pr(&gt;Chisq)    </span></span>
+<span><span class="co">#&gt; regcomp(y ~ x + z, family = "cumulative_logit", data = po)               </span></span>
+<span><span class="co">#&gt; fpo                                                         0.0001989 ***</span></span>
+<span><span class="co">#&gt; ---</span></span>
+<span><span class="co">#&gt; Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1</span></span></code></pre></div>
+<p><code>multinomial_probit</code> is the nominal model with independent
+normal utility errors; like the multinomial logit, it gives each
+category but the first its own predictor.</p>
+<div class="sourceCode" id="cb11"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">xm</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/stats/Normal.html" class="external-link">rnorm</a></span><span class="op">(</span><span class="fl">300</span><span class="op">)</span></span>
+<span><span class="va">ym</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/maxCol.html" class="external-link">max.col</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/cbind.html" class="external-link">cbind</a></span><span class="op">(</span><span class="fl">0</span>, <span class="fl">0.5</span> <span class="op">+</span> <span class="va">xm</span>, <span class="op">-</span><span class="fl">0.3</span> <span class="op">-</span> <span class="va">xm</span><span class="op">)</span> <span class="op">+</span> <span class="fu"><a href="https://rdrr.io/r/base/matrix.html" class="external-link">matrix</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/stats/Normal.html" class="external-link">rnorm</a></span><span class="op">(</span><span class="fl">900</span><span class="op">)</span>, <span class="fl">300</span><span class="op">)</span><span class="op">)</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/stats/coef.html" class="external-link">coef</a></span><span class="op">(</span><span class="fu"><a href="../reference/regcomp.html">regcomp</a></span><span class="op">(</span><span class="va">ym</span> <span class="op">~</span> <span class="va">xm</span>, family <span class="op">=</span> <span class="st">"multinomial_probit"</span>, data <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span><span class="va">xm</span>, <span class="va">ym</span><span class="op">)</span><span class="op">)</span><span class="op">)</span></span>
+<span><span class="co">#&gt; eta2:(Intercept)          eta2:xm eta3:(Intercept)          eta3:xm </span></span>
+<span><span class="co">#&gt;        0.6907868        1.2721510       -0.3542442       -0.9623227</span></span></code></pre></div>
+</div>
   </main><aside class="col-md-3"><nav id="toc" aria-label="Table of contents"><h2>On this page</h2>
     </nav></aside>
 </div>

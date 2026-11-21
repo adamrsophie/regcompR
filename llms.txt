@@ -264,6 +264,8 @@ GPL-3. See
   : Validate parameters and responses
 - [`ordinal-families`](https://adamrsophie.github.io/regcompR/reference/ordinal-families.md)
   : Cumulative link ordinal families
+- [`partial_odds()`](https://adamrsophie.github.io/regcompR/reference/partial_odds.md)
+  : Partial proportional odds family
 
 ## Building families
 
@@ -276,6 +278,8 @@ GPL-3. See
   : Link functions
 - [`quantile_param()`](https://adamrsophie.github.io/regcompR/reference/quantile_param.md)
   : Quantile parameterized families
+- [`summary_param()`](https://adamrsophie.github.io/regcompR/reference/summary_param.md)
+  : Mean, mode, geometric and harmonic mean parameterizations
 
 ## Operators
 
@@ -373,6 +377,29 @@ GPL-3. See
   Variance inflation factors
 - [`step_regcomp()`](https://adamrsophie.github.io/regcompR/reference/step_regcomp.md)
   : Stepwise selection of terms
+- [`best_subset()`](https://adamrsophie.github.io/regcompR/reference/best_subset.md)
+  : Best subset selection
+- [`vuong_test()`](https://adamrsophie.github.io/regcompR/reference/vuong_test.md)
+  : Vuong test of non nested models
+- [`boot_regcomp()`](https://adamrsophie.github.io/regcompR/reference/boot_regcomp.md)
+  : Bootstrap a fitted model
+- [`power_sim()`](https://adamrsophie.github.io/regcompR/reference/power_sim.md)
+  : Power by simulation
+- [`skovgaard_test()`](https://adamrsophie.github.io/regcompR/reference/skovgaard_test.md)
+  : Skovgaard's modified directed likelihood ratio
+- [`uplift()`](https://adamrsophie.github.io/regcompR/reference/uplift.md)
+  : Individual uplift predictions
+- [`qini()`](https://adamrsophie.github.io/regcompR/reference/qini.md) :
+  Qini curve and coefficient
+
+## Econometrics
+
+- [`iv_regcomp()`](https://adamrsophie.github.io/regcompR/reference/iv_regcomp.md)
+  : Instrumental variable regression
+- [`panel_within()`](https://adamrsophie.github.io/regcompR/reference/panel_within.md)
+  : Fixed effects (within) estimator for panel data
+- [`hausman_test()`](https://adamrsophie.github.io/regcompR/reference/hausman_test.md)
+  : Hausman test
 
 ## Results and prediction
 

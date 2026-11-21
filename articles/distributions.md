@@ -23,13 +23,13 @@ reg <- registry_table()
 table(reg$category)
 #> 
 #>                bounded            categorical               circular 
-#>                     35                      3                     10 
+#>                     35                      4                     10 
 #>                  count            directional        finite_discrete 
 #>                     51                      4                     16 
 #>                  mixed           multivariate                ordinal 
 #>                      2                     22                     10 
 #>               positive quantile_parameterized                   real 
-#>                     65                      5                     56
+#>                     65                      5                     58
 head(reg[, c("id", "category", "parameters", "status", "cdf", "stan")])
 #>                        id category      parameters    status         cdf
 #> 1 adjacent_category_logit  ordinal mu, cuts, scale validated unavailable
@@ -354,6 +354,28 @@ log_sum_exp(c(1000, 1000))
 #> [1] 1000.693
 log_diff_exp(log(3), log(2))
 #> [1] 2.220446e-16
+```
+
+## Robust and frontier regression
+
+The `huber` family has a normal center and exponential tails beyond `k`
+scale units (`k = 1.345` by default); with the scale fixed, its maximum
+likelihood estimate is the Huber M estimate of
+[`MASS::rlm()`](https://rdrr.io/pkg/MASS/man/rlm.html). The
+`stochastic_frontier` family is the normal minus half normal production
+frontier of Aigner, Lovell and Schmidt (1977): `mu` is the frontier,
+`sigma_v` the noise and `sigma_u` the inefficiency scale.
+
+``` r
+
+xr <- rnorm(200); yr <- 1 + 2 * xr + rt(200, 2)
+coef(regcomp(yr ~ xr, family = "huber", data = data.frame(xr, yr)))
+#>    mu:(Intercept)             mu:xr sigma:(Intercept) 
+#>         1.0614053         2.0304453         0.5765277
+xf <- runif(300); yf <- 1 + 0.5 * xf + rnorm(300, 0, 0.2) - abs(rnorm(300, 0, 0.4))
+exp(coef(regcomp(yf ~ xf, family = "stochastic_frontier", data = data.frame(xf, yf)))[3:4])
+#> sigma_v:(Intercept) sigma_u:(Intercept) 
+#>           0.1865530           0.4374265
 ```
 
 [`vignette("operators")`](https://adamrsophie.github.io/regcompR/articles/operators.md)

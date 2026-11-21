@@ -358,6 +358,99 @@ needed for LOO).</p>
 <span><span class="fu"><a href="https://rdrr.io/r/base/length.html" class="external-link">length</a></span><span class="op">(</span><span class="fu"><a href="../reference/log_lik.html">log_lik</a></span><span class="op">(</span><span class="va">fnb</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="co">#&gt; [1] 300</span></span></code></pre></div>
 </div>
+<div class="section level2">
+<h2 id="instrumental-variables-panel-fixed-effects-and-the-hausman-test">Instrumental variables, panel fixed effects and the Hausman
+test<a class="anchor" aria-label="anchor" href="#instrumental-variables-panel-fixed-effects-and-the-hausman-test"></a>
+</h2>
+<p><code><a href="../reference/iv_regcomp.html">iv_regcomp()</a></code> fits two stage least squares from an ivreg
+style formula (<code>y ~ regressors | instruments</code>) and reports
+the weak instrument, Wu-Hausman and Sargan tests; the results equal
+<code>ivreg()</code>. <code><a href="../reference/panel_within.html">panel_within()</a></code> is the fixed effects
+(within) estimator of <code>plm()</code>, and
+<code><a href="../reference/hausman_test.html">hausman_test()</a></code> compares it with a random effects fit.</p>
+<div class="sourceCode" id="cb21"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/base/Random.html" class="external-link">set.seed</a></span><span class="op">(</span><span class="fl">2</span><span class="op">)</span></span>
+<span><span class="va">n</span> <span class="op">&lt;-</span> <span class="fl">400</span>; <span class="va">z1</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/stats/Normal.html" class="external-link">rnorm</a></span><span class="op">(</span><span class="va">n</span><span class="op">)</span>; <span class="va">z2</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/stats/Normal.html" class="external-link">rnorm</a></span><span class="op">(</span><span class="va">n</span><span class="op">)</span>; <span class="va">u</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/stats/Normal.html" class="external-link">rnorm</a></span><span class="op">(</span><span class="va">n</span><span class="op">)</span></span>
+<span><span class="va">xe</span> <span class="op">&lt;-</span> <span class="va">z1</span> <span class="op">+</span> <span class="fl">0.5</span> <span class="op">*</span> <span class="va">z2</span> <span class="op">+</span> <span class="va">u</span> <span class="op">+</span> <span class="fu"><a href="https://rdrr.io/r/stats/Normal.html" class="external-link">rnorm</a></span><span class="op">(</span><span class="va">n</span><span class="op">)</span></span>
+<span><span class="fu"><a href="../reference/iv_regcomp.html">iv_regcomp</a></span><span class="op">(</span><span class="va">y</span> <span class="op">~</span> <span class="va">xe</span> <span class="op">|</span> <span class="va">z1</span> <span class="op">+</span> <span class="va">z2</span>, data <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span>y <span class="op">=</span> <span class="fl">1</span> <span class="op">+</span> <span class="fl">2</span> <span class="op">*</span> <span class="va">xe</span> <span class="op">+</span> <span class="va">u</span>, <span class="va">xe</span>, <span class="va">z1</span>, <span class="va">z2</span><span class="op">)</span><span class="op">)</span></span>
+<span><span class="co">#&gt; &lt;regcomp_lm&gt; instrumental variables (2SLS), n = 400, residual df = 398</span></span>
+<span><span class="co">#&gt;             estimate std_error       t p_value</span></span>
+<span><span class="co">#&gt; (Intercept)   1.0167    0.0492 20.6612       0</span></span>
+<span><span class="co">#&gt; xe            2.0122    0.0402 50.0423       0</span></span>
+<span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt; Diagnostic tests:</span></span>
+<span><span class="co">#&gt;                       df1 df2 statistic p_value</span></span>
+<span><span class="co">#&gt; Weak instruments (xe)   2 397  156.9332  0.0000</span></span>
+<span><span class="co">#&gt; Wu-Hausman              1 397  166.6047  0.0000</span></span>
+<span><span class="co">#&gt; Sargan                  1  NA    0.0604  0.8059</span></span>
+<span><span class="va">pd</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span>id <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/factor.html" class="external-link">factor</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/rep.html" class="external-link">rep</a></span><span class="op">(</span><span class="fl">1</span><span class="op">:</span><span class="fl">60</span>, each <span class="op">=</span> <span class="fl">5</span><span class="op">)</span><span class="op">)</span>, x <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/stats/Normal.html" class="external-link">rnorm</a></span><span class="op">(</span><span class="fl">300</span><span class="op">)</span><span class="op">)</span></span>
+<span><span class="va">pd</span><span class="op">$</span><span class="va">y</span> <span class="op">&lt;-</span> <span class="fl">1</span> <span class="op">+</span> <span class="fl">0.5</span> <span class="op">*</span> <span class="va">pd</span><span class="op">$</span><span class="va">x</span> <span class="op">+</span> <span class="fu"><a href="https://rdrr.io/r/stats/Normal.html" class="external-link">rnorm</a></span><span class="op">(</span><span class="fl">60</span><span class="op">)</span><span class="op">[</span><span class="va">pd</span><span class="op">$</span><span class="va">id</span><span class="op">]</span> <span class="op">+</span> <span class="fu"><a href="https://rdrr.io/r/stats/Normal.html" class="external-link">rnorm</a></span><span class="op">(</span><span class="fl">300</span><span class="op">)</span></span>
+<span><span class="va">fe</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/panel_within.html">panel_within</a></span><span class="op">(</span><span class="va">y</span> <span class="op">~</span> <span class="va">x</span>, data <span class="op">=</span> <span class="va">pd</span>, id <span class="op">=</span> <span class="st">"id"</span><span class="op">)</span></span>
+<span><span class="va">re</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/regcomp.html">regcomp</a></span><span class="op">(</span><span class="va">y</span> <span class="op">~</span> <span class="va">x</span> <span class="op">+</span> <span class="op">(</span><span class="fl">1</span> <span class="op">|</span> <span class="va">id</span><span class="op">)</span>, family <span class="op">=</span> <span class="st">"normal"</span>, data <span class="op">=</span> <span class="va">pd</span><span class="op">)</span></span>
+<span><span class="fu"><a href="../reference/hausman_test.html">hausman_test</a></span><span class="op">(</span><span class="va">fe</span>, <span class="va">re</span><span class="op">)</span></span>
+<span><span class="co">#&gt;   statistic df   p_value</span></span>
+<span><span class="co">#&gt; 1 0.5527477  1 0.4571972</span></span></code></pre></div>
+</div>
+<div class="section level2">
+<h2 id="robust-covariances-bootstrap-power-and-non-nested-tests">Robust covariances, bootstrap, power and non nested tests<a class="anchor" aria-label="anchor" href="#robust-covariances-bootstrap-power-and-non-nested-tests"></a>
+</h2>
+<p><code>vcov(type = "HC0")</code> to <code>"HC3"</code> give the
+heteroscedasticity consistent covariances of
+<code><a href="https://zeileis.codeberg.page/sandwich/reference/vcovHC.html" class="external-link">sandwich::vcovHC()</a></code>. <code><a href="../reference/boot_regcomp.html">boot_regcomp()</a></code> bootstraps
+any statistic (parametric or case resampling, by clusters if needed);
+<code><a href="../reference/power_sim.html">power_sim()</a></code> estimates the power to detect an effect by
+simulating from the fit with chosen coefficients;
+<code><a href="../reference/vuong_test.html">vuong_test()</a></code> compares non nested models;
+<code><a href="../reference/best_subset.html">best_subset()</a></code> and <code><a href="../reference/step_regcomp.html">step_regcomp()</a></code> select terms
+by AIC, AICc, BIC or Hannan-Quinn.</p>
+<div class="sourceCode" id="cb22"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">pw</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span>x1 <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/stats/Normal.html" class="external-link">rnorm</a></span><span class="op">(</span><span class="fl">80</span><span class="op">)</span>, x2 <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/stats/Normal.html" class="external-link">rnorm</a></span><span class="op">(</span><span class="fl">80</span><span class="op">)</span><span class="op">)</span>; <span class="va">pw</span><span class="op">$</span><span class="va">y</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/stats/Poisson.html" class="external-link">rpois</a></span><span class="op">(</span><span class="fl">80</span>, <span class="fu"><a href="https://rdrr.io/r/base/Log.html" class="external-link">exp</a></span><span class="op">(</span><span class="fl">0.5</span> <span class="op">+</span> <span class="fl">0.3</span> <span class="op">*</span> <span class="va">pw</span><span class="op">$</span><span class="va">x1</span><span class="op">)</span><span class="op">)</span></span>
+<span><span class="va">fp</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/regcomp.html">regcomp</a></span><span class="op">(</span><span class="va">y</span> <span class="op">~</span> <span class="va">x1</span> <span class="op">+</span> <span class="va">x2</span>, family <span class="op">=</span> <span class="st">"poisson"</span>, data <span class="op">=</span> <span class="va">pw</span><span class="op">)</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/base/MathFun.html" class="external-link">sqrt</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/diag.html" class="external-link">diag</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/stats/vcov.html" class="external-link">vcov</a></span><span class="op">(</span><span class="va">fp</span>, type <span class="op">=</span> <span class="st">"HC3"</span><span class="op">)</span><span class="op">)</span><span class="op">)</span></span>
+<span><span class="co">#&gt; lambda:(Intercept)          lambda:x1          lambda:x2 </span></span>
+<span><span class="co">#&gt;         0.09980880         0.09288988         0.09954112</span></span>
+<span><span class="fu"><a href="../reference/boot_regcomp.html">boot_regcomp</a></span><span class="op">(</span><span class="va">fp</span>, R <span class="op">=</span> <span class="fl">50</span><span class="op">)</span></span>
+<span><span class="co">#&gt; &lt;regcomp_boot&gt; parametric bootstrap, 50 replicates</span></span>
+<span><span class="co">#&gt;                    estimate std_error   lower  upper</span></span>
+<span><span class="co">#&gt; lambda:(Intercept)   0.5376    0.0807  0.3157 0.6311</span></span>
+<span><span class="co">#&gt; lambda:x1            0.1087    0.0885 -0.0399 0.2922</span></span>
+<span><span class="co">#&gt; lambda:x2           -0.1197    0.0740 -0.2559 0.0187</span></span>
+<span><span class="fu"><a href="../reference/power_sim.html">power_sim</a></span><span class="op">(</span><span class="va">fp</span>, <span class="st">"lambda:x1"</span>, nsim <span class="op">=</span> <span class="fl">50</span>, coefficients <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"lambda:x1"</span> <span class="op">=</span> <span class="fl">0.2</span><span class="op">)</span><span class="op">)</span></span>
+<span><span class="co">#&gt;        term power     lower     upper nsim failed</span></span>
+<span><span class="co">#&gt; 1 lambda:x1  0.74 0.5965523 0.8536994   50      0</span></span>
+<span><span class="fu"><a href="../reference/vuong_test.html">vuong_test</a></span><span class="op">(</span><span class="va">fp</span>, <span class="fu"><a href="../reference/regcomp.html">regcomp</a></span><span class="op">(</span><span class="va">y</span> <span class="op">~</span> <span class="va">x1</span> <span class="op">+</span> <span class="va">x2</span>, family <span class="op">=</span> <span class="st">"negative_binomial_nb2"</span>, data <span class="op">=</span> <span class="va">pw</span><span class="op">)</span><span class="op">)</span></span>
+<span><span class="co">#&gt;                statistic   p_value preferred</span></span>
+<span><span class="co">#&gt; Raw           -0.6649517 0.2530407   model 2</span></span>
+<span><span class="co">#&gt; AIC-corrected  0.1636208 0.4350148   model 1</span></span>
+<span><span class="co">#&gt; BIC-corrected  1.1504617 0.1249769   model 1</span></span>
+<span><span class="fu"><a href="../reference/best_subset.html">best_subset</a></span><span class="op">(</span><span class="va">fp</span>, criterion <span class="op">=</span> <span class="st">"AICc"</span><span class="op">)</span></span>
+<span><span class="co">#&gt;     terms     AICc df</span></span>
+<span><span class="co">#&gt; 1  (none) 280.8812  1</span></span>
+<span><span class="co">#&gt; 2      x2 280.9031  2</span></span>
+<span><span class="co">#&gt; 3      x1 281.0836  2</span></span>
+<span><span class="co">#&gt; 4 x1 + x2 281.2575  3</span></span></code></pre></div>
+</div>
+<div class="section level2">
+<h2 id="uplift-models-and-higher-order-inference">Uplift models and higher order inference<a class="anchor" aria-label="anchor" href="#uplift-models-and-higher-order-inference"></a>
+</h2>
+<p><code><a href="../reference/uplift.html">uplift()</a></code> gives individual treatment effects of a model
+with treatment by covariate interactions and <code><a href="../reference/qini.html">qini()</a></code>
+evaluates them (the Qini curve and coefficient, as tools4uplift).
+<code><a href="../reference/skovgaard_test.html">skovgaard_test()</a></code> refines the likelihood ratio test of one
+coefficient for small samples.</p>
+<div class="sourceCode" id="cb23"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">up</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span>t <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/stats/Binomial.html" class="external-link">rbinom</a></span><span class="op">(</span><span class="fl">400</span>, <span class="fl">1</span>, <span class="fl">0.5</span><span class="op">)</span>, x <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/stats/Normal.html" class="external-link">rnorm</a></span><span class="op">(</span><span class="fl">400</span><span class="op">)</span><span class="op">)</span></span>
+<span><span class="va">up</span><span class="op">$</span><span class="va">y</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/stats/Binomial.html" class="external-link">rbinom</a></span><span class="op">(</span><span class="fl">400</span>, <span class="fl">1</span>, <span class="fu"><a href="https://rdrr.io/r/stats/Logistic.html" class="external-link">plogis</a></span><span class="op">(</span><span class="op">-</span><span class="fl">0.5</span> <span class="op">+</span> <span class="fl">0.3</span> <span class="op">*</span> <span class="va">up</span><span class="op">$</span><span class="va">x</span> <span class="op">+</span> <span class="va">up</span><span class="op">$</span><span class="va">t</span> <span class="op">*</span> <span class="op">(</span><span class="fl">0.2</span> <span class="op">+</span> <span class="fl">0.8</span> <span class="op">*</span> <span class="va">up</span><span class="op">$</span><span class="va">x</span><span class="op">)</span><span class="op">)</span><span class="op">)</span></span>
+<span><span class="va">fu</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/regcomp.html">regcomp</a></span><span class="op">(</span><span class="va">y</span> <span class="op">~</span> <span class="va">t</span> <span class="op">*</span> <span class="va">x</span>, family <span class="op">=</span> <span class="st">"bernoulli"</span>, data <span class="op">=</span> <span class="va">up</span><span class="op">)</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/base/attr.html" class="external-link">attr</a></span><span class="op">(</span><span class="fu"><a href="../reference/qini.html">qini</a></span><span class="op">(</span><span class="fu"><a href="../reference/uplift.html">uplift</a></span><span class="op">(</span><span class="va">fu</span>, <span class="st">"t"</span><span class="op">)</span>, <span class="va">up</span><span class="op">$</span><span class="va">t</span>, <span class="va">up</span><span class="op">$</span><span class="va">y</span><span class="op">)</span>, <span class="st">"qini"</span><span class="op">)</span></span>
+<span><span class="co">#&gt; [1] 5.164355</span></span>
+<span><span class="va">sm</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span>x <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/stats/Normal.html" class="external-link">rnorm</a></span><span class="op">(</span><span class="fl">15</span><span class="op">)</span><span class="op">)</span>; <span class="va">sm</span><span class="op">$</span><span class="va">y</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/stats/Poisson.html" class="external-link">rpois</a></span><span class="op">(</span><span class="fl">15</span>, <span class="fu"><a href="https://rdrr.io/r/base/Log.html" class="external-link">exp</a></span><span class="op">(</span><span class="fl">0.5</span> <span class="op">+</span> <span class="fl">0.4</span> <span class="op">*</span> <span class="va">sm</span><span class="op">$</span><span class="va">x</span><span class="op">)</span><span class="op">)</span></span>
+<span><span class="fu"><a href="../reference/skovgaard_test.html">skovgaard_test</a></span><span class="op">(</span><span class="fu"><a href="../reference/regcomp.html">regcomp</a></span><span class="op">(</span><span class="va">y</span> <span class="op">~</span> <span class="va">x</span>, family <span class="op">=</span> <span class="st">"poisson"</span>, data <span class="op">=</span> <span class="va">sm</span><span class="op">)</span>, <span class="st">"lambda:x"</span>, R <span class="op">=</span> <span class="fl">500</span><span class="op">)</span></span>
+<span><span class="co">#&gt;      statistic     p_value</span></span>
+<span><span class="co">#&gt; Wald  2.559985 0.010467655</span></span>
+<span><span class="co">#&gt; r     2.742970 0.006088617</span></span>
+<span><span class="co">#&gt; r*    2.717801 0.006571741</span></span></code></pre></div>
+</div>
   </main><aside class="col-md-3"><nav id="toc" aria-label="Table of contents"><h2>On this page</h2>
     </nav></aside>
 </div>

@@ -103,13 +103,13 @@ status; <code><a href="../reference/registry_table.html">registry_table()</a></c
 <span><span class="fu"><a href="https://rdrr.io/r/base/table.html" class="external-link">table</a></span><span class="op">(</span><span class="va">reg</span><span class="op">$</span><span class="va">category</span><span class="op">)</span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt;                bounded            categorical               circular </span></span>
-<span><span class="co">#&gt;                     35                      3                     10 </span></span>
+<span><span class="co">#&gt;                     35                      4                     10 </span></span>
 <span><span class="co">#&gt;                  count            directional        finite_discrete </span></span>
 <span><span class="co">#&gt;                     51                      4                     16 </span></span>
 <span><span class="co">#&gt;                  mixed           multivariate                ordinal </span></span>
 <span><span class="co">#&gt;                      2                     22                     10 </span></span>
 <span><span class="co">#&gt;               positive quantile_parameterized                   real </span></span>
-<span><span class="co">#&gt;                     65                      5                     56</span></span>
+<span><span class="co">#&gt;                     65                      5                     58</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/utils/head.html" class="external-link">head</a></span><span class="op">(</span><span class="va">reg</span><span class="op">[</span>, <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"id"</span>, <span class="st">"category"</span>, <span class="st">"parameters"</span>, <span class="st">"status"</span>, <span class="st">"cdf"</span>, <span class="st">"stan"</span><span class="op">)</span><span class="op">]</span><span class="op">)</span></span>
 <span><span class="co">#&gt;                        id category      parameters    status         cdf</span></span>
 <span><span class="co">#&gt; 1 adjacent_category_logit  ordinal mu, cuts, scale validated unavailable</span></span>
@@ -386,6 +386,27 @@ links that <code><a href="../reference/regcomp.html">regcomp()</a></code> accept
 <span><span class="co">#&gt; [1] 1000.693</span></span>
 <span><span class="fu"><a href="../reference/numerics.html">log_diff_exp</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/Log.html" class="external-link">log</a></span><span class="op">(</span><span class="fl">3</span><span class="op">)</span>, <span class="fu"><a href="https://rdrr.io/r/base/Log.html" class="external-link">log</a></span><span class="op">(</span><span class="fl">2</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="co">#&gt; [1] 2.220446e-16</span></span></code></pre></div>
+</div>
+<div class="section level2">
+<h2 id="robust-and-frontier-regression">Robust and frontier regression<a class="anchor" aria-label="anchor" href="#robust-and-frontier-regression"></a>
+</h2>
+<p>The <code>huber</code> family has a normal center and exponential
+tails beyond <code>k</code> scale units (<code>k = 1.345</code> by
+default); with the scale fixed, its maximum likelihood estimate is the
+Huber M estimate of <code><a href="https://rdrr.io/pkg/MASS/man/rlm.html" class="external-link">MASS::rlm()</a></code>. The
+<code>stochastic_frontier</code> family is the normal minus half normal
+production frontier of Aigner, Lovell and Schmidt (1977):
+<code>mu</code> is the frontier, <code>sigma_v</code> the noise and
+<code>sigma_u</code> the inefficiency scale.</p>
+<div class="sourceCode" id="cb17"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">xr</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/stats/Normal.html" class="external-link">rnorm</a></span><span class="op">(</span><span class="fl">200</span><span class="op">)</span>; <span class="va">yr</span> <span class="op">&lt;-</span> <span class="fl">1</span> <span class="op">+</span> <span class="fl">2</span> <span class="op">*</span> <span class="va">xr</span> <span class="op">+</span> <span class="fu"><a href="https://rdrr.io/r/stats/TDist.html" class="external-link">rt</a></span><span class="op">(</span><span class="fl">200</span>, <span class="fl">2</span><span class="op">)</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/stats/coef.html" class="external-link">coef</a></span><span class="op">(</span><span class="fu"><a href="../reference/regcomp.html">regcomp</a></span><span class="op">(</span><span class="va">yr</span> <span class="op">~</span> <span class="va">xr</span>, family <span class="op">=</span> <span class="st">"huber"</span>, data <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span><span class="va">xr</span>, <span class="va">yr</span><span class="op">)</span><span class="op">)</span><span class="op">)</span></span>
+<span><span class="co">#&gt;    mu:(Intercept)             mu:xr sigma:(Intercept) </span></span>
+<span><span class="co">#&gt;         1.0614053         2.0304453         0.5765277</span></span>
+<span><span class="va">xf</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/stats/Uniform.html" class="external-link">runif</a></span><span class="op">(</span><span class="fl">300</span><span class="op">)</span>; <span class="va">yf</span> <span class="op">&lt;-</span> <span class="fl">1</span> <span class="op">+</span> <span class="fl">0.5</span> <span class="op">*</span> <span class="va">xf</span> <span class="op">+</span> <span class="fu"><a href="https://rdrr.io/r/stats/Normal.html" class="external-link">rnorm</a></span><span class="op">(</span><span class="fl">300</span>, <span class="fl">0</span>, <span class="fl">0.2</span><span class="op">)</span> <span class="op">-</span> <span class="fu"><a href="https://rdrr.io/r/base/MathFun.html" class="external-link">abs</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/stats/Normal.html" class="external-link">rnorm</a></span><span class="op">(</span><span class="fl">300</span>, <span class="fl">0</span>, <span class="fl">0.4</span><span class="op">)</span><span class="op">)</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/base/Log.html" class="external-link">exp</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/stats/coef.html" class="external-link">coef</a></span><span class="op">(</span><span class="fu"><a href="../reference/regcomp.html">regcomp</a></span><span class="op">(</span><span class="va">yf</span> <span class="op">~</span> <span class="va">xf</span>, family <span class="op">=</span> <span class="st">"stochastic_frontier"</span>, data <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span><span class="va">xf</span>, <span class="va">yf</span><span class="op">)</span><span class="op">)</span><span class="op">)</span><span class="op">[</span><span class="fl">3</span><span class="op">:</span><span class="fl">4</span><span class="op">]</span><span class="op">)</span></span>
+<span><span class="co">#&gt; sigma_v:(Intercept) sigma_u:(Intercept) </span></span>
+<span><span class="co">#&gt;           0.1865530           0.4374265</span></span></code></pre></div>
 <p><code><a href="../articles/operators.html">vignette("operators")</a></code> shows how to build new families
 from these, and how to register your own.</p>
 </div>

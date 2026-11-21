@@ -143,3 +143,47 @@ tanh(coef(fh)["rho:(Intercept)"])     # the error correlation
 #> rho:(Intercept) 
 #>       0.3267187
 ```
+
+## Partial proportional odds and multinomial probit
+
+`partial_odds(~ z)` relaxes proportional odds for the covariates `z`:
+their effects shift each threshold separately (parameters `d1`, `d2`,
+…), as the nominal effects of
+[`ordinal::clm()`](https://rdrr.io/pkg/ordinal/man/clm.html).
+
+``` r
+
+po <- data.frame(x = rnorm(400), z = rnorm(400)); u <- runif(400)
+po$y <- factor(1 + (u > plogis(-1 - 0.8 * po$x)) + (u > plogis(1 + 0.5 * po$z - 0.8 * po$x)))
+fpo <- regcomp(y ~ x, family = partial_odds(~ z), data = po)
+coef(fpo)
+#>       mu:x       d1:z       d2:z   cuts:1|2   cuts:2|3 
+#>  0.8858083 -0.2667663  0.2123071 -1.0016558  0.9846142
+anova(regcomp(y ~ x + z, family = "cumulative_logit", data = po), fpo)
+#> Likelihood ratio tests
+#> 
+#>                                                            df  logLik    AIC
+#> regcomp(y ~ x + z, family = "cumulative_logit", data = po)  4 -391.99 791.99
+#> fpo                                                         5 -385.07 780.15
+#>                                                             Chisq Chi Df
+#> regcomp(y ~ x + z, family = "cumulative_logit", data = po)              
+#> fpo                                                        13.842      1
+#>                                                            Pr(>Chisq)    
+#> regcomp(y ~ x + z, family = "cumulative_logit", data = po)               
+#> fpo                                                         0.0001989 ***
+#> ---
+#> Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+```
+
+`multinomial_probit` is the nominal model with independent normal
+utility errors; like the multinomial logit, it gives each category but
+the first its own predictor.
+
+``` r
+
+xm <- rnorm(300)
+ym <- max.col(cbind(0, 0.5 + xm, -0.3 - xm) + matrix(rnorm(900), 300))
+coef(regcomp(ym ~ xm, family = "multinomial_probit", data = data.frame(xm, ym)))
+#> eta2:(Intercept)          eta2:xm eta3:(Intercept)          eta3:xm 
+#>        0.6907868        1.2721510       -0.3542442       -0.9623227
+```

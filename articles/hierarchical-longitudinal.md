@@ -179,6 +179,32 @@ The TMB engine uses automatic differentiation and is much faster for
 large multilevel models; it gives the same estimates as the default
 engine.
 
+## Areal, relatedness and space time effects
+
+`car()`, `leroux()` and `icar()` give areal random effects from an
+adjacency matrix (`icar()` plus `(1 | region)` is the BYM model);
+`relmat()` takes a known relatedness matrix (kinship, genomic or
+phylogenetic); `spacetime()` crosses a Leroux spatial with an AR(1)
+temporal correlation. They work in every parameter and family.
+
+``` r
+
+gr <- expand.grid(i = 1:5, j = 1:5)
+Wg <- outer(1:25, 1:25, function(a, b) as.numeric(abs(gr$i[a] - gr$i[b]) + abs(gr$j[a] - gr$j[b]) == 1))
+dimnames(Wg) <- list(paste0("a", 1:25), paste0("a", 1:25))
+ar <- data.frame(area = factor(rep(rownames(Wg), 4), levels = rownames(Wg)), x = rnorm(100))
+sp <- as.vector(t(chol(solve(diag(rowSums(Wg)) - 0.9 * Wg))) %*% rnorm(25))
+ar$y <- rpois(100, exp(0.3 + 0.5 * ar$x + sp[ar$area]))
+fl <- regcomp(y ~ x + leroux(area | 1, Wg), family = "poisson", data = ar)
+fb <- regcomp(y ~ x + icar(area | 1, Wg) + (1 | area), family = "poisson", data = ar)
+c(leroux = AIC(fl), bym = AIC(fb))
+#>   leroux      bym 
+#> 303.5827 300.0614
+plogis(fl$theta[2])   # Leroux spatial dependence
+#> lambda:leroux(area | 1):logit_rho 
+#>                         0.7022909
+```
+
 ## Smooth terms
 
 Smooth terms from mgcv enter any parameter through their mixed model
@@ -194,27 +220,23 @@ parameters; the fits agree with
 sm <- data.frame(x = runif(300), w = runif(300), f = factor(sample(c("a", "b"), 300, TRUE)))
 sm$y <- ifelse(sm$f == "a", sin(2 * pi * sm$x), cos(2 * pi * sm$x)) + rnorm(300, 0, 0.3)
 fs <- regcomp(y ~ f + s(x, by = f, k = 8), sigma ~ s(w, k = 5), family = "normal", data = sm)
-#> Warning: The Hessian is not positive definite; standard errors are unavailable
-#> or unreliable.
 fs$theta
 #> mu:s(x, by = f, k = 8):s(x):fa:log_sd(smooth) 
-#>                                     1.0117977 
+#>                                     1.0368475 
 #> mu:s(x, by = f, k = 8):s(x):fb:log_sd(smooth) 
-#>                                     0.8809964 
+#>                                     0.8717579 
 #>              sigma:s(w, k = 5):log_sd(smooth) 
-#>                                   -10.2054669
+#>                                   -10.6450627
 plot(fs, which = "effects", variable = "x")
 ```
 
-![](hierarchical-longitudinal_files/figure-html/unnamed-chunk-8-1.png)
+![](hierarchical-longitudinal_files/figure-html/unnamed-chunk-9-1.png)
 
 ``` r
 
 ft <- regcomp(y ~ t2(x, w, k = 4), family = "normal", data = sm)
-#> Warning: The Hessian is not positive definite; standard errors are unavailable
-#> or unreliable.
 logLik(ft)
-#> 'log Lik.' -278.2674 (df=8)
+#> 'log Lik.' -283.1154 (df=8)
 ```
 
 ## Multiple membership
@@ -231,7 +253,7 @@ mmd$y <- rnorm(200, 1 + mmd$x + 0.6 * eff[mmd$s1] + 0.4 * eff[mmd$s2], 1)
 fmm <- regcomp(y ~ x + (1 | mm(s1, s2, weights = cbind(w1, w2))), family = "normal", data = mmd)
 fmm$theta
 #> mu:1 | mm(s1, s2, weights = cbind(w1, w2)):log_sd((Intercept)) 
-#>                                                      -0.069056
+#>                                                     -0.7109981
 ```
 
 ## Marginal models
@@ -277,8 +299,8 @@ sd0$t <- pmin(tev, 8); sd0$d <- as.numeric(tev <= 8)
 pp <- person_period(sd0, "t", "d")
 fh <- regcomp(event ~ factor(period) + x + (1 | cl), family = "bernoulli", data = pp)
 coef(fh)["prob:x"]
-#>   prob:x 
-#> 0.583332
+#>    prob:x 
+#> 0.4880301
 ```
 
 ## Nonlinear models

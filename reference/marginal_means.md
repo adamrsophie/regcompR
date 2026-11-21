@@ -76,6 +76,6 @@ d <- data.frame(x = rnorm(300), g = factor(sample(c("a", "b"), 300, TRUE)))
 d$y <- rpois(300, exp(0.2 + 0.5 * d$x + 0.4 * (d$g == "b")))
 marginal_means(regcomp(y ~ x + g, family = "poisson", data = d), "g")
 #>   g estimate std_error statistic      p_value    lower    upper
-#> 1 a 1.449369 0.1009556  14.35651 9.699538e-47 1.251500 1.647238
-#> 2 b 2.023168 0.1137642  17.78388 9.422775e-71 1.800194 2.246142
+#> 1 a 1.619548 0.1055833  15.33905 4.192763e-53 1.412608 1.826487
+#> 2 b 2.212646 0.1205646  18.35237 3.160093e-75 1.976344 2.448948
 ```

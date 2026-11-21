@@ -337,3 +337,111 @@ c(observed_zeros = mean(d$y == 0), simulated_zeros = mean(sims == 0))
 length(log_lik(fnb))
 #> [1] 300
 ```
+
+## Instrumental variables, panel fixed effects and the Hausman test
+
+[`iv_regcomp()`](https://adamrsophie.github.io/regcompR/reference/iv_regcomp.md)
+fits two stage least squares from an ivreg style formula
+(`y ~ regressors | instruments`) and reports the weak instrument,
+Wu-Hausman and Sargan tests; the results equal `ivreg()`.
+[`panel_within()`](https://adamrsophie.github.io/regcompR/reference/panel_within.md)
+is the fixed effects (within) estimator of `plm()`, and
+[`hausman_test()`](https://adamrsophie.github.io/regcompR/reference/hausman_test.md)
+compares it with a random effects fit.
+
+``` r
+
+set.seed(2)
+n <- 400; z1 <- rnorm(n); z2 <- rnorm(n); u <- rnorm(n)
+xe <- z1 + 0.5 * z2 + u + rnorm(n)
+iv_regcomp(y ~ xe | z1 + z2, data = data.frame(y = 1 + 2 * xe + u, xe, z1, z2))
+#> <regcomp_lm> instrumental variables (2SLS), n = 400, residual df = 398
+#>             estimate std_error       t p_value
+#> (Intercept)   1.0167    0.0492 20.6612       0
+#> xe            2.0122    0.0402 50.0423       0
+#> 
+#> Diagnostic tests:
+#>                       df1 df2 statistic p_value
+#> Weak instruments (xe)   2 397  156.9332  0.0000
+#> Wu-Hausman              1 397  166.6047  0.0000
+#> Sargan                  1  NA    0.0604  0.8059
+pd <- data.frame(id = factor(rep(1:60, each = 5)), x = rnorm(300))
+pd$y <- 1 + 0.5 * pd$x + rnorm(60)[pd$id] + rnorm(300)
+fe <- panel_within(y ~ x, data = pd, id = "id")
+re <- regcomp(y ~ x + (1 | id), family = "normal", data = pd)
+hausman_test(fe, re)
+#>   statistic df   p_value
+#> 1 0.5527477  1 0.4571972
+```
+
+## Robust covariances, bootstrap, power and non nested tests
+
+`vcov(type = "HC0")` to `"HC3"` give the heteroscedasticity consistent
+covariances of
+[`sandwich::vcovHC()`](https://zeileis.codeberg.page/sandwich/reference/vcovHC.html).
+[`boot_regcomp()`](https://adamrsophie.github.io/regcompR/reference/boot_regcomp.md)
+bootstraps any statistic (parametric or case resampling, by clusters if
+needed);
+[`power_sim()`](https://adamrsophie.github.io/regcompR/reference/power_sim.md)
+estimates the power to detect an effect by simulating from the fit with
+chosen coefficients;
+[`vuong_test()`](https://adamrsophie.github.io/regcompR/reference/vuong_test.md)
+compares non nested models;
+[`best_subset()`](https://adamrsophie.github.io/regcompR/reference/best_subset.md)
+and
+[`step_regcomp()`](https://adamrsophie.github.io/regcompR/reference/step_regcomp.md)
+select terms by AIC, AICc, BIC or Hannan-Quinn.
+
+``` r
+
+pw <- data.frame(x1 = rnorm(80), x2 = rnorm(80)); pw$y <- rpois(80, exp(0.5 + 0.3 * pw$x1))
+fp <- regcomp(y ~ x1 + x2, family = "poisson", data = pw)
+sqrt(diag(vcov(fp, type = "HC3")))
+#> lambda:(Intercept)          lambda:x1          lambda:x2 
+#>         0.09980880         0.09288988         0.09954112
+boot_regcomp(fp, R = 50)
+#> <regcomp_boot> parametric bootstrap, 50 replicates
+#>                    estimate std_error   lower  upper
+#> lambda:(Intercept)   0.5376    0.0807  0.3157 0.6311
+#> lambda:x1            0.1087    0.0885 -0.0399 0.2922
+#> lambda:x2           -0.1197    0.0740 -0.2559 0.0187
+power_sim(fp, "lambda:x1", nsim = 50, coefficients = c("lambda:x1" = 0.2))
+#>        term power     lower     upper nsim failed
+#> 1 lambda:x1  0.74 0.5965523 0.8536994   50      0
+vuong_test(fp, regcomp(y ~ x1 + x2, family = "negative_binomial_nb2", data = pw))
+#>                statistic   p_value preferred
+#> Raw           -0.6649517 0.2530407   model 2
+#> AIC-corrected  0.1636208 0.4350148   model 1
+#> BIC-corrected  1.1504617 0.1249769   model 1
+best_subset(fp, criterion = "AICc")
+#>     terms     AICc df
+#> 1  (none) 280.8812  1
+#> 2      x2 280.9031  2
+#> 3      x1 281.0836  2
+#> 4 x1 + x2 281.2575  3
+```
+
+## Uplift models and higher order inference
+
+[`uplift()`](https://adamrsophie.github.io/regcompR/reference/uplift.md)
+gives individual treatment effects of a model with treatment by
+covariate interactions and
+[`qini()`](https://adamrsophie.github.io/regcompR/reference/qini.md)
+evaluates them (the Qini curve and coefficient, as tools4uplift).
+[`skovgaard_test()`](https://adamrsophie.github.io/regcompR/reference/skovgaard_test.md)
+refines the likelihood ratio test of one coefficient for small samples.
+
+``` r
+
+up <- data.frame(t = rbinom(400, 1, 0.5), x = rnorm(400))
+up$y <- rbinom(400, 1, plogis(-0.5 + 0.3 * up$x + up$t * (0.2 + 0.8 * up$x)))
+fu <- regcomp(y ~ t * x, family = "bernoulli", data = up)
+attr(qini(uplift(fu, "t"), up$t, up$y), "qini")
+#> [1] 5.164355
+sm <- data.frame(x = rnorm(15)); sm$y <- rpois(15, exp(0.5 + 0.4 * sm$x))
+skovgaard_test(regcomp(y ~ x, family = "poisson", data = sm), "lambda:x", R = 500)
+#>      statistic     p_value
+#> Wald  2.559985 0.010467655
+#> r     2.742970 0.006088617
+#> r*    2.717801 0.006571741
+```

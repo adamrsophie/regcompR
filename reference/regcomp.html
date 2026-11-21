@@ -212,9 +212,24 @@ unequally spaced numeric times; <code>gau(x + y | g)</code> and
 <code>matern32(x + y | g)</code> give Gaussian and Matern (smoothness 3/2)
 correlation in the coordinates on the left of the bar, for spatial
 effects. One random effect is created per distinct coordinate.</p></li>
-</ul><p>Structured random effects are available in every parameter and for every
+<li><p><code>relmat(id | 1, K)</code>: effects over the levels of <code>id</code> with a known
+relatedness (kinship, genomic or phylogenetic) matrix <code>K</code> whose rows
+are the levels (by row name, else in level order).</p></li>
+<li><p><code>car(region | 1, W)</code>, <code>leroux(region | 1, W)</code> and <code>icar(region | 1, W)</code>:
+areal effects from a symmetric adjacency matrix <code>W</code>: the proper CAR
+model (precision <code>D - rho W</code>), the Leroux model (precision
+<code>(1 - rho) I + rho (D - W)</code>) and the intrinsic CAR (sum to zero,
+scaled to unit geometric mean variance). <code>icar()</code> plus <code>(1 | region)</code>
+is the BYM model.</p></li>
+<li><p><code>spacetime(region + time | 1, W)</code>: a separable space time effect, the
+Kronecker product of a Leroux spatial and an AR(1) temporal
+correlation (time a factor of equally spaced periods).</p></li>
+</ul><p>A group other than <code>1</code> on the right of the bar gives independent
+replicates of the field (one per year, say).</p>
+<p>Structured random effects are available in every parameter and for every
 family, so a latent autoregressive process can enter a count, survival or
-ordinal model. The Bayesian engine supports <code>us</code> and <code>diag</code> structures.</p>
+ordinal model. The TMB engine does not support <code>car()</code>, <code>leroux()</code> and
+<code>spacetime()</code>; Stan does not support <code>spacetime()</code>.</p>
     </div>
     <div class="section level2">
     <h2 id="engines">Engines<a class="anchor" aria-label="anchor" href="#engines"></a></h2>

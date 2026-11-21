@@ -17,7 +17,7 @@ step_regcomp(
   object,
   scope = NULL,
   direction = c("both", "backward", "forward"),
-  criterion = c("AIC", "BIC"),
+  criterion = c("AIC", "BIC", "AICc", "HQ"),
   par = NULL,
   trace = FALSE
 )
@@ -40,7 +40,8 @@ step_regcomp(
 
 - criterion:
 
-  `"AIC"` or `"BIC"`.
+  `"AIC"`, `"BIC"`, `"AICc"` (small sample AIC) or `"HQ"`
+  (Hannan-Quinn).
 
 - par:
 
@@ -65,12 +66,12 @@ fs <- step_regcomp(f0, scope = ~ x1 + x2 + x3, direction = "forward", criterion 
 formula(fs)
 #> $lambda
 #> y ~ x1
-#> <environment: 0x61258d1dfaa8>
+#> <environment: 0x5ebc5a32ac78>
 #> 
 #> attr(,"given")
 #> [1] "lambda"
 attr(fs, "steps")
 #>       step      BIC
-#> 1    start 690.8945
-#> + x1  + x1 646.6848
+#> 1    start 669.4252
+#> + x1  + x1 637.4517
 ```

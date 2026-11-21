@@ -49,9 +49,9 @@ degrees of freedom and the p value.
 d <- data.frame(x = rnorm(200), z = rnorm(200)); d$y <- rpois(200, exp(0.5 + 0.3 * d$x + 0.3 * d$z))
 f <- regcomp(y ~ x + z, family = "poisson", data = d)
 wald_test(f, c("lambda:x" = 1, "lambda:z" = -1))
-#>   estimate      chisq df   p_value
-#> 1 -0.01019 0.02043228  1 0.8863364
+#>   estimate     chisq df   p_value
+#> 1  0.03392 0.2369148  1 0.6264434
 wald_test(f, c("lambda:x", "lambda:z"))
-#>        estimate    chisq df      p_value
-#> 1 0.319, 0.3292 71.99382  2 2.326696e-16
+#>         estimate    chisq df      p_value
+#> 1 0.2963, 0.2624 62.74833  2 2.367957e-14
 ```
