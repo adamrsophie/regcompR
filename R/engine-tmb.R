@@ -42,8 +42,8 @@ fit_tmb <- function(spec, control) {
   if (is.null(key)) stop_unsupported("The TMB engine", fam$id)
   if (!is.null(spec$cmat)) stop_unsupported("Censored or truncated responses in the TMB engine (use engine = \"ml\")")
   if (length(spec$aux)) stop_unsupported("Estimated thresholds in the TMB engine")
-  if (any(vapply(spec$blocks, function(b) b$struct %in% c("car", "leroux", "spacetime"), TRUE)))
-    stop_unsupported("car(), leroux() and spacetime() random effects in the TMB engine (use engine = \"ml\")")
+  if (any(vapply(spec$blocks, function(b) b$struct %in% c("car", "leroux", "spacetime", "spde"), TRUE)))
+    stop_unsupported("car(), leroux(), spacetime() and spde() random effects in the TMB engine (use engine = \"ml\")")
   # Check the taped density against the registry density.
   pr <- eta_to_pars(spec, compute_eta(spec, start_values(spec, control)))
   i <- which(is.finite(spec$y))[seq_len(min(5, sum(is.finite(spec$y))))]

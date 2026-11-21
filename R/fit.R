@@ -47,13 +47,19 @@
 #'   Kronecker product of a Leroux spatial and an AR(1) temporal
 #'   correlation (time a factor of equally spaced periods).
 #'
+#' * `spde(x + y | 1, mesh)`: a Matern field (smoothness 1) by the SPDE
+#'   approach of Lindgren, Rue and Lindstrom (2011) on an fmesher
+#'   triangulation, with parameters `log_sd` and `log_range`. The precision
+#'   is sparse but the current engines use it densely, so meshes of up to a
+#'   few hundred nodes are practical.
+#'
 #' A group other than `1` on the right of the bar gives independent
 #' replicates of the field (one per year, say).
 #'
 #' Structured random effects are available in every parameter and for every
 #' family, so a latent autoregressive process can enter a count, survival or
-#' ordinal model. The TMB engine does not support `car()`, `leroux()` and
-#' `spacetime()`; Stan does not support `spacetime()`.
+#' ordinal model. The TMB engine does not support `car()`, `leroux()`,
+#' `spacetime()` and `spde()`; Stan does not support `spacetime()` and `spde()`.
 #'
 #' @section Engines:
 #' * `"ml"`: maximum likelihood in R. Without random effects or smooths the
@@ -373,8 +379,10 @@ build_spec <- function(formula, dots, fam, data, weights = NULL, links = NULL,
     if (length(preds[[k]]$aliased) && !allow_aliased)
       stop_input(sprintf("The design for '%s' is rank deficient; aliased columns: %s. Remove them from the formula, or use a shrinkage penalty (ridge, lasso and similar) with the ml engine.",
                          k, paste(preds[[k]]$aliased, collapse = ", ")))
+    # Offsets on log scale parameters are known variance multipliers
+    # (variance weights).
     if (any(preds[[k]]$offset != 0) && isFALSE(fam$pars[[k]]$offset_allowed) &&
-        is.null(prev))
+        !identical(fam$pars[[k]]$link, "log") && is.null(prev))
       stop_input(sprintf("An offset is not allowed for parameter '%s' of '%s'.", k, fam$id))
   }
   # Data arguments (binomial trials and similar).
@@ -470,12 +478,12 @@ build_spec <- function(formula, dots, fam, data, weights = NULL, links = NULL,
 
 # Number of covariance parameters of a block, starting values and names.
 block_ntheta <- function(b) switch(b$struct, us = b$q + b$q * (b$q - 1) / 2, diag = b$q,
-  homdiag = 1, cs = b$q + 1, homcs = 2, relmat = 1, icar = 1, spacetime = 3, 2)
+  homdiag = 1, cs = b$q + 1, homcs = 2, relmat = 1, icar = 1, spacetime = 3, spde = 2, 2)
 block_theta_start <- function(b) {
   rng <- if (!is.null(b$coords) && nrow(b$coords) > 1) log(stats::median(stats::dist(b$coords))) else 0
   switch(b$struct, us = c(rep(log(0.5), b$q), rep(0, b$q * (b$q - 1) / 2)), diag = rep(log(0.5), b$q),
     homdiag = log(0.5), cs = c(rep(log(0.5), b$q), 0), homcs = c(log(0.5), 0), ar1 = c(log(0.5), 0),
-    relmat = log(0.5), icar = log(0.5), car = c(log(0.5), 0), leroux = c(log(0.5), 0), spacetime = c(log(0.5), 0, 0),
+    relmat = log(0.5), icar = log(0.5), car = c(log(0.5), 0), leroux = c(log(0.5), 0), spacetime = c(log(0.5), 0, 0), spde = c(log(0.5), log(b$M$range0)),
     c(log(0.5), rng))
 }
 block_theta_names <- function(b) {
@@ -488,6 +496,7 @@ block_theta_names <- function(b) {
     homcs = paste0(pre, c("log_sd", "rho_raw")), ar1 = paste0(pre, c("log_sd", "atanh_rho")),
     relmat = , icar = paste0(pre, "log_sd"), car = , leroux = paste0(pre, c("log_sd", "logit_rho")),
     spacetime = paste0(pre, c("log_sd", "logit_rho", "atanh_rho_time")),
+    spde = paste0(pre, c("log_sd", "log_range")),
     paste0(pre, c("log_sd", "log_range")))
 }
 
@@ -524,6 +533,13 @@ block_cov <- function(b, th) {
     # A fixed tiny variance along the constant direction, removed by the
     # Laplace step, which leaves the sum to zero constrained field.
     icar = return(exp(2 * th[1]) * b$M$K + 1e-6 / q),
+    spde = {
+      # alpha = 2 (nu = 1): Q = tau^2 (kappa^4 C + 2 kappa^2 G1 + G2),
+      # range sqrt(8) / kappa, marginal variance 1 / (4 pi kappa^2 tau^2).
+      kap <- sqrt(8) / exp(th[2]); tau2 <- 1 / (4 * pi * kap^2 * exp(2 * th[1]))
+      Q <- tau2 * (kap^4 * b$M$C0 + 2 * kap^2 * b$M$G1 + b$M$G2)
+      return(solve(Q))
+    },
     spacetime = {
       rho <- 1 / (1 + exp(-th[2])); A <- length(b$M$d)
       Ss <- solve((1 - rho) * diag(A) + rho * (diag(b$M$d) - b$M$W))

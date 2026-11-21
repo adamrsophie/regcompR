@@ -108,6 +108,9 @@ reference:
   - skovgaard_test
   - shrink_regcomp
   - mediate_regcomp
+  - pql_regcomp
+  - re_nongauss
+  - bridge_regcomp
   - uplift
   - qini
 - title: Econometrics

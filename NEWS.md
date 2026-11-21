@@ -1,6 +1,12 @@
 # regcompR 0.1.0
 
 * First release.
+* `pql_regcomp()` (penalized quasi-likelihood, equal to MASS::glmmPQL),
+  `re_nongauss()` (gamma, t, logistic and Laplace random intercepts by
+  adaptive quadrature), `spde()` Matern fields on fmesher meshes, and
+  `bridge_regcomp()` / `bayes_factor_regcomp()` (marginal likelihoods of
+  Stan fits by bridge sampling, with all normalizing constants). Offsets
+  are allowed in log scale parameters (variance weights).
 * `panel_within(y ~ x | z)` gives the within instrumental variable
   estimator (equal to plm); `vcov(type = "HAC")` (Newey-West, equal to
   sandwich); `anova(boundary = TRUE)` for variance components on their

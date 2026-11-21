@@ -102,11 +102,11 @@ drop_bars <- function(term) {
 # the distance based ou / exp (exponential), gau (Gaussian) and Matern
 # with smoothness fixed at 3/2, matern32) whose left side gives the coordinates.
 re_structs <- c("us", "diag", "homdiag", "cs", "homcs", "ar1", "ou", "exp", "gau", "matern32",
-                "relmat", "car", "leroux", "icar", "spacetime")
+                "relmat", "car", "leroux", "icar", "spacetime", "spde")
 coord_structs <- c("ou", "exp", "gau", "matern32")
 # Structures over the levels of a factor with a user given matrix: a known
 # relatedness (covariance) matrix, or an adjacency matrix for areal models.
-mat_structs <- c("relmat", "car", "leroux", "icar", "spacetime")
+mat_structs <- c("relmat", "car", "leroux", "icar", "spacetime", "spde")
 is_struct_call <- function(x) is.call(x) && is.name(x[[1]]) && as.character(x[[1]]) %in% re_structs &&
   (length(x) == 2 || length(x) == 3 && as.character(x[[1]]) %in% mat_structs) && length(find_bars_plain(x[[2]])) == 1
 find_bars_plain <- function(x) {
@@ -214,6 +214,22 @@ build_predictor <- function(rhs, data, par, xlev = NULL, smooth_specs = NULL,
     M <- NULL
     if (struct %in% mat_structs) {
       if (is.null(bb$mat)) stop_input(sprintf("%s() needs a matrix, as in %s(region | 1, W).", struct, struct))
+      if (struct == "spde") {
+        # Matern field on a triangulation (fmesher mesh): effects at the
+        # mesh nodes, projected to the data locations.
+        if (!requireNamespace("fmesher", quietly = TRUE)) stop_unsupported("spde() effects without the fmesher package")
+        mesh <- eval(bb$mat, data, env)
+        loc <- do.call(cbind, lapply(all.vars(b[[2]]), function(v) as.numeric(eval(as.name(v), data, env))))
+        if (ncol(loc) != 2) stop_input("spde() needs two coordinates, as in spde(x + y | 1, mesh).")
+        Xr <- as.matrix(fmesher::fm_basis(mesh, loc))
+        if (any(rowSums(Xr) < 0.5)) stop_input("Some locations lie outside the spde() mesh.")
+        colnames(Xr) <- paste0("node", seq_len(ncol(Xr)))
+        fem <- fmesher::fm_fem(mesh, order = 2)
+        # Start the range at a third of the extent of the locations.
+        M <- list(C0 = as.matrix(fem$c0), G1 = as.matrix(fem$g1), G2 = as.matrix(fem$g2),
+                  range0 = max(apply(loc, 2, function(v) diff(range(v)))) / 3)
+        lv <- colnames(Xr); rterms <- rxlev <- rcontr <- NULL
+      } else {
       M <- as.matrix(eval(bb$mat, data, env))
       lhs <- b[[2]]; tm <- NULL
       if (struct == "spacetime") {
@@ -241,6 +257,7 @@ build_predictor <- function(rhs, data, par, xlev = NULL, smooth_specs = NULL,
         M <- c(mat_struct_matrix("leroux", M), list(nt = nt, lv = lv, tlev = levels(tm)))
       }
       rterms <- rxlev <- rcontr <- NULL
+      }
     } else if (struct %in% coord_structs) {
       vars <- all.vars(b[[2]])
       C <- do.call(cbind, lapply(vars, function(v) as.numeric(eval(as.name(v), data, env))))

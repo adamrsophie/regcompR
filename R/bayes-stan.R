@@ -318,7 +318,7 @@ stan_data <- function(spec) {
 
 # Stan code of a structured random effect block: r_j = diag(sd) chol(R) z_j.
 stan_struct_block <- function(b, j, priors) {
-  if (b$struct == "spacetime") stop_unsupported("spacetime() random effects in Stan (use engine = \"ml\")")
+  if (b$struct %in% c("spacetime", "spde")) stop_unsupported(sprintf("%s() random effects in Stan (use engine = \"ml\")", b$struct))
   q <- sprintf("q_%d", j); L <- sprintf("L_%d", j)
   data <- c(sprintf("  int<lower=1> L_%d;", j), sprintf("  int<lower=1> q_%d;", j),
             if (is.null(b$W)) sprintf("  array[N] int<lower=1, upper=L_%d> g_%d;", j, j) else sprintf("  matrix[N, L_%d] W_%d;", j, j),

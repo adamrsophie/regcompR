@@ -166,3 +166,15 @@ support families with BUGS densities and unstructured random effects.
 family_capabilities("generalized_poisson")[c("stan", "tmb", "bugs")]
 supports(hurdle("gamma"), backend = "stan")
 ```
+
+## Marginal likelihoods and Bayes factors
+
+`bridge_regcomp()` estimates the log marginal likelihood of a Stan fit by
+bridge sampling and `bayes_factor_regcomp()` compares two fits. The model
+is rewritten with all normalizing constants, so the estimates match
+direct numerical integration (for example, -51.941 against -51.940 for a
+Poisson regression with normal priors). Use long chains.
+
+```r
+bayes_factor_regcomp(fit_with_x, fit_without_x)
+```

@@ -128,6 +128,32 @@ c(leroux = AIC(fl), bym = AIC(fb))
 plogis(fl$theta[2])   # Leroux spatial dependence
 ```
 
+### Matern fields by the SPDE approach
+
+`spde(x + y | 1, mesh)` places a Matern field on an fmesher triangulation;
+its parameters are the marginal standard deviation and the range.
+
+```{r, eval = requireNamespace("fmesher", quietly = TRUE)}
+gs <- data.frame(sx = runif(80), sy = runif(80), x = rnorm(80))
+gs$y <- 1 + 0.5 * gs$x + sin(3 * gs$sx) + cos(2 * gs$sy) + rnorm(80, 0, 0.3)
+mesh <- fmesher::fm_mesh_2d(loc = as.matrix(gs[, 1:2]), max.edge = c(0.2, 0.5), cutoff = 0.05)
+fsp <- regcomp(y ~ x + spde(sx + sy | 1, mesh), family = "normal", data = gs)
+exp(fsp$theta)
+```
+
+## Non-normal random effects and PQL
+
+`re_nongauss()` fits a random intercept with a gamma (frailty), t,
+logistic or Laplace law by adaptive quadrature, and `pql_regcomp()` fits a
+GLMM by penalized quasi-likelihood, as `MASS::glmmPQL()`.
+
+```{r}
+fr <- data.frame(g = factor(rep(1:30, each = 5)), x = rnorm(150))
+fr$y <- rpois(150, exp(0.3 + 0.4 * fr$x) * rgamma(30, 2, 2)[fr$g])
+re_nongauss(y ~ x, ~ g, family = "poisson", data = fr, re = "gamma")
+pql_regcomp(y ~ x + (1 | g), family = poisson(), data = fr)
+```
+
 ## Smooth terms
 
 Smooth terms from mgcv enter any parameter through their mixed model

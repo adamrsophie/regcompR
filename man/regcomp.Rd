@@ -114,6 +114,11 @@ is the BYM model.
 \item \code{spacetime(region + time | 1, W)}: a separable space time effect, the
 Kronecker product of a Leroux spatial and an AR(1) temporal
 correlation (time a factor of equally spaced periods).
+\item \code{spde(x + y | 1, mesh)}: a Matern field (smoothness 1) by the SPDE
+approach of Lindgren, Rue and Lindstrom (2011) on an fmesher
+triangulation, with parameters \code{log_sd} and \code{log_range}. The precision
+is sparse but the current engines use it densely, so meshes of up to a
+few hundred nodes are practical.
 }
 
 A group other than \code{1} on the right of the bar gives independent
@@ -121,8 +126,8 @@ replicates of the field (one per year, say).
 
 Structured random effects are available in every parameter and for every
 family, so a latent autoregressive process can enter a count, survival or
-ordinal model. The TMB engine does not support \code{car()}, \code{leroux()} and
-\code{spacetime()}; Stan does not support \code{spacetime()}.
+ordinal model. The TMB engine does not support \code{car()}, \code{leroux()},
+\code{spacetime()} and \code{spde()}; Stan does not support \code{spacetime()} and \code{spde()}.
 }
 
 \section{Engines}{
