@@ -367,7 +367,8 @@ build_spec <- function(formula, dots, fam, data, weights = NULL, links = NULL,
       prev_pred = if (!is.null(prev)) prev$preds[[k]],
       smooth_specs = if (!is.null(prev)) prev$preds[[k]]$smooths,
       re_levels = if (!is.null(prev)) { pb <- prev$preds[[k]]$blocks; lab <- vapply(pb, `[[`, "", "label")
-        c(stats::setNames(lapply(pb, `[[`, "levels"), lab), stats::setNames(lapply(pb, `[[`, "coords"), paste0(".coords.", lab))) })
+        c(stats::setNames(lapply(pb, `[[`, "levels"), lab), stats::setNames(lapply(pb, `[[`, "coords"), paste0(".coords.", lab)),
+          stats::setNames(lapply(pb, function(b) if (is.list(b$M)) b$M[intersect(c("lv", "tlev"), names(b$M))]), paste0(".mat.", lab))) })
     preds[[k]]$dot_formula <- fk
     if (length(preds[[k]]$aliased) && !allow_aliased)
       stop_input(sprintf("The design for '%s' is rank deficient; aliased columns: %s. Remove them from the formula, or use a shrinkage penalty (ridge, lasso and similar) with the ml engine.",

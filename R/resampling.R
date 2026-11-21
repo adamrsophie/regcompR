@@ -175,6 +175,8 @@ update_cov <- function(f) {
 vuong_test <- function(object1, object2) {
   if (object1$inference != "frequentist" || object2$inference != "frequentist") stop_unsupported("The Vuong test for a Bayesian fit")
   same_response(list(object1, object2), "The Vuong test")
+  if (object1$spec$Q > 0 || object2$spec$Q > 0)
+    stop_unsupported("The Vuong test for models with random effects or smooths (pointwise log likelihoods are conditional)")
   m <- log_lik(object1) - log_lik(object2)
   n <- length(m)
   dk <- object1$df - object2$df

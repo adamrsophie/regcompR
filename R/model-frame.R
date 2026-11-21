@@ -219,23 +219,26 @@ build_predictor <- function(rhs, data, par, xlev = NULL, smooth_specs = NULL,
       if (struct == "spacetime") {
         if (!is.call(lhs) || !identical(lhs[[1]], as.name("+")) || length(lhs) != 3)
           stop_input("spacetime() needs an area and a time variable, as in spacetime(region + time | 1, W).")
-        tm <- factor(eval(lhs[[3]], data, env)); lhs <- lhs[[2]]
+        tm <- eval(lhs[[3]], data, env); lhs <- lhs[[2]]
       }
+      # New data reuse the area and time levels of the fit.
+      pm <- re_levels[[paste0(".mat.", paste(deparse(bb$key, width.cutoff = 500L), collapse = ""))]]
+      if (!is.null(tm)) tm <- factor(tm, levels = pm$tlev %||% levels(factor(tm)))
       v <- as.character(eval(lhs, data, env))
-      lv <- rownames(M) %||% levels(factor(v))
+      lv <- rownames(M) %||% pm$lv %||% levels(factor(v))
       if (nrow(M) != ncol(M) || nrow(M) != length(lv))
         stop_input(sprintf("The %s() matrix must be square with one row per level of %s.", struct, deparse(b[[2]])))
       if (any(is.na(match(v[!is.na(v)], lv)))) stop_input(sprintf("Some levels of %s are not rows of the %s() matrix.", deparse(b[[2]]), struct))
       if (is.null(tm)) {
         Xr <- outer(match(v, lv), seq_along(lv), `==`) * 1
         colnames(Xr) <- lv
-        M <- mat_struct_matrix(struct, M)
+        M <- c(mat_struct_matrix(struct, M), list(lv = lv))
       } else {
         # Area major, time minor: the order of kronecker(S_area, R_time).
         nt <- nlevels(tm)
         Xr <- outer((match(v, lv) - 1) * nt + as.integer(tm), seq_len(length(lv) * nt), `==`) * 1
         colnames(Xr) <- paste(rep(lv, each = nt), rep(levels(tm), length(lv)), sep = ":")
-        M <- c(mat_struct_matrix("leroux", M), list(nt = nt))
+        M <- c(mat_struct_matrix("leroux", M), list(nt = nt, lv = lv, tlev = levels(tm)))
       }
       rterms <- rxlev <- rcontr <- NULL
     } else if (struct %in% coord_structs) {

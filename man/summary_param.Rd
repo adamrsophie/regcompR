@@ -32,6 +32,8 @@ the derivative of the log density (or the lower end of the support).
 }
 \examples{
 gm <- summary_param("gamma", type = "mode")
+\donttest{
 d <- data.frame(x = runif(200)); d$y <- rgamma(200, shape = 3, scale = exp(1 + d$x) / 2)
 coef(regcomp(y ~ x, family = gm, data = d))
+}
 }

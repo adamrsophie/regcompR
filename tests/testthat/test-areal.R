@@ -22,6 +22,8 @@ test_that("relatedness, CAR, Leroux and intrinsic CAR effects give the exact nor
     expect_equal(as.numeric(logLik(f)), -o$value, tolerance = 1e-6, info = st)
     expect_equal(unname(c(coef(f), f$theta)), o$par, tolerance = 1e-3, info = st)
   }
+  Kn <- unname(K); fk <- regcomp(y ~ x + relmat(region | 1, Kn), family = "normal", data = d)
+  expect_equal(unname(predict(fk, newdata = d[d$region == "r3", ])), unname(predict(fk)[d$region == "r3"]))
   expect_error(regcomp(y ~ x + car(region | 1, W[-1, -1]), family = "normal", data = d), "not rows")
   expect_error(regcomp(y ~ x + car(region | 1, W), family = "normal", data = d, engine = "tmb"), class = "regcomp_unsupported")
 })
@@ -32,7 +34,9 @@ test_that("a separable space time effect gives the exact normal marginal likelih
   d <- expand.grid(time = 1:4, region = rownames(W)); d <- rbind(d, d); d$x <- rnorm(nrow(d))
   u <- rnorm(A * 4); d$y <- 1 + 0.5 * d$x + u[(match(d$region, rownames(W)) - 1) * 4 + d$time] + rnorm(nrow(d), 0, 0.5)
   f <- regcomp(y ~ x + spacetime(region + time | 1, W), family = "normal", data = d)
-  b <- f$spec$blocks[[1]]; Z <- b$Xr; X <- cbind(1, d$x)
+  b <- f$spec$blocks[[1]]; X <- cbind(1, d$x)
+  Z <- outer((match(d$region, rownames(W)) - 1) * 4 + d$time, seq_len(A * 4), `==`) * 1
+  expect_equal(unname(predict(f, newdata = d[d$time == 3, ])), unname(predict(f)[d$time == 3]))
   nll <- function(p) -mvtnorm::dmvnorm(d$y, X %*% p[1:2], exp(2 * p[3]) * diag(nrow(d)) +
     Z %*% regcompR:::block_cov(b, p[4:6]) %*% t(Z), log = TRUE)
   o <- optim(c(1, 0.5, log(0.5), 0, 0, 0), nll, method = "BFGS", control = list(reltol = 1e-12, maxit = 2000))

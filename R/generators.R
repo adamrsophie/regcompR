@@ -461,8 +461,10 @@ vroot <- function(f, lo, hi, tol = 1e-12, maxit = 200) {
 #' @export
 #' @examples
 #' gm <- summary_param("gamma", type = "mode")
+#' \donttest{
 #' d <- data.frame(x = runif(200)); d$y <- rgamma(200, shape = 3, scale = exp(1 + d$x) / 2)
 #' coef(regcomp(y ~ x, family = gm, data = d))
+#' }
 summary_param <- function(base, par = names(get_family(base)$pars)[1],
                           type = c("mean", "mode", "geometric_mean", "harmonic_mean")) {
   type <- match.arg(type); base <- get_family(base)
@@ -497,9 +499,12 @@ summary_param <- function(base, par = names(get_family(base)$pars)[1],
     n <- max(lengths(p)); p <- lapply(p, rep_len, n)
     f <- function(e) { q <- p[others]; q[[par]] <- lk$linkinv(e); fun(q[bn]) - p$q }
     lo <- rep(-2, n); hi <- rep(2, n)
-    for (j in 1:40) { s <- sign(f(lo)) != sign(f(hi)); if (all(s, na.rm = TRUE)) break
+    for (j in 1:40) { s <- sign(f(lo)) != sign(f(hi)); s[is.na(s)] <- FALSE; if (all(s)) break
       lo[!s] <- lo[!s] * 1.6; hi[!s] <- hi[!s] * 1.6 }
-    q <- p[others]; q[[par]] <- lk$linkinv(vroot(f, lo, hi)); q[bn]
+    # No bracket: the summary cannot take this value (say the gamma mode
+    # when the shape is at most 1); the likelihood is then rejected.
+    e <- rep(NA_real_, n); if (any(s)) e[s] <- vroot(function(x) { ee <- e; ee[s] <- x; f(ee)[s] }, lo[s], hi[s])
+    q <- p[others]; q[[par]] <- lk$linkinv(e); q[bn]
   }
   qpar <- P("q", if (base$category == "bounded") "unit" else if (base$category == "positive") "positive" else "real",
             role = sub("_", " ", type), offset_allowed = TRUE)
