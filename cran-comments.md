@@ -8,12 +8,14 @@ This is the first submission of regcompR.
 
 * This is a new submission. 'cmdstanr' is a suggested package outside the
   mainstream repositories, available from the `Additional_repositories`
-  given in DESCRIPTION.
+  given in DESCRIPTION. The words flagged as possibly misspelled
+  (Kristensen, Rigby, Stasinopoulos, et al) are author names in citations.
 
 ## Test environments
 
 * local macOS (aarch64), R release
 * GitHub Actions: ubuntu-latest (devel, release, oldrel-1), windows-latest (release)
+* win-builder: R-devel (2026-11-17 r90926 ucrt), 1 NOTE (new submission)
 
 ## Notes for the reviewers
 
