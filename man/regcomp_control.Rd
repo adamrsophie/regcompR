@@ -16,7 +16,7 @@ regcomp_control(
   iter_warmup = 1000,
   iter_sampling = 1000,
   seed = 1,
-  runner = c("bayescompR", "cmdstanr", "rstan", "jags", "openbugs"),
+  runner = NULL,
   cores = 1,
   adapt_delta = 0.8,
   start = NULL,
@@ -44,7 +44,9 @@ optimization fails.}
 \item{chains, iter_warmup, iter_sampling, seed, runner, cores}{Bayesian
 settings: chains, iterations, seed, the runner (\code{"bayescompR"},
 \code{"cmdstanr"} or \code{"rstan"} for Stan, \code{"jags"} through 'R2jags' or
-\code{"openbugs"} through 'R2OpenBUGS') and parallel chains.}
+\code{"openbugs"} through 'R2OpenBUGS') and parallel chains. The default
+runner is the first installed of bayescompR (available from GitHub),
+cmdstanr and rstan.}
 
 \item{adapt_delta}{Target acceptance for NUTS.}
 

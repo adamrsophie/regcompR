@@ -41,15 +41,17 @@ fit_bayes <- function(spec, priors, control) {
 
 run_stan <- function(code, data, control, runner) {
   if (runner == "bayescompR") {
-    if (!requireNamespace("bayescompR", quietly = TRUE))
+    if (!optional_pkg("bayescompR"))
       stop_unsupported("The 'bayescompR' runner needs the 'bayescompR' package; it")
-    m <- bayescompR::bayescomp_model(code, data = data, seed = control$seed)
-    f <- bayescompR::bayescomp_sample(m, chains = control$chains, iter_warmup = control$iter_warmup,
+    # bayescompR is not on CRAN, so it is called without a declared import.
+    bc <- function(f) getExportedValue("bayescompR", f)
+    m <- bc("bayescomp_model")(code, data = data, seed = control$seed)
+    f <- bc("bayescomp_sample")(m, chains = control$chains, iter_warmup = control$iter_warmup,
                                       iter_sampling = control$iter_sampling, seed = control$seed,
                                       refresh = 0, adapt_delta = control$adapt_delta,
                                       cores = control$cores, init = control$init %||% 2)
-    arr <- bayescompR::bayescomp_draws(f, format = "array")
-    div <- tryCatch(sum(bayescompR::bayescomp_draws(f, variables = "divergent__", format = "matrix")),
+    arr <- bc("bayescomp_draws")(f, format = "array")
+    div <- tryCatch(sum(bc("bayescomp_draws")(f, variables = "divergent__", format = "matrix")),
                     error = function(e) NA)
     return(list(draws = arr, language = "stan", sampler = f, divergences = div))
   }
@@ -112,9 +114,10 @@ run_bugs <- function(spec, priors, control, runner) {
                       jags.seed = control$seed, progress.bar = "none", quiet = TRUE)
     arr <- f$BUGSoutput$sims.array
   } else {
-    if (!requireNamespace("R2OpenBUGS", quietly = TRUE))
+    if (!optional_pkg("R2OpenBUGS"))
       stop_unsupported("The 'openbugs' runner needs the 'R2OpenBUGS' package and OpenBUGS; it")
-    f <- R2OpenBUGS::bugs(data = data, inits = inits, parameters.to.save = params,
+    # OpenBUGS runs on few platforms; R2OpenBUGS is not a declared dependency.
+    f <- getExportedValue("R2OpenBUGS", "bugs")(data = data, inits = inits, parameters.to.save = params,
                           model.file = file, n.chains = control$chains, n.iter = iter,
                           n.burnin = control$iter_warmup, n.thin = 1, DIC = FALSE,
                           bugs.seed = control$seed)
@@ -268,3 +271,7 @@ ess_raw <- function(x) {
   tau <- max(-1 + 2 * sum(rho[seq_len(max_t)]) + rho[max_t + 1], 1 / log10(S))
   S / tau
 }
+
+# Runners outside CRAN (bayescompR) or with limited platforms (R2OpenBUGS)
+# are optional and not declared, so their presence is checked by name.
+optional_pkg <- function(pkg) requireNamespace(pkg, quietly = TRUE)

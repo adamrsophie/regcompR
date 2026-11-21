@@ -185,7 +185,9 @@ model_family <- function(family, parameterization, formula, data) {
 #' @param chains,iter_warmup,iter_sampling,seed,runner,cores Bayesian
 #'   settings: chains, iterations, seed, the runner (`"bayescompR"`,
 #'   `"cmdstanr"` or `"rstan"` for Stan, `"jags"` through 'R2jags' or
-#'   `"openbugs"` through 'R2OpenBUGS') and parallel chains.
+#'   `"openbugs"` through 'R2OpenBUGS') and parallel chains. The default
+#'   runner is the first installed of bayescompR (available from GitHub),
+#'   cmdstanr and rstan.
 #' @param adapt_delta Target acceptance for NUTS.
 #' @param init Initial values for the Stan runners: a radius for uniform
 #'   initial values on the unconstrained scale (the default is 2), or a list
@@ -206,13 +208,13 @@ regcomp_control <- function(maxit = 1000, rel_tol = 1e-10, inner_maxit = 50,
                             inner_tol = 1e-8, restarts = 2, hessian = TRUE,
                             trace = FALSE, chains = 4, iter_warmup = 1000,
                             iter_sampling = 1000, seed = 1,
-                            runner = c("bayescompR", "cmdstanr", "rstan", "jags", "openbugs"),
+                            runner = NULL,
                             cores = 1, adapt_delta = 0.8, start = NULL,
                             prox_maxit = 5000, prox_tol = 1e-8, init = NULL) {
   list(maxit = maxit, rel_tol = rel_tol, inner_maxit = inner_maxit,
        inner_tol = inner_tol, restarts = restarts, hessian = hessian,
        trace = trace, chains = chains, iter_warmup = iter_warmup,
-       iter_sampling = iter_sampling, seed = seed, runner = match.arg(runner),
+       iter_sampling = iter_sampling, seed = seed, runner = default_runner(runner),
        cores = cores, adapt_delta = adapt_delta, start = start,
        prox_maxit = prox_maxit, prox_tol = prox_tol, init = init)
 }
@@ -1000,4 +1002,11 @@ obs_count <- function(spec) {
   y <- spec$y
   ok <- if (is.matrix(y)) stats::complete.cases(y) else !is.na(y)
   sum(rep_len(spec$weights, length(ok)) > 0 & ok)
+}
+
+default_runner <- function(runner) {
+  ok <- c("bayescompR", "cmdstanr", "rstan", "jags", "openbugs")
+  if (!is.null(runner)) return(match.arg(runner, ok))
+  for (r in ok[1:2]) if (requireNamespace(r, quietly = TRUE)) return(r)
+  "rstan"
 }

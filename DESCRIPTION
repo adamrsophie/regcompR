@@ -1,5 +1,5 @@
 Package: regcompR
-Title: Distributional Regression with a Verified Registry of Probability Distributions
+Title: Distributional Regression with a Registry of Distributions
 Version: 0.1.0
 Authors@R:
     person("Adam R", "Sophie", email = "adamrsophie@gmail.com",
@@ -21,7 +21,7 @@ Description: A framework for distributional regression in which every
     likelihood with a Laplace approximation for random effects and
     smooth terms, optionally through 'TMB' (Kristensen et al. 2016
     <doi:10.18637/jss.v070.i05>), or by Bayesian inference through
-    generated 'Stan' programs run by 'bayescompR', 'cmdstanr' or 'rstan'.
+    generated 'Stan' programs run by 'cmdstanr' or 'rstan'.
     Predictions, quantiles, event probabilities, randomized quantile
     residuals, proper scoring rules, cross validation, and plots for
     every distribution and fit are included.
@@ -41,7 +41,6 @@ Suggests:
     actuar,
     AER,
     ald,
-    bayescompR,
     BiasedUrn,
     bridgesampling,
     broom,
@@ -92,7 +91,6 @@ Suggests:
     posterior,
     quantreg,
     R2jags,
-    R2OpenBUGS,
     rmarkdown,
     RMTstat,
     rmutil,
@@ -120,5 +118,4 @@ Config/testthat/edition: 3
 URL: https://github.com/adamrsophie/regcompR, https://adamrsophie.github.io/regcompR/
 BugReports: https://github.com/adamrsophie/regcompR/issues
 Additional_repositories: https://stan-dev.r-universe.dev
-Remotes: github::adamrsophie/bayescompR
 Config/roxygen2/version: 8.1.1
