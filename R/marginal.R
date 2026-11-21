@@ -41,10 +41,15 @@ obs_scores <- function(fit) {
 #' the number of coefficients; `"HC2"` and `"HC3"` divide each score by
 #' `sqrt(1 - h_i)` and `1 - h_i`, with leverages `h_i` the diagonal of the
 #' weighted hat matrix (MacKinnon and White 1985). For a one parameter GLM
-#' (Poisson, binomial) they equal `sandwich::vcovHC()`.
+#' (Poisson, binomial) they equal `sandwich::vcovHC()`. `"HAC"` is the
+#' Newey-West covariance for serially correlated rows (in data order), with
+#' Bartlett weights `1 - l / (lag + 1)`; it equals
+#' `sandwich::NeweyWest(prewhite = FALSE, adjust = FALSE)`.
 #'
 #' @param object A fitted model.
-#' @param type `"model"`, `"sandwich"` (`"HC0"`), `"HC1"`, `"HC2"`, `"HC3"` or `"quasi"`.
+#' @param type `"model"`, `"sandwich"` (`"HC0"`), `"HC1"`, `"HC2"`, `"HC3"`, `"HAC"` or `"quasi"`.
+#' @param lag Maximum lag of the HAC covariance (default
+#'   `floor(4 (n / 100)^(2 / 9))`).
 #' @param cluster Optional cluster identifier: a vector, or a one sided
 #'   formula evaluated in the model data.
 #' @param ... Unused.
@@ -56,7 +61,8 @@ obs_scores <- function(fit) {
 #' d$y <- rpois(150, exp(0.3 + 0.5 * d$x + rnorm(30, 0, 0.5)[d$g]))
 #' fit <- regcomp(y ~ x, family = "poisson", data = d)
 #' sqrt(diag(vcov(fit, type = "sandwich", cluster = ~ g)))
-vcov.regcomp_fit <- function(object, type = c("model", "sandwich", "quasi", "HC0", "HC1", "HC2", "HC3"), cluster = NULL, ...) {
+vcov.regcomp_fit <- function(object, type = c("model", "sandwich", "quasi", "HC0", "HC1", "HC2", "HC3", "HAC"), cluster = NULL,
+                             lag = NULL, ...) {
   type <- match.arg(type)
   if (type == "HC0") type <- "sandwich"
   bn <- object$spec$beta_names
@@ -71,6 +77,17 @@ vcov.regcomp_fit <- function(object, type = c("model", "sandwich", "quasi", "HC0
   if (object$spec$Q > 0) stop_unsupported(sprintf("A %s covariance for models with random effects or smooths", type))
   if (type == "quasi") return(V * sum(stats::residuals(object, type = "pearson")^2) / (object$nobs - length(bn)))
   S <- obs_scores(object)
+  if (type == "HAC") {
+    # Newey and West (1987): Bartlett weighted autocovariances of the
+    # scores, in the row order of the data.
+    if (!is.null(cluster)) stop_unsupported("HAC covariances with clusters")
+    n <- nrow(S); lag <- lag %||% floor(4 * (n / 100)^(2 / 9))
+    M <- crossprod(S)
+    for (l in seq_len(min(lag, n - 1))) { G <- crossprod(S[-seq_len(l), , drop = FALSE], S[seq_len(n - l), , drop = FALSE])
+      M <- M + (1 - l / (lag + 1)) * (G + t(G)) }
+    out <- V %*% M %*% V; dimnames(out) <- list(bn, bn)
+    return(out)
+  }
   if (type %in% c("HC2", "HC3")) {
     if (!is.null(cluster)) stop_unsupported("HC2 and HC3 with clusters")
     h <- obs_leverage(object, V)

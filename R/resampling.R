@@ -263,12 +263,8 @@ skovgaard_test <- function(object, term, value = 0, R = 1000, seed = 1) {
   if (is.na(k)) stop_input(sprintf("Unknown coefficient '%s'.", term))
   bh <- unname(object$coefficients); p <- length(bh); bs <- coef_scale(spec, object$coefficients)
   info <- function(sp, b) { H <- num_jacobian(function(x) ml_gradient(sp, x), b, bs); -(H + t(H)) / 2 }
-  # Constrained fit with the coefficient held at value.
   b0 <- bh; b0[k] <- value
-  full <- function(z) { b <- b0; b[-k] <- z; b }
-  o <- stats::nlminb(bh[-k], function(z) -ml_objective(spec, full(z)), function(z) -ml_gradient(spec, full(z))[-k],
-                     scale = 1 / bs[-k], control = list(eval.max = 1000, iter.max = 1000, rel.tol = 1e-12))
-  bt <- full(o$par)
+  bt <- constrained_ml(spec, b0, k, bs)
   r <- sign(bh[k] - value) * sqrt(max(2 * (ml_objective(spec, bh) - ml_objective(spec, bt)), 0))
   jh <- info(spec, bh); jt <- info(spec, bt)
   local_seed(seed)
@@ -288,4 +284,61 @@ skovgaard_test <- function(object, term, value = 0, R = 1000, seed = 1) {
   w <- (bh[k] - value) * sqrt(1 / solve(jh)[k, k])
   st <- c(Wald = w, r = r, `r*` = rs)
   data.frame(statistic = st, p_value = 2 * stats::pnorm(-abs(st)), row.names = names(st))
+}
+
+# Maximum likelihood over the coefficients other than `fixed`, which stay
+# at their values in `beta`.
+constrained_ml <- function(spec, beta, fixed, bs = rep(1, length(beta))) {
+  full <- function(z) { b <- beta; b[-fixed] <- z; b }
+  o <- stats::nlminb(beta[-fixed], function(z) -ml_objective(spec, full(z)), function(z) -ml_gradient(spec, full(z))[-fixed],
+                     scale = 1 / bs[-fixed], control = list(eval.max = 1000, iter.max = 1000, rel.tol = 1e-12))
+  full(o$par)
+}
+
+#' Predictive shrinkage of regression coefficients
+#'
+#' Shrinks the slopes of one parameter by a common factor `c` to correct
+#' the overfitting of predictions in new data: the heuristic factor
+#' `c = (LR - df) / LR` of van Houwelingen and le Cessie (1990), with `LR`
+#' the likelihood ratio statistic against the model without the
+#' parameter's covariates and `df` its degrees of freedom, or a factor
+#' given by the user. The intercept and the other parameters (precision of
+#' a beta regression, say) are then re-estimated with the shrunken slopes
+#' held fixed. Works for any family (beta regression, GLMs, distributional
+#' models) without random effects.
+#'
+#' @param object A fitted model (frequentist, no random effects).
+#' @param par Parameter whose slopes are shrunk (default the first).
+#' @param factor Optional shrinkage factor in (0, 1]; default heuristic.
+#' @return The fit with shrunken coefficients (without standard errors), with
+#'   the factor as attribute `"shrinkage"`.
+#' @references van Houwelingen and le Cessie (1990), Predictive value of
+#'   statistical models. Stat. Med., 9, 1303-1325.
+#' @export
+#' @examples
+#' d <- data.frame(x1 = rnorm(60), x2 = rnorm(60), x3 = rnorm(60))
+#' d$y <- rbeta(60, plogis(0.3 * d$x1) * 10, (1 - plogis(0.3 * d$x1)) * 10)
+#' f <- regcomp(y ~ x1 + x2 + x3, family = "beta", data = d)
+#' attr(shrink_regcomp(f), "shrinkage")
+shrink_regcomp <- function(object, par = NULL, factor = NULL) {
+  no_nl(object, "Shrinkage")
+  if (object$inference != "frequentist") stop_unsupported("Shrinkage of a Bayesian fit")
+  spec <- object$spec
+  if (spec$Q > 0 || length(spec$aux)) stop_unsupported("Shrinkage for models with random effects, smooths or thresholds")
+  par <- par %||% spec$rpars[1]
+  idx <- spec$beta_idx[[par]]; slopes <- idx[colnames(spec$preds[[par]]$X) != "(Intercept)"]
+  if (!length(slopes)) stop_input(sprintf("The parameter '%s' has no slopes to shrink.", par))
+  beta <- unname(object$coefficients); bs <- coef_scale(spec, object$coefficients)
+  if (is.null(factor)) {
+    b0 <- beta; b0[slopes] <- 0
+    lr <- 2 * (object$logLik - ml_objective(spec, constrained_ml(spec, b0, slopes, bs)))
+    factor <- max(0, (lr - length(slopes)) / lr)
+  }
+  if (factor < 0 || factor > 1) stop_input("factor must lie in [0, 1].")
+  b1 <- beta; b1[slopes] <- factor * beta[slopes]
+  b1 <- constrained_ml(spec, b1, slopes, bs)
+  out <- object
+  out$coefficients[] <- b1; out$logLik <- ml_objective(spec, b1); out$vcov <- NULL
+  attr(out, "shrinkage") <- factor
+  out
 }

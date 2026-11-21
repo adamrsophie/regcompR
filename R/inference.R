@@ -18,6 +18,9 @@ same_response <- function(fits, what) {
 #' Self and Liang 1987).
 #'
 #' @param object,... Fitted models.
+#' @param boundary If `TRUE`, p values for an added variance component
+#'   use the 50:50 mixture of chi squares with `df - 1` and `df` degrees of
+#'   freedom (Self and Liang 1987), as the variance lies on its boundary.
 #' @return A data frame of class `anova` with degrees of freedom, log
 #'   likelihood, AIC, the likelihood ratio statistic, its degrees of
 #'   freedom and p value.
@@ -27,7 +30,7 @@ same_response <- function(fits, what) {
 #' f1 <- regcomp(y ~ x, family = "poisson", data = d)
 #' f2 <- regcomp(y ~ x + z, family = "poisson", data = d)
 #' anova(f1, f2)
-anova.regcomp_fit <- function(object, ...) {
+anova.regcomp_fit <- function(object, ..., boundary = FALSE) {
   fits <- c(list(object), list(...))
   if (length(fits) < 2) stop_input("anova() of regcompR fits compares two or more nested models.")
   same_response(fits, "A likelihood ratio test")
@@ -35,9 +38,15 @@ anova.regcomp_fit <- function(object, ...) {
   o <- order(vapply(fits, `[[`, 0, "df")); fits <- fits[o]
   ll <- vapply(fits, `[[`, 0, "logLik"); df <- vapply(fits, `[[`, 0, "df")
   lr <- c(NA, 2 * diff(ll)); ddf <- c(NA, diff(df))
+  pv <- stats::pchisq(lr, ddf, lower.tail = FALSE)
+  # One added variance on its boundary (plus ddf - 1 unconstrained
+  # covariances): a 50:50 mixture of chi squares with ddf - 1 and ddf df
+  # (Self and Liang 1987; Stram and Lee 1994).
+  if (boundary) pv <- 0.5 * pv + 0.5 * ifelse(ddf > 1, stats::pchisq(lr, pmax(ddf - 1, 1), lower.tail = FALSE), 0)
   out <- data.frame(df = df, logLik = ll, AIC = -2 * ll + 2 * df, Chisq = lr, `Chi Df` = ddf,
-                    `Pr(>Chisq)` = stats::pchisq(lr, ddf, lower.tail = FALSE), check.names = FALSE, row.names = nm[o])
-  structure(out, heading = "Likelihood ratio tests\n", class = c("anova", "data.frame"))
+                    `Pr(>Chisq)` = pv, check.names = FALSE, row.names = nm[o])
+  structure(out, heading = if (boundary) "Likelihood ratio tests (boundary mixture p values)\n" else "Likelihood ratio tests\n",
+            class = c("anova", "data.frame"))
 }
 
 #' Wald tests of linear hypotheses

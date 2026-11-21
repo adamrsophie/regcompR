@@ -1,6 +1,11 @@
 # regcompR 0.1.0
 
 * First release.
+* `panel_within(y ~ x | z)` gives the within instrumental variable
+  estimator (equal to plm); `vcov(type = "HAC")` (Newey-West, equal to
+  sandwich); `anova(boundary = TRUE)` for variance components on their
+  boundary; `shrink_regcomp()` (predictive shrinkage, any family including
+  beta regression); `mediate_regcomp()` (causal mediation, as mediation).
 * `summary_param()` reparameterizes a family by its mean, mode, geometric
   or harmonic mean; `uplift()` and `qini()` (equal to tools4uplift) for
   uplift models; `skovgaard_test()` gives Skovgaard's modified directed

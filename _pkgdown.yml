@@ -106,6 +106,8 @@ reference:
   - boot_regcomp
   - power_sim
   - skovgaard_test
+  - shrink_regcomp
+  - mediate_regcomp
   - uplift
   - qini
 - title: Econometrics

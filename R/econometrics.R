@@ -116,10 +116,13 @@ iv_regcomp <- function(formula, data) {
 #' Least squares after subtracting the unit means (and, for two way
 #' effects, after also projecting out time dummies), as `plm(model =
 #' "within")`. Equal to least squares with unit (and time) dummies, without
-#' building them.
+#' building them. A three part formula `y ~ x | z` gives the within
+#' (fixed effects) instrumental variable estimator: two stage least squares
+#' on the demeaned data, as `plm(y ~ x | z, model = "within")`.
 #'
 #' @param formula A formula `y ~ x1 + x2` without an intercept term
-#'   (absorbed by the unit effects).
+#'   (absorbed by the unit effects), or `y ~ regressors | instruments` for
+#'   instrumental variables.
 #' @param data A data frame.
 #' @param id,time Names of the unit and time variables in `data`.
 #' @param effect `"individual"` or `"twoways"`.
@@ -133,22 +136,34 @@ iv_regcomp <- function(formula, data) {
 panel_within <- function(formula, data, id, time = NULL, effect = c("individual", "twoways")) {
   effect <- match.arg(effect); cl <- match.call()
   if (effect == "twoways" && is.null(time)) stop_input("Two way effects need time.")
-  mf <- stats::model.frame(formula, data)
+  iv <- length(formula) == 3 && is.call(formula[[3]]) && identical(formula[[3]][[1]], as.name("|"))
+  env <- environment(formula)
+  fx <- if (iv) stats::as.formula(call("~", formula[[2]], formula[[3]][[2]]), env = env) else formula
+  all_f <- if (iv) stats::as.formula(call("~", formula[[2]], call("+", formula[[3]][[2]], formula[[3]][[3]])), env = env) else formula
+  mf <- stats::model.frame(all_f, data)
   keep <- as.integer(rownames(mf)); if (anyNA(keep)) keep <- seq_len(nrow(mf))
   g <- factor(data[[id]][keep])
   y <- stats::model.response(mf)
-  X <- stats::model.matrix(formula, mf); X <- X[, colnames(X) != "(Intercept)", drop = FALSE]
+  noint <- function(M) M[, colnames(M) != "(Intercept)", drop = FALSE]
+  X <- noint(stats::model.matrix(fx, mf))
+  Z <- if (iv) noint(stats::model.matrix(stats::as.formula(call("~", formula[[3]][[3]]), env = env), mf)) else X
   if (effect == "twoways") {
     tt <- factor(data[[time]][keep]); Tm <- stats::model.matrix(~ tt)[, -1, drop = FALSE]
-    X <- cbind(X, Tm)
+    X <- cbind(X, Tm); Z <- cbind(Z, Tm)
   }
-  dm <- function(v) v - stats::ave(v, g)
-  Xw <- apply(X, 2, dm); if (!is.matrix(Xw)) Xw <- matrix(Xw, ncol = ncol(X), dimnames = list(NULL, colnames(X)))
-  st <- ols(Xw, dm(y))
+  dm <- function(M) { M <- as.matrix(M); out <- apply(M, 2, function(v) v - stats::ave(v, g))
+    matrix(out, ncol = ncol(M), dimnames = list(NULL, colnames(M))) }
+  Xw <- dm(X); Zw <- dm(Z); yw <- drop(dm(y))
+  if (iv) {
+    if (ncol(Zw) < ncol(Xw)) stop_input("Fewer instruments than regressors: the model is not identified.")
+    Xh <- Zw %*% qr.coef(qr(Zw), Xw); colnames(Xh) <- colnames(Xw)
+    st <- ols(Xh, yw); st$res <- drop(yw - Xw %*% st$b)
+  } else st <- ols(Xw, yw)
   n <- length(y); df <- n - nlevels(g) - ncol(X)
   V <- sum(st$res^2) / df * st$XtXi; dimnames(V) <- list(colnames(X), colnames(X)); b <- st$b; names(b) <- colnames(X)
   k <- if (effect == "twoways") setdiff(colnames(X), colnames(Tm)) else colnames(X)
-  new_regcomp_lm(b[k], V[k, k, drop = FALSE], st$res, df, sprintf("within estimator (%s effects)", effect), cl)
+  new_regcomp_lm(b[k], V[k, k, drop = FALSE], st$res, df,
+                 sprintf("within %sestimator (%s effects)", if (iv) "instrumental variables " else "", effect), cl)
 }
 
 #' Hausman test

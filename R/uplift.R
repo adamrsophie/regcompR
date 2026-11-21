@@ -90,3 +90,68 @@ plot.regcomp_qini <- function(x, ...) {
   graphics::lines(c(0, 1), c(0, x$inc_uplift[nrow(x)]), lty = 2)
   invisible(x)
 }
+
+#' Causal mediation analysis
+#'
+#' Average causal mediation effects (ACME), average direct effects (ADE),
+#' the total effect and the proportion mediated from a mediator model and
+#' an outcome model, by the quasi-Bayesian Monte Carlo method of Imai,
+#' Keele and Tingley (2010), as `mediation::mediate()`: coefficients are
+#' drawn from their asymptotic normal distribution, mediators are simulated
+#' from the mediator model under treatment and control, and outcomes are
+#' predicted under each combination. Any families (and distributional
+#' models) without random effects.
+#'
+#' @param med Fitted mediator model (with the treatment as covariate).
+#' @param out Fitted outcome model (with treatment and mediator).
+#' @param treat Name of the treatment variable.
+#' @param mediator Name of the mediator variable (the response of `med`).
+#' @param treated,control Treatment values compared.
+#' @param sims Number of Monte Carlo draws.
+#' @param level Interval level.
+#' @param seed Random seed.
+#' @return A data frame with estimates, intervals and two sided Monte Carlo
+#'   p values for ACME and ADE under control and treatment, their
+#'   averages, the total effect and the proportion mediated (the median of
+#'   its draws).
+#' @references Imai, Keele and Tingley (2010), A general approach to causal
+#'   mediation analysis. Psychological Methods, 15, 309-334.
+#' @export
+#' @examples
+#' set.seed(1); n <- 300
+#' d <- data.frame(t = rbinom(n, 1, 0.5), x = rnorm(n))
+#' d$m <- rnorm(n, 0.5 * d$t + 0.3 * d$x); d$y <- rpois(n, exp(0.2 + 0.3 * d$m + 0.2 * d$t))
+#' mm <- regcomp(m ~ t + x, family = "normal", data = d)
+#' my <- regcomp(y ~ t + m + x, family = "poisson", data = d)
+#' mediate_regcomp(mm, my, "t", "m", sims = 200)
+mediate_regcomp <- function(med, out, treat, mediator, treated = 1, control = 0, sims = 1000, level = 0.95, seed = 1) {
+  for (f in list(med, out)) {
+    if (f$inference != "frequentist") stop_unsupported("Mediation analysis of a Bayesian fit")
+    if (f$spec$Q > 0) stop_unsupported("Mediation analysis with random effects")
+  }
+  local_seed(seed)
+  d <- out$model_data
+  draw <- function(f) { V <- stats::vcov(f); b <- f$coefficients
+    sweep(matrix(stats::rnorm(sims * length(b)), sims) %*% chol(V), 2, b, `+`) }
+  Bm <- draw(med); Bo <- draw(out)
+  at <- function(t) { x <- d; x[[treat]] <- if (is.factor(d[[treat]])) factor(t, levels = levels(d[[treat]])) else t; x }
+  d1 <- at(treated); d0 <- at(control)
+  setm <- function(x, m) { x[[mediator]] <- if (is.factor(d[[mediator]])) factor(levels(d[[mediator]])[m], levels = levels(d[[mediator]])) else m; x }
+  eff <- t(vapply(seq_len(sims), function(s) {
+    fm <- med; fm$coefficients[] <- Bm[s, ]; fo <- out; fo$coefficients[] <- Bo[s, ]
+    m1 <- simulate(fm, newdata = d1)[, 1]; m0 <- simulate(fm, newdata = d0)[, 1]
+    y <- function(x, m) as.numeric(stats::predict(fo, setm(x, m), type = "mean"))
+    y11 <- y(d1, m1); y10 <- y(d1, m0); y01 <- y(d0, m1); y00 <- y(d0, m0)
+    c(acme0 = mean(y01 - y00), acme1 = mean(y11 - y10), ade0 = mean(y10 - y00), ade1 = mean(y11 - y01), total = mean(y11 - y00))
+  }, numeric(5)))
+  eff <- cbind(eff, acme = (eff[, 1] + eff[, 2]) / 2, ade = (eff[, 3] + eff[, 4]) / 2)
+  eff <- cbind(eff, prop = eff[, "acme"] / eff[, "total"])
+  a <- (1 - level) / 2
+  # Means of the draws; the median for the proportion mediated, a ratio
+  # (as mediation does).
+  est <- colMeans(eff); est["prop"] <- stats::median(eff[, "prop"])
+  data.frame(estimate = est, lower = apply(eff, 2, stats::quantile, a), upper = apply(eff, 2, stats::quantile, 1 - a),
+             p_value = apply(eff, 2, function(v) min(1, 2 * min(mean(v <= 0), mean(v >= 0)))),
+             row.names = c("ACME (control)", "ACME (treated)", "ADE (control)", "ADE (treated)", "Total effect",
+                           "ACME (average)", "ADE (average)", "Prop. mediated"))
+}

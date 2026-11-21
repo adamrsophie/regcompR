@@ -14,7 +14,8 @@ panel_within(
 }
 \arguments{
 \item{formula}{A formula \code{y ~ x1 + x2} without an intercept term
-(absorbed by the unit effects).}
+(absorbed by the unit effects), or \code{y ~ regressors | instruments} for
+instrumental variables.}
 
 \item{data}{A data frame.}
 
@@ -28,7 +29,9 @@ An object of class \code{regcomp_lm}.
 \description{
 Least squares after subtracting the unit means (and, for two way
 effects, after also projecting out time dummies), as \code{plm(model = "within")}. Equal to least squares with unit (and time) dummies, without
-building them.
+building them. A three part formula \code{y ~ x | z} gives the within
+(fixed effects) instrumental variable estimator: two stage least squares
+on the demeaned data, as \code{plm(y ~ x | z, model = "within")}.
 }
 \examples{
 set.seed(1)

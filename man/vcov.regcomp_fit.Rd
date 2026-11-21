@@ -6,18 +6,22 @@
 \usage{
 \method{vcov}{regcomp_fit}(
   object,
-  type = c("model", "sandwich", "quasi", "HC0", "HC1", "HC2", "HC3"),
+  type = c("model", "sandwich", "quasi", "HC0", "HC1", "HC2", "HC3", "HAC"),
   cluster = NULL,
+  lag = NULL,
   ...
 )
 }
 \arguments{
 \item{object}{A fitted model.}
 
-\item{type}{\code{"model"}, \code{"sandwich"} (\code{"HC0"}), \code{"HC1"}, \code{"HC2"}, \code{"HC3"} or \code{"quasi"}.}
+\item{type}{\code{"model"}, \code{"sandwich"} (\code{"HC0"}), \code{"HC1"}, \code{"HC2"}, \code{"HC3"}, \code{"HAC"} or \code{"quasi"}.}
 
 \item{cluster}{Optional cluster identifier: a vector, or a one sided
 formula evaluated in the model data.}
+
+\item{lag}{Maximum lag of the HAC covariance (default
+\code{floor(4 (n / 100)^(2 / 9))}).}
 
 \item{...}{Unused.}
 }
@@ -42,7 +46,10 @@ binomial or Poisson, whose estimates are the same.
 the number of coefficients; \code{"HC2"} and \code{"HC3"} divide each score by
 \code{sqrt(1 - h_i)} and \code{1 - h_i}, with leverages \code{h_i} the diagonal of the
 weighted hat matrix (MacKinnon and White 1985). For a one parameter GLM
-(Poisson, binomial) they equal \code{sandwich::vcovHC()}.
+(Poisson, binomial) they equal \code{sandwich::vcovHC()}. \code{"HAC"} is the
+Newey-West covariance for serially correlated rows (in data order), with
+Bartlett weights \code{1 - l / (lag + 1)}; it equals
+\code{sandwich::NeweyWest(prewhite = FALSE, adjust = FALSE)}.
 }
 \examples{
 set.seed(1)

@@ -4,10 +4,14 @@
 \alias{anova.regcomp_fit}
 \title{Likelihood ratio tests of nested models}
 \usage{
-\method{anova}{regcomp_fit}(object, ...)
+\method{anova}{regcomp_fit}(object, ..., boundary = FALSE)
 }
 \arguments{
 \item{object, ...}{Fitted models.}
+
+\item{boundary}{If \code{TRUE}, p values for an added variance component
+use the 50:50 mixture of chi squares with \code{df - 1} and \code{df} degrees of
+freedom (Self and Liang 1987), as the variance lies on its boundary.}
 }
 \value{
 A data frame of class \code{anova} with degrees of freedom, log

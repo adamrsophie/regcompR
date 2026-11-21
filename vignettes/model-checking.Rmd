@@ -256,3 +256,19 @@ attr(qini(uplift(fu, "t"), up$t, up$y), "qini")
 sm <- data.frame(x = rnorm(15)); sm$y <- rpois(15, exp(0.5 + 0.4 * sm$x))
 skovgaard_test(regcomp(y ~ x, family = "poisson", data = sm), "lambda:x", R = 500)
 ```
+
+## Shrinkage and mediation
+
+`shrink_regcomp()` shrinks slopes by the heuristic factor of van
+Houwelingen and le Cessie, then re-estimates the intercept and the other
+parameters. `mediate_regcomp()` estimates causal mediation effects from a
+mediator and an outcome model of any families.
+
+```{r}
+md <- data.frame(t = rbinom(300, 1, 0.5), x = rnorm(300))
+md$m <- rnorm(300, 0.5 * md$t + 0.3 * md$x); md$y <- rbinom(300, 1, plogis(-0.3 + 0.6 * md$m + 0.3 * md$t))
+mm <- regcomp(m ~ t + x, family = "normal", data = md)
+my <- regcomp(y ~ t + m + x, family = "bernoulli", data = md)
+mediate_regcomp(mm, my, "t", "m", sims = 300)
+attr(shrink_regcomp(my), "shrinkage")
+```
